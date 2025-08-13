@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -50,12 +51,49 @@ func (c *Client) newRequest(method, path string, body interface{}) (*http.Reques
 	return req, nil
 }
 
+func (c *Client) newRequestWithFilter(method, path string, query string, body interface{}) (*http.Request, error) {
+	rel := &url.URL{Path: c.BasePath + path}
+	u := c.BaseURL.ResolveReference(rel)
+	var buf io.ReadWriter
+	if body != nil {
+		jsonStr, _ := json.Marshal(body)
+		buf = bytes.NewBuffer(jsonStr)
+	}
+
+	queryWithFilter := ""
+
+	if len(query) == 0 {
+		queryWithFilter = u.String()
+	} else {
+		queryWithFilter = fmt.Sprintf("%s?%s", u.String(), query)
+	}
+
+	req, err := http.NewRequest(method, queryWithFilter, buf)
+	if err != nil {
+		return nil, err
+	}
+	bearer := "Bearer " + c.Token
+	req.Header.Set("Authorization", bearer)
+	if body != nil {
+		req.Header.Set("Content-Type", jsonapi.MediaType)
+	}
+
+	return req, nil
+}
+
 func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 	resp, err := c.HttpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			// Log the error or handle it appropriately
+			// For now, we'll ignore it as it's a cleanup operation
+			_ = closeErr
+		}
+	}()
+
 	if v != nil {
 		err = json.NewDecoder(resp.Body).Decode(v)
 	}

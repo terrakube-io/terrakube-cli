@@ -29,10 +29,16 @@ type Organization struct {
 type OrganizationAttributes struct {
 
 	// description
-	Description string `json:"description,omitempty"`
+	Description *string `json:"description,omitempty"`
 
 	// name
 	Name string `json:"name,omitempty"`
+
+	// executionMode
+	ExecutionMode *string `json:"executionMode,omitempty"`
+
+	// icon
+	Icon *string `json:"icon,omitempty"`
 }
 
 type OrganizationRelationships struct {

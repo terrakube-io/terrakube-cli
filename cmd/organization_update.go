@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"terrakube/client/models"
 	"fmt"
+	"terrakube/client/models"
 
 	"github.com/spf13/cobra"
 )
@@ -22,6 +22,8 @@ var updateOrganizationCmd = &cobra.Command{
 var OrganizationId string
 var OrganizationUpdateDescription string
 var OrganizationUpdateName string
+var OrganizationUpdateIcon string
+var OrganizationUpdateExecutionMode string
 
 func init() {
 	organizationCmd.AddCommand(updateOrganizationCmd)
@@ -29,6 +31,16 @@ func init() {
 	_ = updateOrganizationCmd.MarkFlagRequired("id")
 	updateOrganizationCmd.Flags().StringVarP(&OrganizationUpdateName, "name", "n", "", "Name of the organization")
 	updateOrganizationCmd.Flags().StringVarP(&OrganizationUpdateDescription, "description", "d", "", "Description of the organization")
+	updateOrganizationCmd.Flags().StringVarP(&OrganizationUpdateExecutionMode, "executionMode", "e", "", "Default execution mode for the organization")
+	updateOrganizationCmd.Flags().StringVarP(&OrganizationUpdateIcon, "icon", "i", "", "Organization icon")
+
+	// Add validation for execution mode
+	updateOrganizationCmd.PreRunE = func(cmd *cobra.Command, args []string) error {
+		if OrganizationUpdateExecutionMode != "" && OrganizationUpdateExecutionMode != "remote" && OrganizationUpdateExecutionMode != "local" {
+			return fmt.Errorf("executionMode must be either 'remote' or 'local'")
+		}
+		return nil
+	}
 }
 
 func updateOrganization() {
@@ -36,8 +48,10 @@ func updateOrganization() {
 
 	organization := models.Organization{
 		Attributes: &models.OrganizationAttributes{
-			Name:        OrganizationUpdateName,
-			Description: OrganizationUpdateDescription,
+			Name:          OrganizationUpdateName,
+			Description:   &OrganizationUpdateDescription,
+			ExecutionMode: &OrganizationUpdateExecutionMode,
+			Icon:          &OrganizationUpdateIcon,
 		},
 		Type: "organization",
 		ID:   OrganizationId,
