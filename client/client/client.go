@@ -63,7 +63,7 @@ func (c *Client) newRequestWithFilter(method, path string, query string, body in
 	queryWithFilter := ""
 
 	if len(query) == 0 {
-		queryWithFilter = fmt.Sprintf("%s", u.String())
+		queryWithFilter = u.String()
 	} else {
 		queryWithFilter = fmt.Sprintf("%s?%s", u.String(), query)
 	}
@@ -86,7 +86,14 @@ func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			// Log the error or handle it appropriately
+			// For now, we'll ignore it as it's a cleanup operation
+			_ = closeErr
+		}
+	}()
+
 	if v != nil {
 		err = json.NewDecoder(resp.Body).Decode(v)
 	}

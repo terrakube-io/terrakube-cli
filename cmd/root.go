@@ -97,19 +97,19 @@ func newClient() *client.Client {
 }
 
 func renderOutput(result interface{}, format string) {
-	switch {
-	case format == "json":
+	switch format {
+	case "json":
 		printJSON, err := json.MarshalIndent(result, "", "    ")
 		if err != nil {
 			log.Fatal("Failed to generate json", err)
 		}
 		fmt.Printf("%s\n", string(printJSON))
-	case format == "tsv":
+	case "tsv":
 		data, _ := splitInterface(result)
 		for _, v := range data {
 			fmt.Println(strings.Join(v[:], "\t"))
 		}
-	case format == "table":
+	case "table":
 		data, header := splitInterface(result)
 		if len(data) > 0 {
 			table := tablewriter.NewWriter(os.Stdout)
@@ -120,7 +120,7 @@ func renderOutput(result interface{}, format string) {
 			table.SetCenterSeparator("|")
 			table.Render()
 		}
-	case format == "none":
+	case "none":
 
 	}
 }
