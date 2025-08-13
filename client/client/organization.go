@@ -1,9 +1,9 @@
 package client
 
 import (
-	"terrakube/client/models"
 	"fmt"
 	"net/http"
+	"terrakube/client/models"
 )
 
 type OrganizationClient struct {
@@ -11,7 +11,7 @@ type OrganizationClient struct {
 }
 
 func (c *OrganizationClient) List(filter string) ([]*models.Organization, error) {
-	req, err := c.Client.newRequest(http.MethodGet, "organization", nil)
+	req, err := c.Client.newRequestWithFilter(http.MethodGet, "organization", filter, nil)
 	if err != nil {
 		return nil, err
 	}
