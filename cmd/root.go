@@ -149,6 +149,21 @@ func splitInterface(input interface{}) ([][]string, []string) {
 				switch fieldValue.Kind() {
 				case reflect.Bool:
 					valueStr = fmt.Sprintf("%t", fieldValue.Bool())
+				case reflect.Ptr:
+					if fieldValue.IsNil() {
+						valueStr = ""
+					} else {
+						// Dereference the pointer and get its value
+						derefValue := fieldValue.Elem()
+						switch derefValue.Kind() {
+						case reflect.String:
+							valueStr = derefValue.String()
+						case reflect.Bool:
+							valueStr = fmt.Sprintf("%t", derefValue.Bool())
+						default:
+							valueStr = fmt.Sprintf("%v", derefValue.Interface())
+						}
+					}
 				default:
 					valueStr = fieldValue.String()
 				}
@@ -171,6 +186,22 @@ func splitInterface(input interface{}) ([][]string, []string) {
 			switch fieldValue.Kind() {
 			case reflect.Bool:
 				valueStr = fmt.Sprintf("%t", fieldValue.Bool())
+			case reflect.Ptr:
+				if fieldValue.IsNil() {
+					valueStr = ""
+				} else {
+					// Dereference the pointer and get its value
+					derefValue := fieldValue.Elem()
+					switch derefValue.Kind() {
+					case reflect.String:
+						valueStr = derefValue.String()
+
+					case reflect.Bool:
+						valueStr = fmt.Sprintf("%t", derefValue.Bool())
+					default:
+						valueStr = fmt.Sprintf("%v", derefValue.Interface())
+					}
+				}
 			default:
 				valueStr = fieldValue.String()
 			}

@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"terrakube/client/models"
 	"fmt"
+	"terrakube/client/models"
 
 	"github.com/spf13/cobra"
 )
@@ -15,6 +15,8 @@ var ModuleCreateDescription string
 var ModuleCreateOrgId string
 var ModuleCreateSource string
 var ModuleCreateProvider string
+var ModuleCreateTagPrefix string
+var ModuleCreateFolder string
 
 var createModuleCmd = &cobra.Command{
 	Use:   "create",
@@ -34,6 +36,8 @@ func init() {
 	createModuleCmd.Flags().StringVarP(&ModuleCreateDescription, "description", "d", "", "Description of the new module")
 	createModuleCmd.Flags().StringVarP(&ModuleCreateSource, "source", "s", "", "Source of the new module")
 	createModuleCmd.Flags().StringVarP(&ModuleCreateProvider, "provider", "p", "", "Provider of the new module")
+	createModuleCmd.Flags().StringVarP(&ModuleCreateTagPrefix, "tag-prefix", "t", "", "Tag prefix of the new module")
+	createModuleCmd.Flags().StringVarP(&ModuleCreateFolder, "folder", "f", "", "Folder of the new module")
 
 }
 
@@ -42,11 +46,12 @@ func createModule() {
 
 	module := models.Module{
 		Attributes: &models.ModuleAttributes{
-			Description:  ModuleCreateDescription,
-			Name:         ModuleCreateName,
-			Source:       ModuleCreateSource,
-			SourceSample: ModuleCreateSource,
-			Provider:     ModuleCreateProvider,
+			Description: ModuleCreateDescription,
+			Name:        ModuleCreateName,
+			Source:      ModuleCreateSource,
+			Provider:    ModuleCreateProvider,
+			TagPrefix:   &ModuleCreateTagPrefix,
+			Folder:      &ModuleCreateFolder,
 		},
 		Type: "module",
 	}

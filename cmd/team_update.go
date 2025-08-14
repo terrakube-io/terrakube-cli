@@ -16,6 +16,10 @@ var TeamUpdateOrgId string
 var TeamUpdateManageProvider bool
 var TeamUpdateManageModule bool
 var TeamUpdateManageWorkspace bool
+var TeamUpdateManageState bool
+var TeamUpdateManageCollection bool
+var TeamUpdateManageVcs bool
+var TeamUpdateManageTemplate bool
 
 var updateTeamCmd = &cobra.Command{
 	Use:   "update",
@@ -37,7 +41,10 @@ func init() {
 	updateTeamCmd.Flags().BoolVarP(&TeamUpdateManageProvider, "manage-provider", "", false, "Manage Provider Permissions")
 	updateTeamCmd.Flags().BoolVarP(&TeamUpdateManageModule, "manage-module", "", false, "Manage Module Permissions")
 	updateTeamCmd.Flags().BoolVarP(&TeamUpdateManageWorkspace, "manage-workspace", "", false, "Manage Workspaces Permissions")
-
+	updateTeamCmd.Flags().BoolVarP(&TeamUpdateManageState, "manage-state", "", false, "Manage State Permissions")
+	updateTeamCmd.Flags().BoolVarP(&TeamUpdateManageCollection, "manage-collection", "", false, "Manage Collection Permissions")
+	updateTeamCmd.Flags().BoolVarP(&TeamUpdateManageVcs, "manage-vcs", "", false, "Manage VCS Permissions")
+	updateTeamCmd.Flags().BoolVarP(&TeamUpdateManageTemplate, "manage-template", "", false, "Manage Template Permissions")
 }
 
 func updateTeam() {
@@ -45,10 +52,14 @@ func updateTeam() {
 
 	team := models.Team{
 		Attributes: &models.TeamAttributes{
-			Name:            TeamUpdateName,
-			ManageWorkspace: TeamUpdateManageWorkspace,
-			ManageModule:    TeamUpdateManageModule,
-			ManageProvider:  TeamUpdateManageProvider,
+			Name:             TeamUpdateName,
+			ManageWorkspace:  TeamUpdateManageWorkspace,
+			ManageModule:     TeamUpdateManageModule,
+			ManageProvider:   TeamUpdateManageProvider,
+			ManageState:      TeamUpdateManageState,
+			ManageCollection: TeamUpdateManageCollection,
+			ManageVcs:        TeamUpdateManageVcs,
+			ManageTemplate:   TeamUpdateManageTemplate,
 		},
 		ID:   TeamId,
 		Type: "Team",

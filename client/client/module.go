@@ -1,9 +1,9 @@
 package client
 
 import (
-	"terrakube/client/models"
 	"fmt"
 	"net/http"
+	"terrakube/client/models"
 )
 
 type ModuleClient struct {
@@ -11,7 +11,7 @@ type ModuleClient struct {
 }
 
 func (c *ModuleClient) List(organizationId string, filter string) ([]*models.Module, error) {
-	req, err := c.Client.newRequest(http.MethodGet, fmt.Sprintf("organization/%v/module", organizationId), nil)
+	req, err := c.Client.newRequestWithFilter(http.MethodGet, fmt.Sprintf("organization/%v/module", organizationId), filter, nil)
 	if err != nil {
 		return nil, err
 	}

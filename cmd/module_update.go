@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"terrakube/client/models"
 	"fmt"
+	"terrakube/client/models"
 
 	"github.com/spf13/cobra"
 )
@@ -16,6 +16,8 @@ var ModuleUpdateName string
 var ModuleUpdateOrgId string
 var ModuleUpdateSource string
 var ModuleUpdateProvider string
+var ModuleUpdateTagPrefix string
+var ModuleUpdateFolder string
 
 var updateModuleCmd = &cobra.Command{
 	Use:   "update",
@@ -31,12 +33,14 @@ func init() {
 	updateModuleCmd.AddCommand(updateOrganizationCmd)
 	updateModuleCmd.Flags().StringVarP(&ModuleId, "id", "", "", "Id of the module (required)")
 	_ = updateModuleCmd.MarkFlagRequired("id")
-	updateModuleCmd.Flags().StringVarP(&ModuleUpdateName, "name", "n", "", "Name of the module")
-	updateModuleCmd.Flags().StringVarP(&ModuleUpdateDescription, "description", "d", "", "Description of the module")
 	updateModuleCmd.Flags().StringVarP(&ModuleUpdateOrgId, "organization-id", "", "", "Organization Id (required)")
 	_ = updateModuleCmd.MarkFlagRequired("organization-id")
+	updateModuleCmd.Flags().StringVarP(&ModuleUpdateName, "name", "n", "", "Name of the module")
+	updateModuleCmd.Flags().StringVarP(&ModuleUpdateDescription, "description", "d", "", "Description of the module")
 	updateModuleCmd.Flags().StringVarP(&ModuleUpdateSource, "source", "s", "", "Source of the module")
 	updateModuleCmd.Flags().StringVarP(&ModuleUpdateProvider, "provider", "p", "", "Provider of the module")
+	updateModuleCmd.Flags().StringVarP(&ModuleUpdateTagPrefix, "tag-prefix", "t", "", "Tag prefix of the module")
+	updateModuleCmd.Flags().StringVarP(&ModuleUpdateFolder, "folder", "f", "", "Folder of the module")
 }
 
 func updateModule() {
@@ -48,6 +52,8 @@ func updateModule() {
 			Description: ModuleUpdateDescription,
 			Source:      ModuleUpdateSource,
 			Provider:    ModuleUpdateProvider,
+			TagPrefix:   &ModuleUpdateTagPrefix,
+			Folder:      &ModuleUpdateFolder,
 		},
 		ID:   ModuleId,
 		Type: "module",

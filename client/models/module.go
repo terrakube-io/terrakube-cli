@@ -41,8 +41,11 @@ type ModuleAttributes struct {
 	// source
 	Source string `json:"source,omitempty"`
 
-	// sourceSample
-	SourceSample string `json:"sourceSample,omitempty"`
+	// tagprefix
+	TagPrefix *string `json:"tagPrefix,omitempty"`
+
+	// folder
+	Folder *string `json:"folder,omitempty"`
 
 	// registryPath
 	RegistryPath string `json:"registryPath,omitempty"`
