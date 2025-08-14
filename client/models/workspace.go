@@ -43,44 +43,14 @@ type WorkspaceAttributes struct {
 }
 
 type WorkspaceRelationships struct {
-
-	// definition
-	Definition *WorkspaceRelationshipsDefinition `json:"definition,omitempty"`
-
-	// environment
-	Environment *WorkspaceRelationshipsEnvironment `json:"environment,omitempty"`
-
 	// job
 	Job *WorkspaceRelationshipsJob `json:"job,omitempty"`
 
 	// organization
 	Organization *WorkspaceRelationshipsOrganization `json:"organization,omitempty"`
 
-	// secret
-	Secret *WorkspaceRelationshipsSecret `json:"secret,omitempty"`
-
 	// variable
 	Variable *WorkspaceRelationshipsVariable `json:"variable,omitempty"`
-}
-
-type WorkspaceRelationshipsDefinition struct {
-
-	// id
-	ID string `json:"id,omitempty"`
-
-	// type
-	// Enum: [definition]
-	Type string `json:"type,omitempty"`
-}
-
-type WorkspaceRelationshipsEnvironment struct {
-
-	// id
-	ID string `json:"id,omitempty"`
-
-	// type
-	// Enum: [environment]
-	Type string `json:"type,omitempty"`
 }
 
 type WorkspaceRelationshipsJob struct {
@@ -100,16 +70,6 @@ type WorkspaceRelationshipsOrganization struct {
 
 	// type
 	// Enum: [organization]
-	Type string `json:"type,omitempty"`
-}
-
-type WorkspaceRelationshipsSecret struct {
-
-	// id
-	ID string `json:"id,omitempty"`
-
-	// type
-	// Enum: [secret]
 	Type string `json:"type,omitempty"`
 }
 
