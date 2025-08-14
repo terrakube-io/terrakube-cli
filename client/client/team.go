@@ -11,7 +11,7 @@ type TeamClient struct {
 }
 
 func (c *TeamClient) List(organizationId string, filter string) ([]*models.Team, error) {
-	req, err := c.Client.newRequest(http.MethodGet, fmt.Sprintf("organization/%v/team", organizationId), nil)
+	req, err := c.Client.newRequestWithFilter(http.MethodGet, fmt.Sprintf("organization/%v/team", organizationId), filter, nil)
 	if err != nil {
 		return nil, err
 	}

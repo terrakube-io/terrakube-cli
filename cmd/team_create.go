@@ -15,6 +15,10 @@ var TeamCreateOrgId string
 var TeamCreateManageProvider bool
 var TeamCreateManageModule bool
 var TeamCreateManageWorkspace bool
+var TeamCreateManageState bool
+var TeamCreateManageCollection bool
+var TeamCreateManageVcs bool
+var TeamCreateManageTemplate bool
 
 var createTeamCmd = &cobra.Command{
 	Use:   "create",
@@ -32,11 +36,12 @@ func init() {
 	createTeamCmd.Flags().StringVarP(&TeamCreateOrgId, "organization-id", "", "", "Organization Id (required)")
 	_ = createTeamCmd.MarkFlagRequired("organization-id")
 	createTeamCmd.Flags().BoolVarP(&TeamCreateManageProvider, "manage-provider", "", false, "Manage Provider Permissions")
-	_ = createTeamCmd.MarkFlagRequired("manage-provider")
 	createTeamCmd.Flags().BoolVarP(&TeamCreateManageModule, "manage-module", "", false, "Manage Module Permissions")
-	_ = createTeamCmd.MarkFlagRequired("manage-module")
 	createTeamCmd.Flags().BoolVarP(&TeamCreateManageWorkspace, "manage-workspace", "", false, "Manage Workspaces Permissions")
-	_ = createTeamCmd.MarkFlagRequired("manage-workspace")
+	createTeamCmd.Flags().BoolVarP(&TeamCreateManageState, "manage-state", "", false, "Manage State Permissions")
+	createTeamCmd.Flags().BoolVarP(&TeamCreateManageCollection, "manage-collection", "", false, "Manage Collection Permissions")
+	createTeamCmd.Flags().BoolVarP(&TeamCreateManageVcs, "manage-vcs", "", false, "Manage VCS Permissions")
+	createTeamCmd.Flags().BoolVarP(&TeamCreateManageTemplate, "manage-template", "", false, "Manage Template Permissions")
 
 }
 
@@ -45,10 +50,14 @@ func createTeam() {
 
 	team := models.Team{
 		Attributes: &models.TeamAttributes{
-			Name:            TeamCreateName,
-			ManageWorkspace: TeamCreateManageWorkspace,
-			ManageModule:    TeamCreateManageModule,
-			ManageProvider:  TeamCreateManageProvider,
+			Name:             TeamCreateName,
+			ManageWorkspace:  TeamCreateManageWorkspace,
+			ManageModule:     TeamCreateManageModule,
+			ManageProvider:   TeamCreateManageProvider,
+			ManageState:      TeamCreateManageState,
+			ManageCollection: TeamCreateManageCollection,
+			ManageVcs:        TeamCreateManageVcs,
+			ManageTemplate:   TeamCreateManageTemplate,
 		},
 		Type: "team",
 	}

@@ -144,7 +144,16 @@ func splitInterface(input interface{}) ([][]string, []string) {
 				if i == 0 {
 					headers = append(headers, attr.Type().Field(j).Name)
 				}
-				row = append(row, attr.Field(j).String())
+				fieldValue := attr.Field(j)
+				var valueStr string
+				switch fieldValue.Kind() {
+				case reflect.Bool:
+					valueStr = fmt.Sprintf("%t", fieldValue.Bool())
+				default:
+					valueStr = fieldValue.String()
+				}
+
+				row = append(row, valueStr)
 			}
 			result = append(result, row)
 		}
@@ -157,7 +166,15 @@ func splitInterface(input interface{}) ([][]string, []string) {
 		attr := reflect.Indirect(reflect.ValueOf(d.FieldByName("Attributes").Interface()))
 		for j := 0; j < attr.NumField(); j++ {
 			headers = append(headers, attr.Type().Field(j).Name)
-			row = append(row, attr.Field(j).String())
+			fieldValue := attr.Field(j)
+			var valueStr string
+			switch fieldValue.Kind() {
+			case reflect.Bool:
+				valueStr = fmt.Sprintf("%t", fieldValue.Bool())
+			default:
+				valueStr = fieldValue.String()
+			}
+			row = append(row, valueStr)
 		}
 		result = append(result, row)
 
