@@ -19,9 +19,7 @@ type Client struct {
 	Module       *ModuleClient
 	Workspace    *WorkspaceClient
 	Variable     *VariableClient
-	Secret       *SecretClient
 	Job          *JobClient
-	Environment  *EnvironmentClient
 	Team         *TeamClient
 	HttpClient   *http.Client
 	BasePath     string
@@ -113,9 +111,7 @@ func NewClient(httpClient *http.Client, token string, baseUrl *url.URL) *Client 
 	c.Module = &ModuleClient{Client: c}
 	c.Workspace = &WorkspaceClient{Client: c}
 	c.Variable = &VariableClient{Client: c}
-	c.Environment = &EnvironmentClient{Client: c}
 	c.Team = &TeamClient{Client: c}
-	c.Secret = &SecretClient{Client: c}
 	c.Job = &JobClient{Client: c}
 
 	// Handle base path
