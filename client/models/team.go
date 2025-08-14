@@ -37,4 +37,16 @@ type TeamAttributes struct {
 
 	// manageProvider
 	ManageProvider bool `json:"manageProvider,omitempty"`
+
+	// manageState
+	ManageState bool `json:"manageState,omitempty"`
+
+	// manageCollection
+	ManageCollection bool `json:"manageCollection,omitempty"`
+
+	// manageVcs
+	ManageVcs bool `json:"manageVcs,omitempty"`
+
+	// manageTemplate
+	ManageTemplate bool `json:"manageTemplate,omitempty"`
 }
