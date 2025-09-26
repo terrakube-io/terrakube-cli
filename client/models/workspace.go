@@ -32,11 +32,23 @@ type WorkspaceAttributes struct {
 	// name
 	Name string `json:"name,omitempty"`
 
+	// description
+	Description string `json:"description,omitempty"`
+
 	// source
 	Source string `json:"source,omitempty"`
 
+	// folder
+	Folder string `json:"folder,omitempty"`
+
+	// Execution mode
+	ExecutionMode string `json:"executionMode,omitempty"`
+
 	// branch
 	Branch string `json:"branch,omitempty"`
+
+	// IaC type
+	IacType string `json:"iacType,omitempty"`
 
 	// terraformVersion
 	TerraformVersion string `json:"terraformVersion,omitempty"`

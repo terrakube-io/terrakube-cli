@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"terrakube/client/models"
 	"fmt"
+	"terrakube/client/models"
 
 	"github.com/spf13/cobra"
 )
@@ -11,14 +11,27 @@ var WorkspaceCreateExample string = `Create a new workspace
     %[1]v workspace create --organization-id 312b4415-806b-47a9-9452-b71f0753136e -n myWorkspace -s https://github.com/terrakube-io/terraform-sample-repository.git -b master -t 0.15.0`
 
 var WorkspaceCreateName string
+var WorkspaceDescription string
+var WorkspaceCreateIacType string
+var WorkspaceCreateFolder string
+var WorkspaceExecutionMode string
 var WorkspaceCreateSource string
 var WorkspaceCreateBranch string
-var WorkspaceCreateTerraformV string
+var WorkspaceCreateCli bool
+var WorkspaceCreateIacV string
 var WorkspaceCreateOrgId string
 var createWorkspaceCmd = &cobra.Command{
 	Use:   "create",
 	Short: "create a workspace",
 	Run: func(cmd *cobra.Command, args []string) {
+		// Adjust branch/source based on CLI flag after flags are parsed
+		if WorkspaceCreateCli {
+			fmt.Println("Creating cli workspace")
+			WorkspaceCreateBranch = "remote-content"
+			WorkspaceCreateSource = "empty"
+		} else {
+			fmt.Println("Creating vcs workspace")
+		}
 		createWorkspace()
 	},
 	Example: fmt.Sprintf(WorkspaceCreateExample, rootCmd.Use),
@@ -32,7 +45,12 @@ func init() {
 	_ = createWorkspaceCmd.MarkFlagRequired("organization-id")
 	createWorkspaceCmd.Flags().StringVarP(&WorkspaceCreateBranch, "branch", "b", "", "Branch of the new workspace")
 	createWorkspaceCmd.Flags().StringVarP(&WorkspaceCreateSource, "source", "s", "", "Source of the new workspace")
-	createWorkspaceCmd.Flags().StringVarP(&WorkspaceCreateTerraformV, "terraform-version", "t", "", "Terraform Version use in the new workspace")
+	createWorkspaceCmd.Flags().StringVarP(&WorkspaceCreateIacV, "iac-version", "v", "", "Terraform/tofu Version use in the new workspace")
+	createWorkspaceCmd.Flags().StringVarP(&WorkspaceCreateFolder, "folder", "f", "/", "Folder of the new workspace")
+	createWorkspaceCmd.Flags().StringVarP(&WorkspaceExecutionMode, "execution-mode", "e", "remote", "Execution mode for workspace")
+	createWorkspaceCmd.Flags().StringVarP(&WorkspaceCreateIacType, "iac-type", "t", "terraform", "IAC Type for workspace")
+	createWorkspaceCmd.Flags().StringVarP(&WorkspaceDescription, "description", "d", "", "Description of the new workspace")
+	createWorkspaceCmd.Flags().BoolVarP(&WorkspaceCreateCli, "cli", "c", false, "Create a CLI workspace")
 }
 
 func createWorkspace() {
@@ -41,9 +59,13 @@ func createWorkspace() {
 	workspace := models.Workspace{
 		Attributes: &models.WorkspaceAttributes{
 			Name:             WorkspaceCreateName,
+			Description:      WorkspaceDescription,
+			Folder:           WorkspaceCreateFolder,
 			Source:           WorkspaceCreateSource,
 			Branch:           WorkspaceCreateBranch,
-			TerraformVersion: WorkspaceCreateTerraformV,
+			IacType:          WorkspaceCreateIacType,
+			ExecutionMode:    WorkspaceExecutionMode,
+			TerraformVersion: WorkspaceCreateIacV,
 		},
 		Type: "workspace",
 	}

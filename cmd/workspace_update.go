@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"terrakube/client/models"
 	"fmt"
+	"terrakube/client/models"
 
 	"github.com/spf13/cobra"
 )
@@ -16,6 +16,10 @@ var WorkspaceUpdateBranch string
 var WorkspaceUpdateTerraformV string
 var WorkspaceUpdateOrgId string
 var WorkspaceUpdateId string
+var WorkspaceUpdateDescription string
+var WorkspaceUpdateFolder string
+var WorkspaceUpdateIacType string
+var WorkspaceUpdateExecutionMode string
 
 var updateWorkspaceCmd = &cobra.Command{
 	Use:   "update",
@@ -35,7 +39,11 @@ func init() {
 	_ = updateWorkspaceCmd.MarkFlagRequired("id")
 	updateWorkspaceCmd.Flags().StringVarP(&WorkspaceUpdateBranch, "branch", "b", "", "Branch of the workspace")
 	updateWorkspaceCmd.Flags().StringVarP(&WorkspaceUpdateSource, "source", "s", "", "Source of the workspace")
-	updateWorkspaceCmd.Flags().StringVarP(&WorkspaceUpdateTerraformV, "terraform-version", "t", "", "Terraform Version use in the workspace")
+	updateWorkspaceCmd.Flags().StringVarP(&WorkspaceUpdateTerraformV, "iac-version", "v", "", "terraform/tofu Version use in the workspace")
+	updateWorkspaceCmd.Flags().StringVarP(&WorkspaceUpdateDescription, "description", "d", "", "Workspace description")
+	updateWorkspaceCmd.Flags().StringVarP(&WorkspaceUpdateFolder, "folder", "f", "/", "Workspace folder")
+	updateWorkspaceCmd.Flags().StringVarP(&WorkspaceUpdateExecutionMode, "execution-mode", "e", "remote", "Workspace execution mode")
+	updateWorkspaceCmd.Flags().StringVarP(&WorkspaceUpdateIacType, "iac-type", "t", "terraform", "Iac type")
 }
 
 func updateWorkspace() {
@@ -44,6 +52,10 @@ func updateWorkspace() {
 	workspace := models.Workspace{
 		Attributes: &models.WorkspaceAttributes{
 			Name:             WorkspaceUpdateName,
+			Description:      WorkspaceUpdateDescription,
+			Folder:           WorkspaceUpdateFolder,
+			IacType:          WorkspaceUpdateIacType,
+			ExecutionMode:    WorkspaceExecutionMode,
 			Branch:           WorkspaceUpdateBranch,
 			Source:           WorkspaceUpdateSource,
 			TerraformVersion: WorkspaceUpdateTerraformV,
