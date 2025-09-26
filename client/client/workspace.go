@@ -1,9 +1,9 @@
 package client
 
 import (
-	"terrakube/client/models"
 	"fmt"
 	"net/http"
+	"terrakube/client/models"
 )
 
 type WorkspaceClient struct {
@@ -11,7 +11,7 @@ type WorkspaceClient struct {
 }
 
 func (c *WorkspaceClient) List(organizationId string, filter string) ([]*models.Workspace, error) {
-	req, err := c.Client.newRequest(http.MethodGet, fmt.Sprintf("organization/%v/workspace", organizationId), nil)
+	req, err := c.Client.newRequestWithFilter(http.MethodGet, fmt.Sprintf("organization/%v/workspace", organizationId), filter, nil)
 	if err != nil {
 		return nil, err
 	}
