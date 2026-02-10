@@ -16,7 +16,7 @@ func captureStdout(t *testing.T, fn func()) string {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 	fn()
-	w.Close()
+	_ = w.Close()
 	out, _ := io.ReadAll(r)
 	os.Stdout = old
 	return string(out)

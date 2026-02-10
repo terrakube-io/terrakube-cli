@@ -235,7 +235,7 @@ func executeCommand(args ...string) (string, error) {
 	rootCmd.SetErr(w)
 	err := rootCmd.Execute()
 
-	w.Close()
+	_ = w.Close()
 	out, _ := io.ReadAll(r)
 	os.Stdout = old
 
