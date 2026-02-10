@@ -15,12 +15,13 @@ jobs:
           - goarch: "386"
             goos: darwin 
     steps:
-    - uses: actions/checkout@v2
-    - uses: wangyoucao577/go-release-action@v1.18
+    - uses: actions/checkout@v4
+    - uses: wangyoucao577/go-release-action@v1.55
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         goos: ${{ matrix.goos }}
         goarch: ${{ matrix.goarch }}
+        goversion: go.mod
         binary_name: "terrakube"
   docker:
     name: Build and Push Docker Image
@@ -57,7 +58,7 @@ jobs:
     name: Bump Homebrew formula
     runs-on: ubuntu-latest
     steps:
-      - uses: mislav/bump-homebrew-formula-action@v1
+      - uses: mislav/bump-homebrew-formula-action@v3
         with:
           formula-name: terrakube
           homebrew-tap: terrakube-io/homebrew-cli
