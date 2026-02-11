@@ -153,6 +153,83 @@ func FixtureJobList() []*terrakube.Job {
 	}
 }
 
+// --- Template ---
+
+func FixtureTemplate() *terrakube.Template {
+	return &terrakube.Template{
+		ID:          "t1a2b3c4-d5e6-7890-abcd-ef1234567890",
+		Name:        "standard-plan",
+		Description: strPtr("Standard Terraform plan template"),
+		Version:     strPtr("1.0.0"),
+		Content:     "flow:\n  - type: terraformPlan",
+	}
+}
+
+func FixtureTemplateList() []*terrakube.Template {
+	return []*terrakube.Template{
+		FixtureTemplate(),
+		{
+			ID:      "t2b3c4d5-e6f7-8901-bcde-f12345678901",
+			Name:    "custom-apply",
+			Version: strPtr("2.0.0"),
+			Content: "flow:\n  - type: terraformApply",
+		},
+	}
+}
+
+// --- VCS ---
+
+func FixtureVCS() *terrakube.VCS {
+	return &terrakube.VCS{
+		ID:             "v1a2b3c4-d5e6-7890-abcd-ef1234567890",
+		Name:           "github-main",
+		Description:    "Main GitHub connection",
+		VcsType:        "GITHUB",
+		ConnectionType: "OAUTH",
+		ClientID:       "client-id-123",
+		ClientSecret:   "client-secret-456",
+		Endpoint:       "https://github.com",
+		APIURL:         "https://api.github.com",
+		Status:         "ACTIVE",
+		Callback:       strPtr("https://app.example.com/callback"),
+	}
+}
+
+func FixtureVCSList() []*terrakube.VCS {
+	return []*terrakube.VCS{
+		FixtureVCS(),
+		{
+			ID:             "v2b3c4d5-e6f7-8901-bcde-f12345678901",
+			Name:           "gitlab-secondary",
+			Description:    "GitLab secondary connection",
+			VcsType:        "GITLAB",
+			ConnectionType: "SSH",
+			Endpoint:       "https://gitlab.com",
+			APIURL:         "https://gitlab.com/api/v4",
+			Status:         "INACTIVE",
+		},
+	}
+}
+
+// --- WorkspaceTag ---
+
+func FixtureWorkspaceTag() *terrakube.WorkspaceTag {
+	return &terrakube.WorkspaceTag{
+		ID:    "wt1a2b3c-d4e5-6789-abcd-ef1234567890",
+		TagID: "tag-prod-001",
+	}
+}
+
+func FixtureWorkspaceTagList() []*terrakube.WorkspaceTag {
+	return []*terrakube.WorkspaceTag{
+		FixtureWorkspaceTag(),
+		{
+			ID:    "wt2b3c4d-e5f6-7890-bcde-f12345678901",
+			TagID: "tag-staging-002",
+		},
+	}
+}
+
 // --- Team ---
 
 func FixtureTeam() *terrakube.Team {

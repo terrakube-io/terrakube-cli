@@ -182,11 +182,12 @@ func resetGlobalFlags() {
 	// Without this, a value set in one test (via flag parsing -> viper binding) bleeds
 	// into subsequent tests because presetRequiredFlags reads viper state.
 	viperKeysToReset := []string{
-		"organization-id", "workspace-id", "id", "name", "api-url", "pat",
+		"organization-id", "organization-name", "workspace-id", "workspace-name",
+		"id", "name", "api-url", "pat",
 		"api_url", "token", "command", "key", "value", "category",
 		"sensitive", "hcl", "filter", "source", "branch", "folder",
 		"execution-mode", "iac-type", "iac-version", "description",
-		"executionMode", "icon", "provider", "tag-prefix",
+		"executionMode", "icon", "provider", "tag-prefix", "tag-id",
 		"manage-provider", "manage-module", "manage-workspace",
 		"manage-state", "manage-collection", "manage-vcs", "manage-template",
 		"cli",
@@ -810,13 +811,15 @@ func TestCmdRootTopLevelCommands(t *testing.T) {
 	resetGlobalFlags()
 
 	expected := map[string]bool{
-		"workspace":    false,
-		"organization": false,
-		"module":       false,
-		"team":         false,
-		"job":          false,
-		"login":        false,
-		"logout":       false,
+		"workspace":     false,
+		"organization":  false,
+		"module":        false,
+		"team":          false,
+		"job":           false,
+		"template":      false,
+		"workspace-tag": false,
+		"login":         false,
+		"logout":        false,
 	}
 
 	for _, sub := range rootCmd.Commands() {
