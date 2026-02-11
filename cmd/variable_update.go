@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"terrakube/client/models"
 
+	terrakube "github.com/denniswebb/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +31,6 @@ var updateVariableCmd = &cobra.Command{
 
 func init() {
 	variableCmd.AddCommand(updateVariableCmd)
-	updateVariableCmd.AddCommand(updateOrganizationCmd)
 	updateVariableCmd.Flags().StringVarP(&VariableId, "id", "", "", "Id of the variable (required)")
 	_ = updateVariableCmd.MarkFlagRequired("id")
 	updateVariableCmd.Flags().StringVarP(&VariableUpdateKey, "key", "k", "", "Key of the variable")
@@ -48,21 +47,19 @@ func init() {
 }
 
 func updateVariable() {
-	client := newClient()
+	client := newTerrakubeClient()
+	ctx := getContext()
 
-	variable := models.Variable{
-		Attributes: &models.VariableAttributes{
-			Key:         VariableUpdateKey,
-			Value:       VariableUpdateValue,
-			Description: VariableUpdateDescription,
-			Sensitive:   VariableUpdateSensitive,
-			Hcl:         VariableUpdateHcl,
-			Category:    VariableUpdateCategory,
-		},
-		ID:   VariableId,
-		Type: "variable",
+	variable := &terrakube.Variable{
+		ID:          VariableId,
+		Key:         VariableUpdateKey,
+		Value:       VariableUpdateValue,
+		Description: VariableUpdateDescription,
+		Sensitive:   VariableUpdateSensitive,
+		Hcl:         VariableUpdateHcl,
+		Category:    VariableUpdateCategory,
 	}
-	err := client.Variable.Update(VariableUpdateOrgId, VariableUpdateWorkspaceId, variable)
+	_, err := client.Variables.Update(ctx, VariableUpdateOrgId, VariableUpdateWorkspaceId, variable)
 
 	if err != nil {
 		fmt.Println(err)

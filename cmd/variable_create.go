@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"terrakube/client/models"
 
+	terrakube "github.com/denniswebb/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
@@ -48,21 +48,19 @@ func init() {
 }
 
 func createVariable() {
-	client := newClient()
+	client := newTerrakubeClient()
+	ctx := getContext()
 
-	variable := models.Variable{
-		Attributes: &models.VariableAttributes{
-			Key:         VariableCreateKey,
-			Value:       VariableCreateValue,
-			Description: VariableCreateDescription,
-			Sensitive:   VariableCreateSensitive,
-			Hcl:         VariableCreateHcl,
-			Category:    VariableCreateCategory,
-		},
-		Type: "variable",
+	variable := &terrakube.Variable{
+		Key:         VariableCreateKey,
+		Value:       VariableCreateValue,
+		Description: VariableCreateDescription,
+		Sensitive:   VariableCreateSensitive,
+		Hcl:         VariableCreateHcl,
+		Category:    VariableCreateCategory,
 	}
 
-	resp, err := client.Variable.Create(VariableCreateOrgId, VariableCreateWorkspaceId, variable)
+	resp, err := client.Variables.Create(ctx, VariableCreateOrgId, VariableCreateWorkspaceId, variable)
 
 	if err != nil {
 		fmt.Println(err)

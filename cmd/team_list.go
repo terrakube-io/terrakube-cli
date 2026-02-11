@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	terrakube "github.com/denniswebb/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
@@ -30,8 +31,10 @@ func init() {
 }
 
 func listTeams() {
-	client := newClient()
-	resp, err := client.Team.List(TeamOrgId, TeamFilter)
+	client := newTerrakubeClient()
+	ctx := getContext()
+
+	resp, err := client.Teams.List(ctx, TeamOrgId, &terrakube.ListOptions{Filter: TeamFilter})
 
 	if err != nil {
 		fmt.Println(err)

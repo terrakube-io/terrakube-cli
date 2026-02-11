@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"terrakube/client/models"
 
+	terrakube "github.com/denniswebb/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +32,6 @@ var updateTeamCmd = &cobra.Command{
 
 func init() {
 	teamCmd.AddCommand(updateTeamCmd)
-	updateTeamCmd.AddCommand(updateOrganizationCmd)
 	updateTeamCmd.Flags().StringVarP(&TeamId, "id", "", "", "Id of the Team (required)")
 	_ = updateTeamCmd.MarkFlagRequired("id")
 	updateTeamCmd.Flags().StringVarP(&TeamUpdateName, "name", "n", "", "Name of the Team")
@@ -48,23 +47,21 @@ func init() {
 }
 
 func updateTeam() {
-	client := newClient()
+	client := newTerrakubeClient()
+	ctx := getContext()
 
-	team := models.Team{
-		Attributes: &models.TeamAttributes{
-			Name:             TeamUpdateName,
-			ManageWorkspace:  TeamUpdateManageWorkspace,
-			ManageModule:     TeamUpdateManageModule,
-			ManageProvider:   TeamUpdateManageProvider,
-			ManageState:      TeamUpdateManageState,
-			ManageCollection: TeamUpdateManageCollection,
-			ManageVcs:        TeamUpdateManageVcs,
-			ManageTemplate:   TeamUpdateManageTemplate,
-		},
-		ID:   TeamId,
-		Type: "Team",
+	team := &terrakube.Team{
+		ID:               TeamId,
+		Name:             TeamUpdateName,
+		ManageWorkspace:  TeamUpdateManageWorkspace,
+		ManageModule:     TeamUpdateManageModule,
+		ManageProvider:   TeamUpdateManageProvider,
+		ManageState:      TeamUpdateManageState,
+		ManageCollection: TeamUpdateManageCollection,
+		ManageVcs:        TeamUpdateManageVcs,
+		ManageTemplate:   TeamUpdateManageTemplate,
 	}
-	err := client.Team.Update(TeamUpdateOrgId, team)
+	_, err := client.Teams.Update(ctx, TeamUpdateOrgId, team)
 
 	if err != nil {
 		fmt.Println(err)

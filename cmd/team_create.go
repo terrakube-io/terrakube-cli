@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"terrakube/client/models"
 
+	terrakube "github.com/denniswebb/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
@@ -46,23 +46,21 @@ func init() {
 }
 
 func createTeam() {
-	client := newClient()
+	client := newTerrakubeClient()
+	ctx := getContext()
 
-	team := models.Team{
-		Attributes: &models.TeamAttributes{
-			Name:             TeamCreateName,
-			ManageWorkspace:  TeamCreateManageWorkspace,
-			ManageModule:     TeamCreateManageModule,
-			ManageProvider:   TeamCreateManageProvider,
-			ManageState:      TeamCreateManageState,
-			ManageCollection: TeamCreateManageCollection,
-			ManageVcs:        TeamCreateManageVcs,
-			ManageTemplate:   TeamCreateManageTemplate,
-		},
-		Type: "team",
+	team := &terrakube.Team{
+		Name:             TeamCreateName,
+		ManageWorkspace:  TeamCreateManageWorkspace,
+		ManageModule:     TeamCreateManageModule,
+		ManageProvider:   TeamCreateManageProvider,
+		ManageState:      TeamCreateManageState,
+		ManageCollection: TeamCreateManageCollection,
+		ManageVcs:        TeamCreateManageVcs,
+		ManageTemplate:   TeamCreateManageTemplate,
 	}
 
-	resp, err := client.Team.Create(TeamCreateOrgId, team)
+	resp, err := client.Teams.Create(ctx, TeamCreateOrgId, team)
 
 	if err != nil {
 		fmt.Println(err)

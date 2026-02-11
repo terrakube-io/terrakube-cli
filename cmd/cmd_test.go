@@ -1505,9 +1505,8 @@ func TestCmdTeamCreatePermissionsInBody(t *testing.T) {
 		t.Errorf("expected request body to contain \"manageWorkspace\":true, got: %s", capturedBody)
 	}
 
-	// Test 2: Without --manage-workspace flag, the field is ABSENT (not false).
-	// BUG: omitempty drops false booleans, so there is no way to distinguish
-	// "user didn't set the flag" from "user explicitly wants false".
+	// Test 2: Without --manage-workspace flag, the field is present as false.
+	// terrakube-go has no omitempty on booleans, so false values are properly sent.
 	resetGlobalFlags()
 	viper.Set("api_url", ts.URL)
 	viper.Set("token", "test-token")
@@ -1530,8 +1529,8 @@ func TestCmdTeamCreatePermissionsInBody(t *testing.T) {
 	data := body["data"].(map[string]interface{})
 	attrs := data["attributes"].(map[string]interface{})
 
-	if _, exists := attrs["manageWorkspace"]; exists {
-		t.Error("expected manageWorkspace to be absent when flag not set (omitempty drops false), but it was present")
+	if _, exists := attrs["manageWorkspace"]; !exists {
+		t.Error("expected manageWorkspace to be present (false value sent by terrakube-go), but it was absent")
 	}
 }
 
@@ -2338,10 +2337,7 @@ func TestCmdModuleDeleteE2E(t *testing.T) {
 
 // ----- Team Update E2E -----
 
-// BUG: team_update.go:35 — updateTeamCmd.AddCommand(updateOrganizationCmd) registers
-// the wrong subcommand (organization update) under team update.
-// BUG: team_update.go:66 — uses Type: "Team" (capital T) instead of "team".
-// BUG: Team boolean omitempty drops false values (same as create).
+// Migrated to terrakube-go: fixes wrong subcommand registration, Type casing, and boolean omitempty bugs.
 func TestCmdTeamUpdateE2E(t *testing.T) {
 	resetGlobalFlags()
 
@@ -2394,9 +2390,9 @@ func TestCmdTeamUpdateE2E(t *testing.T) {
 		t.Errorf("expected manageModule true, got %v", attrs["manageModule"])
 	}
 
-	// BUG: team_update.go uses Type: "Team" (capital T) instead of "team"
-	if data["type"] != "Team" {
-		t.Errorf("expected type 'Team' (BUG: should be 'team'), got %v", data["type"])
+	// terrakube-go correctly uses type "team" (lowercase)
+	if data["type"] != "team" {
+		t.Errorf("expected type 'team', got %v", data["type"])
 	}
 
 	if !strings.Contains(out, "Updated") {

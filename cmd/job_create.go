@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"terrakube/client/models"
 	"fmt"
 
+	terrakube "github.com/denniswebb/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
@@ -34,24 +34,15 @@ func init() {
 }
 
 func createJob() {
-	client := newClient()
+	client := newTerrakubeClient()
+	ctx := getContext()
 
-	job := models.Job{
-		Attributes: &models.JobAttributes{
-			Command: JobCreateCommand,
-		},
-		Type: "job",
-		Relationships: &models.JobRelationships{
-			Workspace: &models.JobRelationshipsWorkspace{
-				Data: &models.JobRelationshipsWorkspaceData{
-					Type: "workspace",
-					ID:   JobCreateWorkspaceId,
-				},
-			},
-		},
+	job := &terrakube.Job{
+		Command:   JobCreateCommand,
+		Workspace: &terrakube.Workspace{ID: JobCreateWorkspaceId},
 	}
 
-	resp, err := client.Job.Create(JobCreateOrgId, job)
+	resp, err := client.Jobs.Create(ctx, JobCreateOrgId, job)
 
 	if err != nil {
 		fmt.Println(err)
