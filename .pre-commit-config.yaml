@@ -1,0 +1,35 @@
+repos:
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v2.8.0
+    hooks:
+      - id: golangci-lint-full
+
+  - repo: local
+    hooks:
+      - id: go-build
+        name: go build
+        entry: go build ./...
+        language: system
+        pass_filenames: false
+        types: [go]
+
+      - id: go-test
+        name: go test
+        entry: go test -race ./...
+        language: system
+        pass_filenames: false
+        types: [go]
+
+      - id: go-mod-tidy
+        name: go mod tidy
+        entry: bash -c 'go mod tidy && git diff --exit-code go.mod go.sum'
+        language: system
+        pass_filenames: false
+        types: [go]
+
+      - id: govulncheck
+        name: govulncheck
+        entry: govulncheck ./...
+        language: system
+        pass_filenames: false
+        types: [go]

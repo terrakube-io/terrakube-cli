@@ -79,6 +79,18 @@ func (c *Client) newRequestWithFilter(method, path string, query string, body in
 	return req, nil
 }
 
+// TODO: do() does not check HTTP status codes. A 401, 403, 404, or 500
+// response is treated identically to a 200. When v is non-nil, the only
+// failure signal is a JSON decode error (e.g., empty body on 500 causes EOF).
+// When v is nil (Update/Delete operations), errors are completely silent —
+// the caller gets nil error even on 500. This needs:
+//   - Check resp.StatusCode and return a structured error for non-2xx responses
+//   - Read and include the response body in the error for debugging
+//   - Update all callers that currently ignore the returned *http.Response
+//   - Update tests in client_test.go (TestDo_500WithValidJSON, TestDo_401Response,
+//     TestDo_404WithJSONError) to assert errors instead of documenting silent success
+//   - Add server error tests for Update/Delete on all resources (currently only
+//     Organization and Variable have them)
 func (c *Client) do(req *http.Request, v interface{}) (*http.Response, error) {
 	resp, err := c.HttpClient.Do(req)
 	if err != nil {

@@ -1,0 +1,20 @@
+[tools]
+go = "1.25.7"
+golangci-lint = "2.8.0"
+"go:golang.org/x/vuln/cmd/govulncheck" = "latest"
+"go:mvdan.cc/gofumpt" = "latest"
+
+[tasks.build]
+run = "go build ./..."
+
+[tasks.test]
+run = "go test -race ./..."
+
+[tasks.lint]
+run = "golangci-lint run ./..."
+
+[tasks.vulncheck]
+run = "govulncheck ./..."
+
+[tasks.check]
+depends = ["build", "test", "lint", "vulncheck"]
