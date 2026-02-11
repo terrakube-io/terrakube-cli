@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	terrakube "github.com/denniswebb/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
@@ -29,8 +30,9 @@ func init() {
 }
 
 func listWorkspaces() {
-	client := newClient()
-	resp, err := client.Workspace.List(WorkspaceOrgId, WorkspaceFilter)
+	client := newTerrakubeClient()
+	ctx := getContext()
+	resp, err := client.Workspaces.List(ctx, WorkspaceOrgId, &terrakube.ListOptions{Filter: WorkspaceFilter})
 
 	if err != nil {
 		fmt.Println(err)

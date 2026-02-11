@@ -29,9 +29,10 @@ func init() {
 }
 
 func deleteWorkspace() {
-	client := newClient()
+	client := newTerrakubeClient()
+	ctx := getContext()
 
-	err := client.Workspace.Delete(WorkspaceDeleteOrgId, WorkspaceDeleteId)
+	err := client.Workspaces.Delete(ctx, WorkspaceDeleteOrgId, WorkspaceDeleteId)
 
 	if err != nil {
 		fmt.Println(err)

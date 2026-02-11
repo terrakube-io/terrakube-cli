@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"terrakube/client/models"
 
+	terrakube "github.com/denniswebb/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
@@ -47,23 +47,22 @@ func init() {
 }
 
 func updateWorkspace() {
-	client := newClient()
+	client := newTerrakubeClient()
+	ctx := getContext()
 
-	workspace := models.Workspace{
-		Attributes: &models.WorkspaceAttributes{
-			Name:             WorkspaceUpdateName,
-			Description:      WorkspaceUpdateDescription,
-			Folder:           WorkspaceUpdateFolder,
-			IacType:          WorkspaceUpdateIacType,
-			ExecutionMode:    WorkspaceExecutionMode,
-			Branch:           WorkspaceUpdateBranch,
-			Source:           WorkspaceUpdateSource,
-			TerraformVersion: WorkspaceUpdateTerraformV,
-		},
-		Type: "workspace",
+	workspace := &terrakube.Workspace{
+		ID:            WorkspaceUpdateId,
+		Name:          WorkspaceUpdateName,
+		Description:   ptrOrNil(WorkspaceUpdateDescription),
+		Folder:        WorkspaceUpdateFolder,
+		IaCType:       WorkspaceUpdateIacType,
+		ExecutionMode: WorkspaceUpdateExecutionMode,
+		Branch:        WorkspaceUpdateBranch,
+		Source:        WorkspaceUpdateSource,
+		IaCVersion:    WorkspaceUpdateTerraformV,
 	}
 
-	err := client.Workspace.Update(WorkspaceUpdateOrgId, workspace)
+	_, err := client.Workspaces.Update(ctx, WorkspaceUpdateOrgId, workspace)
 
 	if err != nil {
 		fmt.Println(err)
