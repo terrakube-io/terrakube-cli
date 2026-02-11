@@ -15,7 +15,21 @@ repos:
 
       - id: go-test
         name: go test
-        entry: go test ./...
+        entry: go test -race ./...
+        language: system
+        pass_filenames: false
+        types: [go]
+
+      - id: go-mod-tidy
+        name: go mod tidy
+        entry: bash -c 'go mod tidy && git diff --exit-code go.mod go.sum'
+        language: system
+        pass_filenames: false
+        types: [go]
+
+      - id: govulncheck
+        name: govulncheck
+        entry: govulncheck ./...
         language: system
         pass_filenames: false
         types: [go]
