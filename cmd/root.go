@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/spf13/viper"
 
+	terrakube "github.com/denniswebb/terrakube-go"
 	"terrakube/client/client"
 )
 
@@ -96,6 +98,32 @@ func newClient() *client.Client {
 	return client.NewClient(nil, viper.GetString("token"), baseURL)
 }
 
+//nolint:unused // used by resource commands during terrakube-go migration
+func newTerrakubeClient() *terrakube.Client {
+	c, err := terrakube.NewClient(
+		terrakube.WithEndpoint(viper.GetString("api_url")),
+		terrakube.WithToken(viper.GetString("token")),
+	)
+	if err != nil {
+		fmt.Printf("Error creating client: %v\n", err)
+		os.Exit(1)
+	}
+	return c
+}
+
+//nolint:unused // used by resource commands during terrakube-go migration
+func getContext() context.Context {
+	return context.Background()
+}
+
+//nolint:unused // used by resource commands during terrakube-go migration
+func ptrOrNil(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
 func renderOutput(result interface{}, format string) {
 	switch format {
 	case "json":
@@ -127,90 +155,97 @@ func renderOutput(result interface{}, format string) {
 
 func splitInterface(input interface{}) ([][]string, []string) {
 	reflectData := reflect.ValueOf(input)
-	headers := make([]string, 0)
-	headers = append(headers, "ID")
+	headers := []string{"ID"}
 	result := make([][]string, 0)
+
 	if reflectData.Kind() == reflect.Slice {
 		for i := 0; i < reflectData.Len(); i++ {
 			data := reflectData.Index(i).Interface()
 			d := reflect.Indirect(reflect.ValueOf(data))
+			row := []string{d.FieldByName("ID").String()}
 
-			row := make([]string, 0)
-			id := d.FieldByName("ID").String()
-			row = append(row, id)
-
-			attr := reflect.Indirect(reflect.ValueOf(d.FieldByName("Attributes").Interface()))
-			for j := 0; j < attr.NumField(); j++ {
-				if i == 0 {
-					headers = append(headers, attr.Type().Field(j).Name)
-				}
-				fieldValue := attr.Field(j)
-				var valueStr string
-				switch fieldValue.Kind() {
-				case reflect.Bool:
-					valueStr = fmt.Sprintf("%t", fieldValue.Bool())
-				case reflect.Ptr:
-					if fieldValue.IsNil() {
-						valueStr = ""
-					} else {
-						// Dereference the pointer and get its value
-						derefValue := fieldValue.Elem()
-						switch derefValue.Kind() {
-						case reflect.String:
-							valueStr = derefValue.String()
-						case reflect.Bool:
-							valueStr = fmt.Sprintf("%t", derefValue.Bool())
-						default:
-							valueStr = fmt.Sprintf("%v", derefValue.Interface())
-						}
-					}
-				default:
-					valueStr = fieldValue.String()
-				}
-
-				row = append(row, valueStr)
+			if isNestedModel(d) {
+				row, headers = appendNestedFields(d, row, headers, i == 0)
+			} else {
+				row, headers = appendFlatFields(d, row, headers, i == 0)
 			}
 			result = append(result, row)
 		}
 	} else {
 		d := reflect.Indirect(reflectData)
-		row := make([]string, 0)
-		id := d.FieldByName("ID").String()
-		row = append(row, id)
+		row := []string{d.FieldByName("ID").String()}
 
-		attr := reflect.Indirect(reflect.ValueOf(d.FieldByName("Attributes").Interface()))
-		for j := 0; j < attr.NumField(); j++ {
-			headers = append(headers, attr.Type().Field(j).Name)
-			fieldValue := attr.Field(j)
-			var valueStr string
-			switch fieldValue.Kind() {
-			case reflect.Bool:
-				valueStr = fmt.Sprintf("%t", fieldValue.Bool())
-			case reflect.Ptr:
-				if fieldValue.IsNil() {
-					valueStr = ""
-				} else {
-					// Dereference the pointer and get its value
-					derefValue := fieldValue.Elem()
-					switch derefValue.Kind() {
-					case reflect.String:
-						valueStr = derefValue.String()
-
-					case reflect.Bool:
-						valueStr = fmt.Sprintf("%t", derefValue.Bool())
-					default:
-						valueStr = fmt.Sprintf("%v", derefValue.Interface())
-					}
-				}
-			default:
-				valueStr = fieldValue.String()
-			}
-			row = append(row, valueStr)
+		if isNestedModel(d) {
+			row, headers = appendNestedFields(d, row, headers, true)
+		} else {
+			row, headers = appendFlatFields(d, row, headers, true)
 		}
 		result = append(result, row)
-
 	}
 	return result, headers
+}
+
+// isNestedModel returns true if the struct has a non-nil Attributes field
+// (old client/models pattern).
+func isNestedModel(d reflect.Value) bool {
+	f := d.FieldByName("Attributes")
+	return f.IsValid() && f.Kind() == reflect.Ptr && !f.IsNil()
+}
+
+// appendNestedFields extracts columns from the old nested Attributes sub-struct.
+func appendNestedFields(d reflect.Value, row []string, headers []string, buildHeaders bool) ([]string, []string) {
+	attr := reflect.Indirect(reflect.ValueOf(d.FieldByName("Attributes").Interface()))
+	for j := 0; j < attr.NumField(); j++ {
+		if buildHeaders {
+			headers = append(headers, attr.Type().Field(j).Name)
+		}
+		row = append(row, formatFieldValue(attr.Field(j)))
+	}
+	return row, headers
+}
+
+// appendFlatFields extracts columns from a flat struct (terrakube-go pattern),
+// skipping the ID field (already handled) and any jsonapi relation fields.
+func appendFlatFields(d reflect.Value, row []string, headers []string, buildHeaders bool) ([]string, []string) {
+	for j := 0; j < d.NumField(); j++ {
+		field := d.Type().Field(j)
+		if field.Name == "ID" || !field.IsExported() {
+			continue
+		}
+		tag := field.Tag.Get("jsonapi")
+		if strings.HasPrefix(tag, "relation,") {
+			continue
+		}
+		if buildHeaders {
+			headers = append(headers, field.Name)
+		}
+		row = append(row, formatFieldValue(d.Field(j)))
+	}
+	return row, headers
+}
+
+func formatFieldValue(fieldValue reflect.Value) string {
+	switch fieldValue.Kind() {
+	case reflect.Bool:
+		return fmt.Sprintf("%t", fieldValue.Bool())
+	case reflect.Ptr:
+		if fieldValue.IsNil() {
+			return ""
+		}
+		derefValue := fieldValue.Elem()
+		switch derefValue.Kind() {
+		case reflect.String:
+			return derefValue.String()
+		case reflect.Bool:
+			return fmt.Sprintf("%t", derefValue.Bool())
+		default:
+			return fmt.Sprintf("%v", derefValue.Interface())
+		}
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return fmt.Sprintf("%d", fieldValue.Int())
+	default:
+		return fieldValue.String()
+	}
 }
 
 func postInitCommands(commands []*cobra.Command) {
