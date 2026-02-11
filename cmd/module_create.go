@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"terrakube/client/models"
 
+	terrakube "github.com/denniswebb/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
@@ -42,21 +42,19 @@ func init() {
 }
 
 func createModule() {
-	client := newClient()
+	client := newTerrakubeClient()
+	ctx := getContext()
 
-	module := models.Module{
-		Attributes: &models.ModuleAttributes{
-			Description: ModuleCreateDescription,
-			Name:        ModuleCreateName,
-			Source:      ModuleCreateSource,
-			Provider:    ModuleCreateProvider,
-			TagPrefix:   &ModuleCreateTagPrefix,
-			Folder:      &ModuleCreateFolder,
-		},
-		Type: "module",
+	module := &terrakube.Module{
+		Name:        ModuleCreateName,
+		Description: ModuleCreateDescription,
+		Source:      ModuleCreateSource,
+		Provider:    ModuleCreateProvider,
+		TagPrefix:   ptrOrNil(ModuleCreateTagPrefix),
+		Folder:      ptrOrNil(ModuleCreateFolder),
 	}
 
-	resp, err := client.Module.Create(ModuleCreateOrgId, module)
+	resp, err := client.Modules.Create(ctx, ModuleCreateOrgId, module)
 
 	if err != nil {
 		fmt.Println(err)

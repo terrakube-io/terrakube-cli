@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"terrakube/client/models"
 
+	terrakube "github.com/denniswebb/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +30,6 @@ var updateModuleCmd = &cobra.Command{
 
 func init() {
 	moduleCmd.AddCommand(updateModuleCmd)
-	updateModuleCmd.AddCommand(updateOrganizationCmd)
 	updateModuleCmd.Flags().StringVarP(&ModuleId, "id", "", "", "Id of the module (required)")
 	_ = updateModuleCmd.MarkFlagRequired("id")
 	updateModuleCmd.Flags().StringVarP(&ModuleUpdateOrgId, "organization-id", "", "", "Organization Id (required)")
@@ -44,21 +43,19 @@ func init() {
 }
 
 func updateModule() {
-	client := newClient()
+	client := newTerrakubeClient()
+	ctx := getContext()
 
-	module := models.Module{
-		Attributes: &models.ModuleAttributes{
-			Name:        ModuleUpdateName,
-			Description: ModuleUpdateDescription,
-			Source:      ModuleUpdateSource,
-			Provider:    ModuleUpdateProvider,
-			TagPrefix:   &ModuleUpdateTagPrefix,
-			Folder:      &ModuleUpdateFolder,
-		},
-		ID:   ModuleId,
-		Type: "module",
+	module := &terrakube.Module{
+		ID:          ModuleId,
+		Name:        ModuleUpdateName,
+		Description: ModuleUpdateDescription,
+		Source:      ModuleUpdateSource,
+		Provider:    ModuleUpdateProvider,
+		TagPrefix:   ptrOrNil(ModuleUpdateTagPrefix),
+		Folder:      ptrOrNil(ModuleUpdateFolder),
 	}
-	err := client.Module.Update(ModuleUpdateOrgId, module)
+	_, err := client.Modules.Update(ctx, ModuleUpdateOrgId, module)
 
 	if err != nil {
 		fmt.Println(err)
@@ -66,5 +63,4 @@ func updateModule() {
 	}
 
 	fmt.Printf("Updated")
-
 }

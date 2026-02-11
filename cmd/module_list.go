@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	terrakube "github.com/denniswebb/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
@@ -30,8 +31,11 @@ func init() {
 }
 
 func listModules() {
-	client := newClient()
-	resp, err := client.Module.List(ModuleOrgId, ModuleFilter)
+	client := newTerrakubeClient()
+	ctx := getContext()
+
+	opts := &terrakube.ListOptions{Filter: ModuleFilter}
+	resp, err := client.Modules.List(ctx, ModuleOrgId, opts)
 
 	if err != nil {
 		fmt.Println(err)
