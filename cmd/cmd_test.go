@@ -2238,3 +2238,521 @@ func TestCmdNewClientUsesViperURL(t *testing.T) {
 		t.Error("expected request to reach test server (proving newClient uses viper api_url), but no request was received")
 	}
 }
+
+// ----- Module Update E2E -----
+
+// BUG: module_update.go:33 — updateModuleCmd.AddCommand(updateOrganizationCmd) registers
+// the wrong subcommand (organization update) under module update. This doesn't break
+// the update command itself, but pollutes the command tree.
+func TestCmdModuleUpdateE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	var receivedBody models.PostBodyModule
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &receivedBody)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand(
+		"module", "update",
+		"--organization-id", "org-abc",
+		"--id", "mod-789",
+		"--name", "updated-mod",
+		"--description", "new desc",
+		"--source", "https://github.com/test/repo.git",
+		"--provider", "azurerm",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if receivedMethod != http.MethodPatch {
+		t.Errorf("expected PATCH, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "organization/org-abc/module/mod-789") {
+		t.Errorf("expected path to contain organization/org-abc/module/mod-789, got %s", receivedPath)
+	}
+	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
+		t.Fatal("expected request body with data and attributes")
+	}
+	if receivedBody.Data.Attributes.Name != "updated-mod" {
+		t.Errorf("expected name 'updated-mod', got %q", receivedBody.Data.Attributes.Name)
+	}
+	if receivedBody.Data.Attributes.Description != "new desc" {
+		t.Errorf("expected description 'new desc', got %q", receivedBody.Data.Attributes.Description)
+	}
+	if receivedBody.Data.Attributes.Source != "https://github.com/test/repo.git" {
+		t.Errorf("expected source 'https://github.com/test/repo.git', got %q", receivedBody.Data.Attributes.Source)
+	}
+	if receivedBody.Data.Attributes.Provider != "azurerm" {
+		t.Errorf("expected provider 'azurerm', got %q", receivedBody.Data.Attributes.Provider)
+	}
+	if !strings.Contains(out, "Updated") {
+		t.Errorf("expected 'Updated' in output, got: %s", out)
+	}
+}
+
+// ----- Module Delete E2E -----
+
+func TestCmdModuleDeleteE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand(
+		"module", "delete",
+		"--organization-id", "org-abc",
+		"--id", "mod-789",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if receivedMethod != http.MethodDelete {
+		t.Errorf("expected DELETE, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "organization/org-abc/module/mod-789") {
+		t.Errorf("expected path to contain organization/org-abc/module/mod-789, got %s", receivedPath)
+	}
+	if !strings.Contains(out, "deleted") {
+		t.Errorf("expected 'deleted' in output, got: %s", out)
+	}
+}
+
+// ----- Team Update E2E -----
+
+// BUG: team_update.go:35 — updateTeamCmd.AddCommand(updateOrganizationCmd) registers
+// the wrong subcommand (organization update) under team update.
+// BUG: team_update.go:66 — uses Type: "Team" (capital T) instead of "team".
+// BUG: Team boolean omitempty drops false values (same as create).
+func TestCmdTeamUpdateE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	var capturedBody []byte
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		capturedBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand(
+		"team", "update",
+		"--organization-id", "org-abc",
+		"--id", "team-789",
+		"--name", "updated-team",
+		"--manage-workspace",
+		"--manage-module",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if receivedMethod != http.MethodPatch {
+		t.Errorf("expected PATCH, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "organization/org-abc/team/team-789") {
+		t.Errorf("expected path to contain organization/org-abc/team/team-789, got %s", receivedPath)
+	}
+
+	// Verify body content via raw JSON
+	var body map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &body); err != nil {
+		t.Fatalf("failed to parse body: %v", err)
+	}
+	data := body["data"].(map[string]interface{})
+	attrs := data["attributes"].(map[string]interface{})
+	if attrs["name"] != "updated-team" {
+		t.Errorf("expected name 'updated-team', got %v", attrs["name"])
+	}
+	if attrs["manageWorkspace"] != true {
+		t.Errorf("expected manageWorkspace true, got %v", attrs["manageWorkspace"])
+	}
+	if attrs["manageModule"] != true {
+		t.Errorf("expected manageModule true, got %v", attrs["manageModule"])
+	}
+
+	// BUG: team_update.go uses Type: "Team" (capital T) instead of "team"
+	if data["type"] != "Team" {
+		t.Errorf("expected type 'Team' (BUG: should be 'team'), got %v", data["type"])
+	}
+
+	if !strings.Contains(out, "Updated") {
+		t.Errorf("expected 'Updated' in output, got: %s", out)
+	}
+}
+
+// ----- Team Delete E2E -----
+
+func TestCmdTeamDeleteE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand(
+		"team", "delete",
+		"--organization-id", "org-abc",
+		"--id", "team-789",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if receivedMethod != http.MethodDelete {
+		t.Errorf("expected DELETE, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "organization/org-abc/team/team-789") {
+		t.Errorf("expected path to contain organization/org-abc/team/team-789, got %s", receivedPath)
+	}
+	if !strings.Contains(out, "deleted") {
+		t.Errorf("expected 'deleted' in output, got: %s", out)
+	}
+}
+
+// ----- Variable Update E2E -----
+
+// BUG: variable_update.go:34 — updateVariableCmd.AddCommand(updateOrganizationCmd) registers
+// the wrong subcommand (organization update) under variable update.
+func TestCmdVariableUpdateE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	var receivedBody models.PostBodyVariable
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &receivedBody)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand(
+		"workspace", "variable", "update",
+		"--organization-id", "org-abc",
+		"--workspace-id", "ws-123",
+		"--id", "var-789",
+		"--key", "UPDATED_KEY",
+		"--value", "new-value",
+		"--category", "ENV",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if receivedMethod != http.MethodPatch {
+		t.Errorf("expected PATCH, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "organization/org-abc/workspace/ws-123/variable/var-789") {
+		t.Errorf("expected path to contain organization/org-abc/workspace/ws-123/variable/var-789, got %s", receivedPath)
+	}
+	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
+		t.Fatal("expected request body with data and attributes")
+	}
+	if receivedBody.Data.Attributes.Key != "UPDATED_KEY" {
+		t.Errorf("expected key 'UPDATED_KEY', got %q", receivedBody.Data.Attributes.Key)
+	}
+	if receivedBody.Data.Attributes.Value != "new-value" {
+		t.Errorf("expected value 'new-value', got %q", receivedBody.Data.Attributes.Value)
+	}
+	if receivedBody.Data.Attributes.Category != "ENV" {
+		t.Errorf("expected category 'ENV', got %q", receivedBody.Data.Attributes.Category)
+	}
+	if !strings.Contains(out, "Updated") {
+		t.Errorf("expected 'Updated' in output, got: %s", out)
+	}
+}
+
+// ----- Variable Delete E2E -----
+
+// BUG: variable_delete.go prints nothing on success — no "deleted" message.
+// This test documents the silent-success behavior.
+func TestCmdVariableDeleteE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	_, err := executeCommand(
+		"workspace", "variable", "delete",
+		"--organization-id", "org-abc",
+		"--workspace-id", "ws-123",
+		"--id", "var-789",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if receivedMethod != http.MethodDelete {
+		t.Errorf("expected DELETE, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "organization/org-abc/workspace/ws-123/variable/var-789") {
+		t.Errorf("expected path to contain organization/org-abc/workspace/ws-123/variable/var-789, got %s", receivedPath)
+	}
+	// No output assertion — variable_delete.go has no fmt.Print on success (BUG)
+}
+
+// ----- Job List E2E -----
+
+func TestCmdJobListE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+
+		resp := models.GetBodyJob{
+			Data: []*models.Job{
+				{
+					ID: "job-1",
+					Attributes: &models.JobAttributes{
+						Command: "plan",
+						Status:  "completed",
+					},
+					Type: "job",
+				},
+				{
+					ID: "job-2",
+					Attributes: &models.JobAttributes{
+						Command: "apply",
+						Status:  "pending",
+					},
+					Type: "job",
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand("job", "list", "--organization-id", "org-abc")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if receivedMethod != http.MethodGet {
+		t.Errorf("expected GET, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "organization/org-abc/job") {
+		t.Errorf("expected path to contain organization/org-abc/job, got %s", receivedPath)
+	}
+	if !strings.Contains(out, "job-1") {
+		t.Errorf("expected output to contain 'job-1', got: %s", out)
+	}
+	if !strings.Contains(out, "job-2") {
+		t.Errorf("expected output to contain 'job-2', got: %s", out)
+	}
+}
+
+// ----- Module Update Missing Flags -----
+
+func TestCmdModuleUpdateMissingId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("module", "update", "--organization-id", "org-123")
+	if err == nil {
+		t.Fatal("expected error for module update without --id, got nil")
+	}
+	if !strings.Contains(err.Error(), "id") {
+		t.Errorf("expected error to mention id, got: %v", err)
+	}
+}
+
+func TestCmdModuleUpdateMissingOrgId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("module", "update", "--id", "mod-123")
+	if err == nil {
+		t.Fatal("expected error for module update without --organization-id, got nil")
+	}
+	if !strings.Contains(err.Error(), "organization-id") {
+		t.Errorf("expected error to mention organization-id, got: %v", err)
+	}
+}
+
+// ----- Module Delete Missing Flags -----
+
+func TestCmdModuleDeleteMissingId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("module", "delete", "--organization-id", "org-123")
+	if err == nil {
+		t.Fatal("expected error for module delete without --id, got nil")
+	}
+	if !strings.Contains(err.Error(), "id") {
+		t.Errorf("expected error to mention id, got: %v", err)
+	}
+}
+
+func TestCmdModuleDeleteMissingOrgId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("module", "delete", "--id", "mod-123")
+	if err == nil {
+		t.Fatal("expected error for module delete without --organization-id, got nil")
+	}
+	if !strings.Contains(err.Error(), "organization-id") {
+		t.Errorf("expected error to mention organization-id, got: %v", err)
+	}
+}
+
+// ----- Team Update Missing Flags -----
+
+func TestCmdTeamUpdateMissingId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("team", "update", "--organization-id", "org-123")
+	if err == nil {
+		t.Fatal("expected error for team update without --id, got nil")
+	}
+	if !strings.Contains(err.Error(), "id") {
+		t.Errorf("expected error to mention id, got: %v", err)
+	}
+}
+
+func TestCmdTeamUpdateMissingOrgId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("team", "update", "--id", "team-123")
+	if err == nil {
+		t.Fatal("expected error for team update without --organization-id, got nil")
+	}
+	if !strings.Contains(err.Error(), "organization-id") {
+		t.Errorf("expected error to mention organization-id, got: %v", err)
+	}
+}
+
+// ----- Team Delete Missing Flags -----
+
+func TestCmdTeamDeleteMissingId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("team", "delete", "--organization-id", "org-123")
+	if err == nil {
+		t.Fatal("expected error for team delete without --id, got nil")
+	}
+	if !strings.Contains(err.Error(), "id") {
+		t.Errorf("expected error to mention id, got: %v", err)
+	}
+}
+
+func TestCmdTeamDeleteMissingOrgId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("team", "delete", "--id", "team-123")
+	if err == nil {
+		t.Fatal("expected error for team delete without --organization-id, got nil")
+	}
+	if !strings.Contains(err.Error(), "organization-id") {
+		t.Errorf("expected error to mention organization-id, got: %v", err)
+	}
+}
+
+// ----- Variable Update Missing Flags -----
+
+func TestCmdVariableUpdateMissingId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("workspace", "variable", "update", "--organization-id", "org-123", "--workspace-id", "ws-123")
+	if err == nil {
+		t.Fatal("expected error for variable update without --id, got nil")
+	}
+	if !strings.Contains(err.Error(), "id") {
+		t.Errorf("expected error to mention id, got: %v", err)
+	}
+}
+
+func TestCmdVariableUpdateMissingOrgId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("workspace", "variable", "update", "--id", "var-123", "--workspace-id", "ws-123")
+	if err == nil {
+		t.Fatal("expected error for variable update without --organization-id, got nil")
+	}
+	if !strings.Contains(err.Error(), "organization-id") {
+		t.Errorf("expected error to mention organization-id, got: %v", err)
+	}
+}
+
+func TestCmdVariableUpdateMissingWorkspaceId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("workspace", "variable", "update", "--organization-id", "org-123", "--id", "var-123")
+	if err == nil {
+		t.Fatal("expected error for variable update without --workspace-id, got nil")
+	}
+	if !strings.Contains(err.Error(), "workspace-id") {
+		t.Errorf("expected error to mention workspace-id, got: %v", err)
+	}
+}
+
+// ----- Variable Delete Missing Flags -----
+
+func TestCmdVariableDeleteMissingId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("workspace", "variable", "delete", "--organization-id", "org-123", "--workspace-id", "ws-123")
+	if err == nil {
+		t.Fatal("expected error for variable delete without --id, got nil")
+	}
+	if !strings.Contains(err.Error(), "id") {
+		t.Errorf("expected error to mention id, got: %v", err)
+	}
+}
+
+func TestCmdVariableDeleteMissingOrgId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("workspace", "variable", "delete", "--id", "var-123", "--workspace-id", "ws-123")
+	if err == nil {
+		t.Fatal("expected error for variable delete without --organization-id, got nil")
+	}
+	if !strings.Contains(err.Error(), "organization-id") {
+		t.Errorf("expected error to mention organization-id, got: %v", err)
+	}
+}
+
+func TestCmdVariableDeleteMissingWorkspaceId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("workspace", "variable", "delete", "--organization-id", "org-123", "--id", "var-123")
+	if err == nil {
+		t.Fatal("expected error for variable delete without --workspace-id, got nil")
+	}
+	if !strings.Contains(err.Error(), "workspace-id") {
+		t.Errorf("expected error to mention workspace-id, got: %v", err)
+	}
+}
