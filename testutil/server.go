@@ -1,7 +1,6 @@
 package testutil
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/google/jsonapi"
 )
 
 // RecordedRequest holds captured details of an HTTP request made to the test server.
@@ -76,7 +77,7 @@ func NewTestServer(t *testing.T) *TestServer {
 		w.WriteHeader(matched.statusCode)
 
 		if matched.responseBody != nil {
-			if err := json.NewEncoder(w).Encode(matched.responseBody); err != nil {
+			if err := jsonapi.MarshalPayload(w, matched.responseBody); err != nil {
 				t.Errorf("failed to encode response body: %v", err)
 			}
 		}
@@ -87,7 +88,7 @@ func NewTestServer(t *testing.T) *TestServer {
 }
 
 // On registers a canned response for the given method and path prefix.
-// responseBody will be JSON-marshaled in the response.
+// responseBody will be JSON:API-marshaled in the response.
 func (ts *TestServer) On(method, path string, statusCode int, responseBody interface{}) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()

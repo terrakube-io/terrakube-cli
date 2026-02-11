@@ -30,7 +30,7 @@ func init() {
 }
 
 func deleteModule() {
-	client := newTerrakubeClient()
+	client := newClient()
 	ctx := getContext()
 
 	err := client.Modules.Delete(ctx, ModuleDeleteOrgId, ModuleDeleteId)

@@ -34,7 +34,7 @@ func init() {
 }
 
 func createJob() {
-	client := newTerrakubeClient()
+	client := newClient()
 	ctx := getContext()
 
 	job := &terrakube.Job{

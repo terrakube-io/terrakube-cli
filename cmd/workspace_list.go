@@ -30,7 +30,7 @@ func init() {
 }
 
 func listWorkspaces() {
-	client := newTerrakubeClient()
+	client := newClient()
 	ctx := getContext()
 	resp, err := client.Workspaces.List(ctx, WorkspaceOrgId, &terrakube.ListOptions{Filter: WorkspaceFilter})
 

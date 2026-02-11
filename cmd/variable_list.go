@@ -34,7 +34,7 @@ func init() {
 }
 
 func listVariables() {
-	client := newTerrakubeClient()
+	client := newClient()
 	ctx := getContext()
 
 	opts := &terrakube.ListOptions{Filter: VariableFilter}

@@ -28,7 +28,7 @@ func init() {
 }
 
 func listOrganizations() {
-	client := newTerrakubeClient()
+	client := newClient()
 	ctx := getContext()
 
 	opts := &terrakube.ListOptions{Filter: OrganizationFilter}

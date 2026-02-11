@@ -54,7 +54,7 @@ func init() {
 }
 
 func createWorkspace() {
-	client := newTerrakubeClient()
+	client := newClient()
 	ctx := getContext()
 
 	workspace := &terrakube.Workspace{

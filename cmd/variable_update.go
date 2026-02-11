@@ -47,7 +47,7 @@ func init() {
 }
 
 func updateVariable() {
-	client := newTerrakubeClient()
+	client := newClient()
 	ctx := getContext()
 
 	variable := &terrakube.Variable{

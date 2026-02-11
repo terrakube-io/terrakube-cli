@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"terrakube/client/models"
-
+	terrakube "github.com/denniswebb/terrakube-go"
+	"github.com/google/jsonapi"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -478,32 +478,24 @@ func TestCmdWorkspaceCreateCliFlag(t *testing.T) {
 	resetGlobalFlags()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var reqBody models.PostBodyWorkspace
 		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &reqBody)
+		var bodyMap map[string]interface{}
+		_ = json.Unmarshal(body, &bodyMap)
 
-		if reqBody.Data != nil && reqBody.Data.Attributes != nil {
-			if reqBody.Data.Attributes.Source != "empty" {
-				t.Errorf("expected source 'empty' when --cli is set, got %q", reqBody.Data.Attributes.Source)
-			}
-			if reqBody.Data.Attributes.Branch != "remote-content" {
-				t.Errorf("expected branch 'remote-content' when --cli is set, got %q", reqBody.Data.Attributes.Branch)
+		if data, ok := bodyMap["data"].(map[string]interface{}); ok {
+			if attrs, ok := data["attributes"].(map[string]interface{}); ok {
+				if attrs["source"] != "empty" {
+					t.Errorf("expected source 'empty' when --cli is set, got %q", attrs["source"])
+				}
+				if attrs["branch"] != "remote-content" {
+					t.Errorf("expected branch 'remote-content' when --cli is set, got %q", attrs["branch"])
+				}
 			}
 		}
 
-		resp := models.PostBodyWorkspace{
-			Data: &models.Workspace{
-				ID: "ws-new",
-				Attributes: &models.WorkspaceAttributes{
-					Name:   "cli-ws",
-					Source: "empty",
-					Branch: "remote-content",
-				},
-				Type: "workspace",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		ws := &terrakube.Workspace{ID: "ws-new", Name: "cli-ws", Source: "empty", Branch: "remote-content"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, ws)
 	})
 
 	ts := setupTestServer(handler)
@@ -536,19 +528,9 @@ func TestCmdWorkspaceCreateWithoutCliFlag(t *testing.T) {
 	resetGlobalFlags()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := models.PostBodyWorkspace{
-			Data: &models.Workspace{
-				ID: "ws-new",
-				Attributes: &models.WorkspaceAttributes{
-					Name:   "vcs-ws",
-					Source: "https://github.com/example/repo.git",
-					Branch: "main",
-				},
-				Type: "workspace",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		ws := &terrakube.Workspace{ID: "ws-new", Name: "vcs-ws", Source: "https://github.com/example/repo.git", Branch: "main"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, ws)
 	})
 
 	ts := setupTestServer(handler)
@@ -890,21 +872,9 @@ func TestCmdWorkspaceListE2E(t *testing.T) {
 			t.Errorf("unexpected auth header: %s", r.Header.Get("Authorization"))
 		}
 
-		resp := models.GetBodyWorkspace{
-			Data: []*models.Workspace{
-				{
-					ID: "ws-1",
-					Attributes: &models.WorkspaceAttributes{
-						Name:   "workspace-one",
-						Source: "https://github.com/example/repo.git",
-						Branch: "main",
-					},
-					Type: "workspace",
-				},
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		workspaces := []*terrakube.Workspace{{ID: "ws-1", Name: "workspace-one", Source: "https://github.com/example/repo.git", Branch: "main"}}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, workspaces)
 	})
 
 	ts := setupTestServer(handler)
@@ -928,20 +898,9 @@ func TestCmdOrganizationListE2E(t *testing.T) {
 
 	desc := "test desc"
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := models.GetBodyOrganization{
-			Data: []*models.Organization{
-				{
-					ID: "org-1",
-					Attributes: &models.OrganizationAttributes{
-						Name:        "org-one",
-						Description: &desc,
-					},
-					Type: "organization",
-				},
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		orgs := []*terrakube.Organization{{ID: "org-1", Name: "org-one", Description: &desc}}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, orgs)
 	})
 
 	ts := setupTestServer(handler)
@@ -960,24 +919,14 @@ func TestCmdOrganizationListE2E(t *testing.T) {
 func TestCmdOrganizationCreateE2E(t *testing.T) {
 	resetGlobalFlags()
 
-	var receivedBody models.PostBodyOrganization
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		// consume body
+		_, _ = io.ReadAll(r.Body)
 
 		desc := "test org"
-		resp := models.PostBodyOrganization{
-			Data: &models.Organization{
-				ID: "org-new",
-				Attributes: &models.OrganizationAttributes{
-					Name:        "new-org",
-					Description: &desc,
-				},
-				Type: "organization",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		org := &terrakube.Organization{ID: "org-new", Name: "new-org", Description: &desc}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, org)
 	})
 
 	ts := setupTestServer(handler)
@@ -996,25 +945,13 @@ func TestCmdOrganizationCreateE2E(t *testing.T) {
 func TestCmdWorkspaceCreateE2E(t *testing.T) {
 	resetGlobalFlags()
 
-	var receivedBody models.PostBodyWorkspace
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		// consume body
+		_, _ = io.ReadAll(r.Body)
 
-		resp := models.PostBodyWorkspace{
-			Data: &models.Workspace{
-				ID: "ws-new",
-				Attributes: &models.WorkspaceAttributes{
-					Name:          "test-ws",
-					Folder:        "/modules",
-					ExecutionMode: "remote",
-					IacType:       "terraform",
-				},
-				Type: "workspace",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		ws := &terrakube.Workspace{ID: "ws-new", Name: "test-ws", Folder: "/modules", ExecutionMode: "remote", IaCType: "terraform"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, ws)
 	})
 
 	ts := setupTestServer(handler)
@@ -1100,18 +1037,9 @@ func TestCmdWorkspaceCreateOutputContainsJSON(t *testing.T) {
 	resetGlobalFlags()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := models.PostBodyWorkspace{
-			Data: &models.Workspace{
-				ID: "ws-json-test",
-				Attributes: &models.WorkspaceAttributes{
-					Name:   "json-ws",
-					Folder: "/",
-				},
-				Type: "workspace",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		ws := &terrakube.Workspace{ID: "ws-json-test", Name: "json-ws", Folder: "/"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, ws)
 	})
 
 	ts := setupTestServer(handler)
@@ -1154,24 +1082,17 @@ func TestCmdWorkspaceCreateOutputContainsJSON(t *testing.T) {
 func TestCmdWorkspaceCreateSendsCorrectBody(t *testing.T) {
 	resetGlobalFlags()
 
-	var receivedBody models.PostBodyWorkspace
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
 
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 
-		resp := models.PostBodyWorkspace{
-			Data: &models.Workspace{
-				ID:         "ws-resp",
-				Attributes: &models.WorkspaceAttributes{Name: "body-test"},
-				Type:       "workspace",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		ws := &terrakube.Workspace{ID: "ws-resp", Name: "body-test"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, ws)
 	})
 
 	ts := setupTestServer(handler)
@@ -1193,57 +1114,55 @@ func TestCmdWorkspaceCreateSendsCorrectBody(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if receivedBody.Data == nil {
-		t.Fatal("expected request body to contain data, got nil")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	attrs := receivedBody.Data.Attributes
-	if attrs == nil {
-		t.Fatal("expected request body data to contain attributes, got nil")
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body to contain data")
 	}
-	if attrs.Name != "body-test" {
-		t.Errorf("expected name 'body-test', got %q", attrs.Name)
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
 	}
-	if attrs.Source != "https://github.com/test/repo.git" {
-		t.Errorf("expected source 'https://github.com/test/repo.git', got %q", attrs.Source)
+	if attrs["name"] != "body-test" {
+		t.Errorf("expected name 'body-test', got %v", attrs["name"])
 	}
-	if attrs.Branch != "develop" {
-		t.Errorf("expected branch 'develop', got %q", attrs.Branch)
+	if attrs["source"] != "https://github.com/test/repo.git" {
+		t.Errorf("expected source 'https://github.com/test/repo.git', got %v", attrs["source"])
 	}
-	if attrs.TerraformVersion != "1.5.0" {
-		t.Errorf("expected iac-version '1.5.0', got %q", attrs.TerraformVersion)
+	if attrs["branch"] != "develop" {
+		t.Errorf("expected branch 'develop', got %v", attrs["branch"])
 	}
-	if attrs.Folder != "/infra" {
-		t.Errorf("expected folder '/infra', got %q", attrs.Folder)
+	if attrs["terraformVersion"] != "1.5.0" {
+		t.Errorf("expected iac-version '1.5.0', got %v", attrs["terraformVersion"])
 	}
-	if attrs.ExecutionMode != "local" {
-		t.Errorf("expected execution-mode 'local', got %q", attrs.ExecutionMode)
+	if attrs["folder"] != "/infra" {
+		t.Errorf("expected folder '/infra', got %v", attrs["folder"])
 	}
-	if attrs.IacType != "tofu" {
-		t.Errorf("expected iac-type 'tofu', got %q", attrs.IacType)
+	if attrs["executionMode"] != "local" {
+		t.Errorf("expected execution-mode 'local', got %v", attrs["executionMode"])
 	}
-	if attrs.Description != "a test workspace" {
-		t.Errorf("expected description 'a test workspace', got %q", attrs.Description)
+	if attrs["iacType"] != "tofu" {
+		t.Errorf("expected iac-type 'tofu', got %v", attrs["iacType"])
+	}
+	if attrs["description"] != "a test workspace" {
+		t.Errorf("expected description 'a test workspace', got %v", attrs["description"])
 	}
 }
 
 func TestCmdOrganizationCreateSendsCorrectBody(t *testing.T) {
 	resetGlobalFlags()
 
-	var receivedBody models.PostBodyOrganization
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 
 		desc := "org desc"
-		resp := models.PostBodyOrganization{
-			Data: &models.Organization{
-				ID:         "org-resp",
-				Attributes: &models.OrganizationAttributes{Name: "body-org", Description: &desc},
-				Type:       "organization",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		org := &terrakube.Organization{ID: "org-resp", Name: "body-org", Description: &desc}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, org)
 	})
 
 	ts := setupTestServer(handler)
@@ -1259,15 +1178,20 @@ func TestCmdOrganizationCreateSendsCorrectBody(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if receivedBody.Data == nil {
-		t.Fatal("expected request body to contain data, got nil")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	attrs := receivedBody.Data.Attributes
-	if attrs == nil {
-		t.Fatal("expected request body data to contain attributes, got nil")
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body to contain data")
 	}
-	if attrs.Name != "body-org" {
-		t.Errorf("expected name 'body-org', got %q", attrs.Name)
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
+	}
+	if attrs["name"] != "body-org" {
+		t.Errorf("expected name 'body-org', got %v", attrs["name"])
 	}
 }
 
@@ -1341,15 +1265,9 @@ func TestCmdOrganizationCreateValidExecutionModes(t *testing.T) {
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		desc := ""
-		resp := models.PostBodyOrganization{
-			Data: &models.Organization{
-				ID:         "org-ok",
-				Attributes: &models.OrganizationAttributes{Name: "ok-org", Description: &desc},
-				Type:       "organization",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		org := &terrakube.Organization{ID: "org-ok", Name: "ok-org", Description: &desc}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, org)
 	})
 
 	ts := setupTestServer(handler)
@@ -1436,15 +1354,9 @@ func TestCmdWorkspaceCreateShortFlags(t *testing.T) {
 	resetGlobalFlags()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := models.PostBodyWorkspace{
-			Data: &models.Workspace{
-				ID:         "ws-short",
-				Attributes: &models.WorkspaceAttributes{Name: "short-ws"},
-				Type:       "workspace",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		ws := &terrakube.Workspace{ID: "ws-short", Name: "short-ws"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, ws)
 	})
 
 	ts := setupTestServer(handler)
@@ -1474,18 +1386,9 @@ func TestCmdTeamCreatePermissionsInBody(t *testing.T) {
 	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedBody, _ = io.ReadAll(r.Body)
-		resp := models.PostBodyTeam{
-			Data: &models.Team{
-				ID: "team-new",
-				Attributes: &models.TeamAttributes{
-					Name:            "test-team",
-					ManageWorkspace: true,
-				},
-				Type: "team",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		team := &terrakube.Team{ID: "team-new", Name: "test-team", ManageWorkspace: true}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, team)
 	})
 
 	ts := setupTestServer(handler)
@@ -1541,12 +1444,11 @@ func TestCmdOrganizationUpdateE2E(t *testing.T) {
 
 	var receivedMethod string
 	var receivedPath string
-	var receivedBody models.PostBodyOrganization
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -1569,11 +1471,20 @@ func TestCmdOrganizationUpdateE2E(t *testing.T) {
 	if !strings.Contains(receivedPath, "organization/org-123") {
 		t.Errorf("expected path to contain organization/org-123, got %s", receivedPath)
 	}
-	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
-		t.Fatal("expected request body with data and attributes")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	if receivedBody.Data.Attributes.Name != "updated-org" {
-		t.Errorf("expected name 'updated-org', got %q", receivedBody.Data.Attributes.Name)
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
+	}
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
+	}
+	if attrs["name"] != "updated-org" {
+		t.Errorf("expected name 'updated-org', got %v", attrs["name"])
 	}
 	if !strings.Contains(out, "Updated") {
 		t.Errorf("expected 'Updated' in output, got: %s", out)
@@ -1616,12 +1527,11 @@ func TestCmdWorkspaceUpdateE2E(t *testing.T) {
 
 	var receivedMethod string
 	var receivedPath string
-	var receivedBody models.PostBodyWorkspace
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -1651,17 +1561,26 @@ func TestCmdWorkspaceUpdateE2E(t *testing.T) {
 	if !strings.Contains(receivedPath, "organization/org-abc/workspace/") {
 		t.Errorf("expected path to contain organization/org-abc/workspace/, got %s", receivedPath)
 	}
-	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
-		t.Fatal("expected request body with data and attributes")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	if receivedBody.Data.Attributes.Name != "updated-ws" {
-		t.Errorf("expected name 'updated-ws', got %q", receivedBody.Data.Attributes.Name)
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
 	}
-	if receivedBody.Data.Attributes.Branch != "develop" {
-		t.Errorf("expected branch 'develop', got %q", receivedBody.Data.Attributes.Branch)
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
 	}
-	if receivedBody.Data.Attributes.TerraformVersion != "1.6.0" {
-		t.Errorf("expected iac-version '1.6.0', got %q", receivedBody.Data.Attributes.TerraformVersion)
+	if attrs["name"] != "updated-ws" {
+		t.Errorf("expected name 'updated-ws', got %v", attrs["name"])
+	}
+	if attrs["branch"] != "develop" {
+		t.Errorf("expected branch 'develop', got %v", attrs["branch"])
+	}
+	if attrs["terraformVersion"] != "1.6.0" {
+		t.Errorf("expected iac-version '1.6.0', got %v", attrs["terraformVersion"])
 	}
 	if !strings.Contains(out, "Updated") {
 		t.Errorf("expected 'Updated' in output, got: %s", out)
@@ -1708,26 +1627,15 @@ func TestCmdModuleCreateE2E(t *testing.T) {
 
 	var receivedMethod string
 	var receivedPath string
-	var receivedBody models.PostBodyModule
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 
-		resp := models.PostBodyModule{
-			Data: &models.Module{
-				ID: "mod-new",
-				Attributes: &models.ModuleAttributes{
-					Name:     "test-mod",
-					Provider: "azurerm",
-					Source:   "https://github.com/test/repo.git",
-				},
-				Type: "module",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		mod := &terrakube.Module{ID: "mod-new", Name: "test-mod", Provider: "azurerm", Source: "https://github.com/test/repo.git"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, mod)
 	})
 
 	ts := setupTestServer(handler)
@@ -1751,14 +1659,23 @@ func TestCmdModuleCreateE2E(t *testing.T) {
 	if !strings.Contains(receivedPath, "organization/org-abc/module") {
 		t.Errorf("expected path to contain organization/org-abc/module, got %s", receivedPath)
 	}
-	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
-		t.Fatal("expected request body with data and attributes")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	if receivedBody.Data.Attributes.Name != "test-mod" {
-		t.Errorf("expected name 'test-mod', got %q", receivedBody.Data.Attributes.Name)
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
 	}
-	if receivedBody.Data.Attributes.Provider != "azurerm" {
-		t.Errorf("expected provider 'azurerm', got %q", receivedBody.Data.Attributes.Provider)
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
+	}
+	if attrs["name"] != "test-mod" {
+		t.Errorf("expected name 'test-mod', got %v", attrs["name"])
+	}
+	if attrs["provider"] != "azurerm" {
+		t.Errorf("expected provider 'azurerm', got %v", attrs["provider"])
 	}
 	if !strings.Contains(out, "mod-new") {
 		t.Errorf("expected output to contain 'mod-new', got: %s", out)
@@ -1776,20 +1693,9 @@ func TestCmdModuleListE2E(t *testing.T) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
 
-		resp := models.GetBodyModule{
-			Data: []*models.Module{
-				{
-					ID: "mod-1",
-					Attributes: &models.ModuleAttributes{
-						Name:     "module-one",
-						Provider: "aws",
-					},
-					Type: "module",
-				},
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		modules := []*terrakube.Module{{ID: "mod-1", Name: "module-one", Provider: "aws"}}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, modules)
 	})
 
 	ts := setupTestServer(handler)
@@ -1825,21 +1731,9 @@ func TestCmdVariableListE2E(t *testing.T) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
 
-		resp := models.GetBodyVariable{
-			Data: []*models.Variable{
-				{
-					ID: "var-1",
-					Attributes: &models.VariableAttributes{
-						Key:      "TF_VAR_name",
-						Value:    "hello",
-						Category: "TERRAFORM",
-					},
-					Type: "variable",
-				},
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		variables := []*terrakube.Variable{{ID: "var-1", Key: "TF_VAR_name", Value: "hello", Category: "TERRAFORM"}}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, variables)
 	})
 
 	ts := setupTestServer(handler)
@@ -1872,26 +1766,15 @@ func TestCmdVariableCreateE2E(t *testing.T) {
 
 	var receivedMethod string
 	var receivedPath string
-	var receivedBody models.PostBodyVariable
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 
-		resp := models.PostBodyVariable{
-			Data: &models.Variable{
-				ID: "var-new",
-				Attributes: &models.VariableAttributes{
-					Key:      "MY_VAR",
-					Value:    "my-value",
-					Category: "TERRAFORM",
-				},
-				Type: "variable",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		v := &terrakube.Variable{ID: "var-new", Key: "MY_VAR", Value: "my-value", Category: "TERRAFORM"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, v)
 	})
 
 	ts := setupTestServer(handler)
@@ -1917,17 +1800,26 @@ func TestCmdVariableCreateE2E(t *testing.T) {
 	if !strings.Contains(receivedPath, "organization/org-abc/workspace/ws-123/variable") {
 		t.Errorf("expected path to contain organization/org-abc/workspace/ws-123/variable, got %s", receivedPath)
 	}
-	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
-		t.Fatal("expected request body with data and attributes")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	if receivedBody.Data.Attributes.Key != "MY_VAR" {
-		t.Errorf("expected key 'MY_VAR', got %q", receivedBody.Data.Attributes.Key)
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
 	}
-	if receivedBody.Data.Attributes.Value != "my-value" {
-		t.Errorf("expected value 'my-value', got %q", receivedBody.Data.Attributes.Value)
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
 	}
-	if receivedBody.Data.Attributes.Category != "TERRAFORM" {
-		t.Errorf("expected category 'TERRAFORM', got %q", receivedBody.Data.Attributes.Category)
+	if attrs["key"] != "MY_VAR" {
+		t.Errorf("expected key 'MY_VAR', got %v", attrs["key"])
+	}
+	if attrs["value"] != "my-value" {
+		t.Errorf("expected value 'my-value', got %v", attrs["value"])
+	}
+	if attrs["category"] != "TERRAFORM" {
+		t.Errorf("expected category 'TERRAFORM', got %v", attrs["category"])
 	}
 	if !strings.Contains(out, "var-new") {
 		t.Errorf("expected output to contain 'var-new', got: %s", out)
@@ -1941,25 +1833,15 @@ func TestCmdJobCreateE2E(t *testing.T) {
 
 	var receivedMethod string
 	var receivedPath string
-	var receivedBody models.PostBodyJob
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 
-		resp := models.PostBodyJob{
-			Data: &models.Job{
-				ID: "job-new",
-				Attributes: &models.JobAttributes{
-					Command: "plan",
-					Status:  "pending",
-				},
-				Type: "job",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		job := &terrakube.Job{ID: "job-new", Command: "plan", Status: "pending"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, job)
 	})
 
 	ts := setupTestServer(handler)
@@ -1981,20 +1863,36 @@ func TestCmdJobCreateE2E(t *testing.T) {
 	if !strings.Contains(receivedPath, "organization/org-abc/job") {
 		t.Errorf("expected path to contain organization/org-abc/job, got %s", receivedPath)
 	}
-	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
-		t.Fatal("expected request body with data and attributes")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	if receivedBody.Data.Attributes.Command != "plan" {
-		t.Errorf("expected command 'plan', got %q", receivedBody.Data.Attributes.Command)
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
+	}
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
+	}
+	if attrs["command"] != "plan" {
+		t.Errorf("expected command 'plan', got %v", attrs["command"])
 	}
 	// Verify workspace relationship is set
-	if receivedBody.Data.Relationships == nil ||
-		receivedBody.Data.Relationships.Workspace == nil ||
-		receivedBody.Data.Relationships.Workspace.Data == nil {
+	rels, ok := data["relationships"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected job to have relationships")
+	}
+	wsRel, ok := rels["workspace"].(map[string]interface{})
+	if !ok {
 		t.Fatal("expected job to have workspace relationship")
 	}
-	if receivedBody.Data.Relationships.Workspace.Data.ID != "ws-123" {
-		t.Errorf("expected workspace relationship ID 'ws-123', got %q", receivedBody.Data.Relationships.Workspace.Data.ID)
+	wsData, ok := wsRel["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected workspace relationship to have data")
+	}
+	if wsData["id"] != "ws-123" {
+		t.Errorf("expected workspace relationship ID 'ws-123', got %v", wsData["id"])
 	}
 	if !strings.Contains(out, "job-new") {
 		t.Errorf("expected output to contain 'job-new', got: %s", out)
@@ -2008,24 +1906,15 @@ func TestCmdTeamCreateE2E(t *testing.T) {
 
 	var receivedMethod string
 	var receivedPath string
-	var receivedBody models.PostBodyTeam
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 
-		resp := models.PostBodyTeam{
-			Data: &models.Team{
-				ID: "team-new",
-				Attributes: &models.TeamAttributes{
-					Name: "test-team",
-				},
-				Type: "team",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		team := &terrakube.Team{ID: "team-new", Name: "test-team"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, team)
 	})
 
 	ts := setupTestServer(handler)
@@ -2046,11 +1935,20 @@ func TestCmdTeamCreateE2E(t *testing.T) {
 	if !strings.Contains(receivedPath, "organization/org-abc/team") {
 		t.Errorf("expected path to contain organization/org-abc/team, got %s", receivedPath)
 	}
-	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
-		t.Fatal("expected request body with data and attributes")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	if receivedBody.Data.Attributes.Name != "test-team" {
-		t.Errorf("expected name 'test-team', got %q", receivedBody.Data.Attributes.Name)
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
+	}
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
+	}
+	if attrs["name"] != "test-team" {
+		t.Errorf("expected name 'test-team', got %v", attrs["name"])
 	}
 	if !strings.Contains(out, "team-new") {
 		t.Errorf("expected output to contain 'team-new', got: %s", out)
@@ -2062,24 +1960,13 @@ func TestCmdTeamCreateE2E(t *testing.T) {
 func TestCmdTeamCreateWithPermissionsE2E(t *testing.T) {
 	resetGlobalFlags()
 
-	var receivedBody models.PostBodyTeam
+	var capturedPermsBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedPermsBody, _ = io.ReadAll(r.Body)
 
-		resp := models.PostBodyTeam{
-			Data: &models.Team{
-				ID: "team-perms",
-				Attributes: &models.TeamAttributes{
-					Name:            "perms-team",
-					ManageWorkspace: true,
-					ManageModule:    true,
-				},
-				Type: "team",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		team := &terrakube.Team{ID: "team-perms", Name: "perms-team", ManageWorkspace: true, ManageModule: true}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, team)
 	})
 
 	ts := setupTestServer(handler)
@@ -2097,13 +1984,22 @@ func TestCmdTeamCreateWithPermissionsE2E(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
-		t.Fatal("expected request body with data and attributes")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedPermsBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	if !receivedBody.Data.Attributes.ManageWorkspace {
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
+	}
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
+	}
+	if attrs["manageWorkspace"] != true {
 		t.Error("expected ManageWorkspace to be true")
 	}
-	if !receivedBody.Data.Attributes.ManageModule {
+	if attrs["manageModule"] != true {
 		t.Error("expected ManageModule to be true")
 	}
 	if !strings.Contains(out, "team-perms") {
@@ -2158,20 +2054,9 @@ func TestCmdLoginWritesConfig(t *testing.T) {
 	desc := "test org"
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// The login command calls Organization.List("") to verify connection.
-		resp := models.GetBodyOrganization{
-			Data: []*models.Organization{
-				{
-					ID: "org-1",
-					Attributes: &models.OrganizationAttributes{
-						Name:        "test-org",
-						Description: &desc,
-					},
-					Type: "organization",
-				},
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		orgs := []*terrakube.Organization{{ID: "org-1", Name: "test-org", Description: &desc}}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, orgs)
 	})
 
 	ts := setupTestServer(handler)
@@ -2215,11 +2100,9 @@ func TestCmdNewClientUsesViperURL(t *testing.T) {
 	var receivedHost string
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedHost = r.Host
-		resp := models.GetBodyOrganization{
-			Data: []*models.Organization{},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		orgs := []*terrakube.Organization{}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, orgs)
 	})
 
 	ts := setupTestServer(handler)
@@ -2248,12 +2131,11 @@ func TestCmdModuleUpdateE2E(t *testing.T) {
 
 	var receivedMethod string
 	var receivedPath string
-	var receivedBody models.PostBodyModule
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -2279,20 +2161,29 @@ func TestCmdModuleUpdateE2E(t *testing.T) {
 	if !strings.Contains(receivedPath, "organization/org-abc/module/mod-789") {
 		t.Errorf("expected path to contain organization/org-abc/module/mod-789, got %s", receivedPath)
 	}
-	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
-		t.Fatal("expected request body with data and attributes")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	if receivedBody.Data.Attributes.Name != "updated-mod" {
-		t.Errorf("expected name 'updated-mod', got %q", receivedBody.Data.Attributes.Name)
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
 	}
-	if receivedBody.Data.Attributes.Description != "new desc" {
-		t.Errorf("expected description 'new desc', got %q", receivedBody.Data.Attributes.Description)
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
 	}
-	if receivedBody.Data.Attributes.Source != "https://github.com/test/repo.git" {
-		t.Errorf("expected source 'https://github.com/test/repo.git', got %q", receivedBody.Data.Attributes.Source)
+	if attrs["name"] != "updated-mod" {
+		t.Errorf("expected name 'updated-mod', got %v", attrs["name"])
 	}
-	if receivedBody.Data.Attributes.Provider != "azurerm" {
-		t.Errorf("expected provider 'azurerm', got %q", receivedBody.Data.Attributes.Provider)
+	if attrs["description"] != "new desc" {
+		t.Errorf("expected description 'new desc', got %v", attrs["description"])
+	}
+	if attrs["source"] != "https://github.com/test/repo.git" {
+		t.Errorf("expected source 'https://github.com/test/repo.git', got %v", attrs["source"])
+	}
+	if attrs["provider"] != "azurerm" {
+		t.Errorf("expected provider 'azurerm', got %v", attrs["provider"])
 	}
 	if !strings.Contains(out, "Updated") {
 		t.Errorf("expected 'Updated' in output, got: %s", out)
@@ -2445,12 +2336,11 @@ func TestCmdVariableUpdateE2E(t *testing.T) {
 
 	var receivedMethod string
 	var receivedPath string
-	var receivedBody models.PostBodyVariable
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -2476,17 +2366,26 @@ func TestCmdVariableUpdateE2E(t *testing.T) {
 	if !strings.Contains(receivedPath, "organization/org-abc/workspace/ws-123/variable/var-789") {
 		t.Errorf("expected path to contain organization/org-abc/workspace/ws-123/variable/var-789, got %s", receivedPath)
 	}
-	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
-		t.Fatal("expected request body with data and attributes")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	if receivedBody.Data.Attributes.Key != "UPDATED_KEY" {
-		t.Errorf("expected key 'UPDATED_KEY', got %q", receivedBody.Data.Attributes.Key)
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
 	}
-	if receivedBody.Data.Attributes.Value != "new-value" {
-		t.Errorf("expected value 'new-value', got %q", receivedBody.Data.Attributes.Value)
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
 	}
-	if receivedBody.Data.Attributes.Category != "ENV" {
-		t.Errorf("expected category 'ENV', got %q", receivedBody.Data.Attributes.Category)
+	if attrs["key"] != "UPDATED_KEY" {
+		t.Errorf("expected key 'UPDATED_KEY', got %v", attrs["key"])
+	}
+	if attrs["value"] != "new-value" {
+		t.Errorf("expected value 'new-value', got %v", attrs["value"])
+	}
+	if attrs["category"] != "ENV" {
+		t.Errorf("expected category 'ENV', got %v", attrs["category"])
 	}
 	if !strings.Contains(out, "Updated") {
 		t.Errorf("expected 'Updated' in output, got: %s", out)
@@ -2541,28 +2440,12 @@ func TestCmdJobListE2E(t *testing.T) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
 
-		resp := models.GetBodyJob{
-			Data: []*models.Job{
-				{
-					ID: "job-1",
-					Attributes: &models.JobAttributes{
-						Command: "plan",
-						Status:  "completed",
-					},
-					Type: "job",
-				},
-				{
-					ID: "job-2",
-					Attributes: &models.JobAttributes{
-						Command: "apply",
-						Status:  "pending",
-					},
-					Type: "job",
-				},
-			},
+		jobs := []*terrakube.Job{
+			{ID: "job-1", Command: "plan", Status: "completed"},
+			{ID: "job-2", Command: "apply", Status: "pending"},
 		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, jobs)
 	})
 
 	ts := setupTestServer(handler)

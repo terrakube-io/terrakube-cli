@@ -33,7 +33,7 @@ func init() {
 }
 
 func deleteVariable() {
-	client := newTerrakubeClient()
+	client := newClient()
 	ctx := getContext()
 
 	err := client.Variables.Delete(ctx, VariableDeleteOrgId, VariableDeleteWorkspaceId, VariableDeleteId)

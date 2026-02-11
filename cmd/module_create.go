@@ -42,7 +42,7 @@ func init() {
 }
 
 func createModule() {
-	client := newTerrakubeClient()
+	client := newClient()
 	ctx := getContext()
 
 	module := &terrakube.Module{

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -20,7 +19,6 @@ import (
 	"github.com/spf13/viper"
 
 	terrakube "github.com/denniswebb/terrakube-go"
-	"terrakube/client/client"
 )
 
 var cfgFile string
@@ -32,7 +30,7 @@ var rootCmd = &cobra.Command{
 	Use:   "terrakube",
 	Short: "terrakube command line tool",
 	Long: `
-terrakube is a CLI to handle remote terraform workspace and modules in organizations 
+terrakube is a CLI to handle remote terraform workspace and modules in organizations
 and handle all the lifecycle (plan, apply, destroy).`,
 }
 
@@ -88,18 +86,7 @@ func initConfig() {
 	postInitCommands(rootCmd.Commands())
 }
 
-func newClient() *client.Client {
-	baseURL, err := url.Parse(viper.GetString("api_url"))
-	if err != nil {
-		fmt.Printf("Error parsing API URL: %v\n", err)
-		os.Exit(1)
-	}
-
-	return client.NewClient(nil, viper.GetString("token"), baseURL)
-}
-
-//nolint:unused // used by resource commands during terrakube-go migration
-func newTerrakubeClient() *terrakube.Client {
+func newClient() *terrakube.Client {
 	c, err := terrakube.NewClient(
 		terrakube.WithEndpoint(viper.GetString("api_url")),
 		terrakube.WithToken(viper.GetString("token")),
@@ -111,12 +98,10 @@ func newTerrakubeClient() *terrakube.Client {
 	return c
 }
 
-//nolint:unused // used by resource commands during terrakube-go migration
 func getContext() context.Context {
 	return context.Background()
 }
 
-//nolint:unused // used by resource commands during terrakube-go migration
 func ptrOrNil(s string) *string {
 	if s == "" {
 		return nil
@@ -163,50 +148,21 @@ func splitInterface(input interface{}) ([][]string, []string) {
 			data := reflectData.Index(i).Interface()
 			d := reflect.Indirect(reflect.ValueOf(data))
 			row := []string{d.FieldByName("ID").String()}
-
-			if isNestedModel(d) {
-				row, headers = appendNestedFields(d, row, headers, i == 0)
-			} else {
-				row, headers = appendFlatFields(d, row, headers, i == 0)
-			}
+			row, headers = appendFields(d, row, headers, i == 0)
 			result = append(result, row)
 		}
 	} else {
 		d := reflect.Indirect(reflectData)
 		row := []string{d.FieldByName("ID").String()}
-
-		if isNestedModel(d) {
-			row, headers = appendNestedFields(d, row, headers, true)
-		} else {
-			row, headers = appendFlatFields(d, row, headers, true)
-		}
+		row, headers = appendFields(d, row, headers, true)
 		result = append(result, row)
 	}
 	return result, headers
 }
 
-// isNestedModel returns true if the struct has a non-nil Attributes field
-// (old client/models pattern).
-func isNestedModel(d reflect.Value) bool {
-	f := d.FieldByName("Attributes")
-	return f.IsValid() && f.Kind() == reflect.Ptr && !f.IsNil()
-}
-
-// appendNestedFields extracts columns from the old nested Attributes sub-struct.
-func appendNestedFields(d reflect.Value, row []string, headers []string, buildHeaders bool) ([]string, []string) {
-	attr := reflect.Indirect(reflect.ValueOf(d.FieldByName("Attributes").Interface()))
-	for j := 0; j < attr.NumField(); j++ {
-		if buildHeaders {
-			headers = append(headers, attr.Type().Field(j).Name)
-		}
-		row = append(row, formatFieldValue(attr.Field(j)))
-	}
-	return row, headers
-}
-
-// appendFlatFields extracts columns from a flat struct (terrakube-go pattern),
-// skipping the ID field (already handled) and any jsonapi relation fields.
-func appendFlatFields(d reflect.Value, row []string, headers []string, buildHeaders bool) ([]string, []string) {
+// appendFields extracts columns from a flat struct, skipping the ID field
+// (already handled) and any jsonapi relation fields.
+func appendFields(d reflect.Value, row []string, headers []string, buildHeaders bool) ([]string, []string) {
 	for j := 0; j < d.NumField(); j++ {
 		field := d.Type().Field(j)
 		if field.Name == "ID" || !field.IsExported() {

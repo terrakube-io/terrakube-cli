@@ -31,7 +31,7 @@ func init() {
 }
 
 func listModules() {
-	client := newTerrakubeClient()
+	client := newClient()
 	ctx := getContext()
 
 	opts := &terrakube.ListOptions{Filter: ModuleFilter}

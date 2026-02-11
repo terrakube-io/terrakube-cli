@@ -31,7 +31,7 @@ func init() {
 }
 
 func listTeams() {
-	client := newTerrakubeClient()
+	client := newClient()
 	ctx := getContext()
 
 	resp, err := client.Teams.List(ctx, TeamOrgId, &terrakube.ListOptions{Filter: TeamFilter})

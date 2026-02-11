@@ -7,7 +7,7 @@ import (
 
 func TestTestServerRecordsRequests(t *testing.T) {
 	ts := NewTestServer(t)
-	ts.On("GET", "/api/v1/organization", http.StatusOK, FixtureGetBodyOrganization())
+	ts.On("GET", "/api/v1/organization", http.StatusOK, FixtureOrganizationList())
 
 	u := ts.URL()
 	if u == nil {
@@ -21,7 +21,7 @@ func TestTestServerRecordsRequests(t *testing.T) {
 
 func TestTestServerRouteMatching(t *testing.T) {
 	ts := NewTestServer(t)
-	body := FixtureGetBodyOrganization()
+	body := FixtureOrganizationList()
 	ts.On("GET", "/api/v1/organization", http.StatusOK, body)
 
 	resp, err := ts.Server.Client().Get(ts.Server.URL + "/api/v1/organization")
@@ -80,7 +80,7 @@ func TestFixturesArePopulated(t *testing.T) {
 	if org.ID == "" {
 		t.Error("organization fixture has empty ID")
 	}
-	if org.Attributes.Name == "" {
+	if org.Name == "" {
 		t.Error("organization fixture has empty name")
 	}
 

@@ -31,7 +31,7 @@ func init() {
 }
 
 func listJobs() {
-	client := newTerrakubeClient()
+	client := newClient()
 	ctx := getContext()
 
 	resp, err := client.Jobs.List(ctx, JobOrgId, &terrakube.ListOptions{Filter: JobFilter})

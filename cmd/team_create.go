@@ -46,7 +46,7 @@ func init() {
 }
 
 func createTeam() {
-	client := newTerrakubeClient()
+	client := newClient()
 	ctx := getContext()
 
 	team := &terrakube.Team{

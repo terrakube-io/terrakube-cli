@@ -29,7 +29,7 @@ func init() {
 }
 
 func deleteWorkspace() {
-	client := newTerrakubeClient()
+	client := newClient()
 	ctx := getContext()
 
 	err := client.Workspaces.Delete(ctx, WorkspaceDeleteOrgId, WorkspaceDeleteId)

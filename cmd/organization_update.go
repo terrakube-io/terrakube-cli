@@ -44,7 +44,7 @@ func init() {
 }
 
 func updateOrganization() {
-	client := newTerrakubeClient()
+	client := newClient()
 	ctx := getContext()
 
 	organization := &terrakube.Organization{
