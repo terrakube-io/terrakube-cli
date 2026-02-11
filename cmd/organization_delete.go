@@ -26,9 +26,10 @@ func init() {
 }
 
 func deleteOrganization() {
-	client := newClient()
+	client := newTerrakubeClient()
+	ctx := getContext()
 
-	err := client.Organization.Delete(OrganizationDeleteId)
+	err := client.Organizations.Delete(ctx, OrganizationDeleteId)
 
 	if err != nil {
 		fmt.Println(err)
