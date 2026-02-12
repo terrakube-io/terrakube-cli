@@ -1,15 +1,21 @@
 package output
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
 	"strings"
 
+	"github.com/google/jsonapi"
 	"github.com/kataras/tablewriter"
 	"gopkg.in/yaml.v3"
 )
+
+// HideNulls controls whether null values are stripped from JSON output.
+// Defaults to true. Set via --hide-nulls flag.
+var HideNulls = true
 
 // Render writes data to w in the specified format.
 // Supported formats: json, yaml, table, tsv, none.
@@ -31,12 +37,87 @@ func Render(w io.Writer, data any, format string) error {
 }
 
 func renderJSON(w io.Writer, data any) error {
-	b, err := json.MarshalIndent(data, "", "    ")
+	b, err := marshalJSONAPI(data)
 	if err != nil {
 		return fmt.Errorf("failed to marshal json: %w", err)
 	}
 	_, err = fmt.Fprintf(w, "%s\n", b)
 	return err
+}
+
+// marshalJSONAPI serializes data using the JSON:API format for backwards
+// compatibility, then unwraps the "data" envelope so the output is just
+// the resource array or object (matching the original CLI output).
+func marshalJSONAPI(data any) ([]byte, error) {
+	v := reflect.ValueOf(data)
+
+	// Handle nil/empty slices — return "null" to match old behavior.
+	if v.Kind() == reflect.Slice && v.Len() == 0 {
+		return json.MarshalIndent(nil, "", "    ")
+	}
+
+	// jsonapi.MarshalPayload requires *Struct or []*Struct.
+	// If we got a plain struct value, take its address.
+	if v.Kind() == reflect.Struct {
+		ptr := reflect.New(v.Type())
+		ptr.Elem().Set(v)
+		data = ptr.Interface()
+	}
+
+	var buf bytes.Buffer
+	if err := jsonapi.MarshalPayload(&buf, data); err != nil {
+		return nil, err
+	}
+
+	// Unwrap: extract .data from the envelope.
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(buf.Bytes(), &envelope); err != nil {
+		return nil, err
+	}
+
+	raw := json.RawMessage(envelope["data"])
+
+	if HideNulls {
+		var err2 error
+		raw, err2 = stripNulls(raw)
+		if err2 != nil {
+			return nil, err2
+		}
+	}
+
+	return json.MarshalIndent(raw, "", "    ")
+}
+
+// stripNulls recursively removes null values from JSON objects.
+func stripNulls(data json.RawMessage) (json.RawMessage, error) {
+	var v any
+	if err := json.Unmarshal(data, &v); err != nil {
+		return data, err
+	}
+	cleaned := stripNullsValue(v)
+	return json.Marshal(cleaned)
+}
+
+func stripNullsValue(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		cleaned := make(map[string]any, len(val))
+		for k, item := range val {
+			if item == nil {
+				continue
+			}
+			cleaned[k] = stripNullsValue(item)
+		}
+		return cleaned
+	case []any:
+		cleaned := make([]any, len(val))
+		for i, item := range val {
+			cleaned[i] = stripNullsValue(item)
+		}
+		return cleaned
+	default:
+		return v
+	}
 }
 
 func renderYAML(w io.Writer, data any) error {

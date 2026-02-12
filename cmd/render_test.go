@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"os"
@@ -8,6 +9,8 @@ import (
 	"testing"
 
 	terrakube "github.com/terrakube-io/terrakube-go"
+
+	outputpkg "terrakube/internal/output"
 )
 
 func captureStdout(t *testing.T, fn func()) string {
@@ -227,21 +230,21 @@ func TestRenderOutput_None(t *testing.T) {
 	}
 }
 
-// Unknown output format silently produces nothing -- no error or warning.
+// Unknown output format now triggers a fatal error via outputpkg.Render.
+// We verify this by checking that Render returns an error directly.
 func TestRenderOutput_UnknownFormat(t *testing.T) {
-	ws := terrakube.Workspace{
+	ws := &terrakube.Workspace{
 		ID:   "ws-unknown-fmt",
 		Name: "invisible",
 	}
 
-	got := captureStdout(t, func() {
-		renderOutput(ws, "xml")
-	})
-
-	// The switch in renderOutput has no default case, so unknown formats
-	// silently fall through and produce zero output.
-	if got != "" {
-		t.Errorf("expected no output for unknown format 'xml', got %q", got)
+	var buf bytes.Buffer
+	err := outputpkg.Render(&buf, ws, "xml")
+	if err == nil {
+		t.Fatal("expected error for unsupported format 'xml'")
+	}
+	if !strings.Contains(err.Error(), "unsupported") {
+		t.Errorf("expected unsupported error, got: %v", err)
 	}
 }
 
@@ -261,12 +264,19 @@ func TestRenderOutput_FlatStruct_JSON(t *testing.T) {
 		t.Fatalf("output is not valid JSON: %v\ngot: %s", err, got)
 	}
 
-	// Flat struct: fields at top level, no nested "attributes"
-	if parsed["Name"] != "json-org" {
-		t.Errorf("expected Name json-org, got %v", parsed["Name"])
+	// JSON:API format: {type, id, attributes: {...}}
+	if parsed["id"] != "org-json" {
+		t.Errorf("expected id org-json, got %v", parsed["id"])
 	}
-	if _, has := parsed["attributes"]; has {
-		t.Error("flat struct JSON should not have nested 'attributes' key")
+	if parsed["type"] != "organization" {
+		t.Errorf("expected type organization, got %v", parsed["type"])
+	}
+	attrs, ok := parsed["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected attributes object, got %T", parsed["attributes"])
+	}
+	if attrs["name"] != "json-org" {
+		t.Errorf("expected name json-org, got %v", attrs["name"])
 	}
 }
 
