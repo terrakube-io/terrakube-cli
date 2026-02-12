@@ -8,7 +8,7 @@ import (
 )
 
 var ModuleUpdateExample string = `Update the description of the module using id
-    %[1]v module update --organization-id e5ad0642-f9b3-48b3-9bf4-35997febe1fb --id 38b6635a-d38e-46f2-a95e-d00a416de4fd -d "new description" `
+    %[1]v module update -o e5ad0642-f9b3-48b3-9bf4-35997febe1fb --id 38b6635a-d38e-46f2-a95e-d00a416de4fd -d "new description" `
 
 var ModuleId string
 var ModuleUpdateDescription string
@@ -32,8 +32,7 @@ func init() {
 	moduleCmd.AddCommand(updateModuleCmd)
 	updateModuleCmd.Flags().StringVarP(&ModuleId, "id", "", "", "Id of the module (required)")
 	_ = updateModuleCmd.MarkFlagRequired("id")
-	updateModuleCmd.Flags().StringVarP(&ModuleUpdateOrgId, "organization-id", "", "", "Organization Id (required)")
-	_ = updateModuleCmd.MarkFlagRequired("organization-id")
+	registerOrgFlag(updateModuleCmd, &ModuleUpdateOrgId)
 	updateModuleCmd.Flags().StringVarP(&ModuleUpdateName, "name", "n", "", "Name of the module")
 	updateModuleCmd.Flags().StringVarP(&ModuleUpdateDescription, "description", "d", "", "Description of the module")
 	updateModuleCmd.Flags().StringVarP(&ModuleUpdateSource, "source", "s", "", "Source of the module")
@@ -45,6 +44,11 @@ func init() {
 func updateModule() {
 	client := newClient()
 	ctx := getContext()
+	orgID, err := resolveOrg(ctx, client, ModuleUpdateOrgId)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	module := &terrakube.Module{
 		ID:          ModuleId,
@@ -55,7 +59,7 @@ func updateModule() {
 		TagPrefix:   ptrOrNil(ModuleUpdateTagPrefix),
 		Folder:      ptrOrNil(ModuleUpdateFolder),
 	}
-	_, err := client.Modules.Update(ctx, ModuleUpdateOrgId, module)
+	_, err = client.Modules.Update(ctx, orgID, module)
 
 	if err != nil {
 		fmt.Println(err)

@@ -29,9 +29,9 @@ func testConfig() Config[testResource] {
 		Name:    "widget",
 		Aliases: []string{"wgt"},
 		Parents: []ParentScope{{
-			Name:     "organization",
-			IDFlag:   "organization-id",
-			NameFlag: "organization-name",
+			Name:   "organization",
+			Flag:   "organization",
+			IDFlag: "organization-id",
 		}},
 		Fields: []FieldDef{
 			{StructField: "Name", Flag: "name", Short: "n", Type: String, Required: true, Description: "widget name"},
@@ -126,14 +126,19 @@ func TestRegister_ParentFlags(t *testing.T) {
 		t.Fatal("expected list command")
 	}
 
-	orgIDFlag := listCmd.Flags().Lookup("organization-id")
-	if orgIDFlag == nil {
-		t.Error("expected --organization-id flag on list")
+	// Primary unified flag
+	orgFlag := listCmd.Flags().Lookup("organization")
+	if orgFlag == nil {
+		t.Error("expected --organization flag on list")
 	}
 
-	orgNameFlag := listCmd.Flags().Lookup("organization-name")
-	if orgNameFlag == nil {
-		t.Error("expected --organization-name flag on list")
+	// Backwards-compat alias: --organization-id normalizes to --organization
+	orgIDFlag := listCmd.Flags().Lookup("organization-id")
+	if orgIDFlag == nil {
+		t.Error("expected --organization-id to normalize to --organization flag")
+	}
+	if orgIDFlag != orgFlag {
+		t.Error("expected --organization-id to resolve to the same flag as --organization")
 	}
 
 	filterFlag := listCmd.Flags().Lookup("filter")

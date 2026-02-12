@@ -20,7 +20,7 @@ func TestCmdVCSListE2E(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "organization/org-123/vcs") {
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/vcs") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -31,7 +31,7 @@ func TestCmdVCSListE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("vcs", "list", "--organization-id", "org-123")
+	out, err := executeCommand("vcs", "list", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestCmdVCSGetE2E(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "organization/org-123/vcs/vcs-456") {
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/vcs/vcs-456") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -62,7 +62,7 @@ func TestCmdVCSGetE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("vcs", "get", "--organization-id", "org-123", "--id", "vcs-456")
+	out, err := executeCommand("vcs", "get", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--id", "vcs-456")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestCmdVCSCreateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"vcs", "create",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--name", "github-main",
 		"--description", "Main GitHub connection",
 		"--vcs-type", "GITHUB",
@@ -164,7 +164,7 @@ func TestCmdVCSDeleteE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("vcs", "delete", "--organization-id", "org-123", "--id", "vcs-del")
+	out, err := executeCommand("vcs", "delete", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--id", "vcs-del")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -188,8 +188,8 @@ func TestCmdVCSListMissingOrg(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for vcs list without org flags, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") && !strings.Contains(err.Error(), "organization-name") {
-		t.Errorf("expected error to mention organization flags, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
@@ -227,7 +227,7 @@ func TestCmdVCSNameResolution(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("vcs", "list", "--organization-name", "acme-corp")
+	out, err := executeCommand("vcs", "list", "--organization", "acme-corp")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -19,7 +19,7 @@ func TestCmdOrganizationVariableListE2E(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "organization/org-123/globalvar") {
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/globalvar") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -30,7 +30,7 @@ func TestCmdOrganizationVariableListE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("organization-variable", "list", "--organization-id", "org-123")
+	out, err := executeCommand("organization-variable", "list", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestCmdOrganizationVariableGetE2E(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "organization/org-123/globalvar/ov-456") {
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/globalvar/ov-456") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -61,7 +61,7 @@ func TestCmdOrganizationVariableGetE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("organization-variable", "get", "--organization-id", "org-123", "--id", "ov-456")
+	out, err := executeCommand("organization-variable", "get", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--id", "ov-456")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestCmdOrganizationVariableCreateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"organization-variable", "create",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--key", "TF_LOG",
 		"--value", "DEBUG",
 		"--description", "Terraform log level",
@@ -155,7 +155,7 @@ func TestCmdOrganizationVariableDeleteE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("organization-variable", "delete", "--organization-id", "org-123", "--id", "ov-del")
+	out, err := executeCommand("organization-variable", "delete", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--id", "ov-del")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestCmdOrganizationVariableListMissingOrg(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for organization-variable list without org flags, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") && !strings.Contains(err.Error(), "organization-name") {
-		t.Errorf("expected error to mention organization flags, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }

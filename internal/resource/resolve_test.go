@@ -3,42 +3,44 @@ package resource
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 
 	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
-func TestResolveParents_IDFlag(t *testing.T) {
-	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().String("org-id", "", "")
-	cmd.Flags().String("org-name", "", "")
-	_ = cmd.Flags().Set("org-id", "abc-123")
-
-	parents := []ParentScope{{
-		Name: "org", IDFlag: "org-id", NameFlag: "org-name",
-	}}
-
-	ids, err := resolveParents(context.Background(), nil, cmd, parents)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestIsUUID(t *testing.T) {
+	tests := []struct {
+		name string
+		val  string
+		want bool
+	}{
+		{"valid UUID", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb", true},
+		{"valid UUID uppercase", "E5AD0642-F9B3-48B3-9BF4-35997FEBE1FB", true},
+		{"too short", "abc-123", false},
+		{"missing dashes", "e5ad0642f9b348b39bf435997febe1fb", true},
+		{"non-hex characters", "e5ad0642-f9b3-48b3-9bf4-35997febe1gz", false},
+		{"empty string", "", false},
 	}
-	if len(ids) != 1 || ids[0] != "abc-123" {
-		t.Errorf("expected [abc-123], got %v", ids)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := IsUUID(tc.val)
+			if got != tc.want {
+				t.Errorf("IsUUID(%q) = %v, want %v", tc.val, got, tc.want)
+			}
+		})
 	}
 }
 
-func TestResolveParents_IDFlagTakesPrecedence(t *testing.T) {
+func TestResolveParents_UUIDValue(t *testing.T) {
 	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().String("org-id", "", "")
-	cmd.Flags().String("org-name", "", "")
-	_ = cmd.Flags().Set("org-id", "id-value")
-	_ = cmd.Flags().Set("org-name", "name-value")
+	cmd.Flags().String("org", "", "")
+	_ = cmd.Flags().Set("org", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb")
 
 	called := false
 	parents := []ParentScope{{
-		Name: "org", IDFlag: "org-id", NameFlag: "org-name",
+		Name: "org", Flag: "org", IDFlag: "org-id",
 		Resolver: func(_ context.Context, _ *terrakube.Client, _ []string, _ string) (string, error) {
 			called = true
 			return "resolved", nil
@@ -49,22 +51,21 @@ func TestResolveParents_IDFlagTakesPrecedence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ids[0] != "id-value" {
-		t.Errorf("expected id-value, got %s", ids[0])
+	if len(ids) != 1 || ids[0] != "e5ad0642-f9b3-48b3-9bf4-35997febe1fb" {
+		t.Errorf("expected UUID passthrough, got %v", ids)
 	}
 	if called {
-		t.Error("resolver should not be called when ID flag is set")
+		t.Error("resolver should not be called when value is a UUID")
 	}
 }
 
-func TestResolveParents_NameFlagCallsResolver(t *testing.T) {
+func TestResolveParents_NameValueCallsResolver(t *testing.T) {
 	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().String("org-id", "", "")
-	cmd.Flags().String("org-name", "", "")
-	_ = cmd.Flags().Set("org-name", "acme")
+	cmd.Flags().String("org", "", "")
+	_ = cmd.Flags().Set("org", "acme")
 
 	parents := []ParentScope{{
-		Name: "org", IDFlag: "org-id", NameFlag: "org-name",
+		Name: "org", Flag: "org", IDFlag: "org-id",
 		Resolver: func(_ context.Context, _ *terrakube.Client, _ []string, name string) (string, error) {
 			if name != "acme" {
 				return "", fmt.Errorf("unexpected name: %s", name)
@@ -82,53 +83,52 @@ func TestResolveParents_NameFlagCallsResolver(t *testing.T) {
 	}
 }
 
-func TestResolveParents_NeitherIDNorName(t *testing.T) {
+func TestResolveParents_EmptyValue(t *testing.T) {
 	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().String("org-id", "", "")
-	cmd.Flags().String("org-name", "", "")
+	cmd.Flags().String("org", "", "")
 
 	parents := []ParentScope{{
-		Name: "org", IDFlag: "org-id", NameFlag: "org-name",
+		Name: "org", Flag: "org", IDFlag: "org-id",
 	}}
 
 	_, err := resolveParents(context.Background(), nil, cmd, parents)
 	if err == nil {
-		t.Fatal("expected error when neither ID nor name is set")
+		t.Fatal("expected error when flag value is empty")
 	}
-	if !strings.Contains(err.Error(), "org-id") || !strings.Contains(err.Error(), "org-name") {
-		t.Errorf("error should mention both flags, got: %v", err)
+	if got := err.Error(); got != "--org is required" {
+		t.Errorf("expected error '--org is required', got: %v", got)
 	}
 }
 
-func TestResolveParents_NoNameFlag(t *testing.T) {
+func TestResolveParents_NonUUIDWithNoResolver(t *testing.T) {
 	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().String("org-id", "", "")
+	cmd.Flags().String("org", "", "")
+	_ = cmd.Flags().Set("org", "acme")
 
 	parents := []ParentScope{{
-		Name: "org", IDFlag: "org-id",
+		Name: "org", Flag: "org", IDFlag: "org-id",
 	}}
 
 	_, err := resolveParents(context.Background(), nil, cmd, parents)
 	if err == nil {
-		t.Fatal("expected error when ID not set and no name flag configured")
+		t.Fatal("expected error when value is not a UUID and no resolver configured")
 	}
-	if !strings.Contains(err.Error(), "org-id") {
-		t.Errorf("error should mention id flag, got: %v", err)
+	errMsg := err.Error()
+	if errMsg != `--org: "acme" is not a valid UUID and name resolution is not configured for org` {
+		t.Errorf("unexpected error: %v", errMsg)
 	}
 }
 
 func TestResolveParents_MultiParent(t *testing.T) {
 	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().String("org-id", "", "")
-	cmd.Flags().String("org-name", "", "")
-	cmd.Flags().String("ws-id", "", "")
-	cmd.Flags().String("ws-name", "", "")
-	_ = cmd.Flags().Set("org-name", "acme")
-	_ = cmd.Flags().Set("ws-name", "prod")
+	cmd.Flags().String("org", "", "")
+	cmd.Flags().String("ws", "", "")
+	_ = cmd.Flags().Set("org", "acme")
+	_ = cmd.Flags().Set("ws", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb")
 
 	parents := []ParentScope{
 		{
-			Name: "org", IDFlag: "org-id", NameFlag: "org-name",
+			Name: "org", Flag: "org", IDFlag: "org-id",
 			Resolver: func(_ context.Context, _ *terrakube.Client, resolvedIDs []string, name string) (string, error) {
 				if len(resolvedIDs) != 0 {
 					return "", fmt.Errorf("org resolver should have no resolved IDs, got %v", resolvedIDs)
@@ -137,7 +137,7 @@ func TestResolveParents_MultiParent(t *testing.T) {
 			},
 		},
 		{
-			Name: "workspace", IDFlag: "ws-id", NameFlag: "ws-name",
+			Name: "workspace", Flag: "ws", IDFlag: "ws-id",
 			Resolver: func(_ context.Context, _ *terrakube.Client, resolvedIDs []string, name string) (string, error) {
 				if len(resolvedIDs) != 1 || resolvedIDs[0] != "org-id-123" {
 					return "", fmt.Errorf("ws resolver expected resolved org ID, got %v", resolvedIDs)
@@ -157,19 +157,19 @@ func TestResolveParents_MultiParent(t *testing.T) {
 	if ids[0] != "org-id-123" {
 		t.Errorf("expected org-id-123, got %s", ids[0])
 	}
-	if ids[1] != "ws-id-456" {
-		t.Errorf("expected ws-id-456, got %s", ids[1])
+	// ws was a UUID, so should be used directly (not resolved)
+	if ids[1] != "e5ad0642-f9b3-48b3-9bf4-35997febe1fb" {
+		t.Errorf("expected UUID passthrough for ws, got %s", ids[1])
 	}
 }
 
 func TestResolveParents_ResolverError(t *testing.T) {
 	cmd := &cobra.Command{Use: "test"}
-	cmd.Flags().String("org-id", "", "")
-	cmd.Flags().String("org-name", "", "")
-	_ = cmd.Flags().Set("org-name", "nonexistent")
+	cmd.Flags().String("org", "", "")
+	_ = cmd.Flags().Set("org", "nonexistent")
 
 	parents := []ParentScope{{
-		Name: "org", IDFlag: "org-id", NameFlag: "org-name",
+		Name: "org", Flag: "org", IDFlag: "org-id",
 		Resolver: func(_ context.Context, _ *terrakube.Client, _ []string, _ string) (string, error) {
 			return "", fmt.Errorf("no organization found with name %q", "nonexistent")
 		},
@@ -179,7 +179,7 @@ func TestResolveParents_ResolverError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error from resolver")
 	}
-	if !strings.Contains(err.Error(), "nonexistent") {
-		t.Errorf("expected error to contain name, got: %v", err)
+	if got := err.Error(); got != `no organization found with name "nonexistent"` {
+		t.Errorf("unexpected error: %v", got)
 	}
 }

@@ -8,7 +8,7 @@ import (
 )
 
 var ModuleCreateExample string = `Create a new module
-    %[1]v module create --organization-id e5ad0642-f9b3-48b3-9bf4-35997febe1fb -n myModule -d "module description" -p azurerm -s https://github.com/terrakube-io/terraform-sample-repository.git `
+    %[1]v module create -o e5ad0642-f9b3-48b3-9bf4-35997febe1fb -n myModule -d "module description" -p azurerm -s https://github.com/terrakube-io/terraform-sample-repository.git `
 
 var ModuleCreateName string
 var ModuleCreateDescription string
@@ -31,8 +31,7 @@ func init() {
 	moduleCmd.AddCommand(createModuleCmd)
 	createModuleCmd.Flags().StringVarP(&ModuleCreateName, "name", "n", "", "Name of the new module (required)")
 	_ = createModuleCmd.MarkFlagRequired("name")
-	createModuleCmd.Flags().StringVarP(&ModuleCreateOrgId, "organization-id", "", "", "Organization Id (required)")
-	_ = createModuleCmd.MarkFlagRequired("organization-id")
+	registerOrgFlag(createModuleCmd, &ModuleCreateOrgId)
 	createModuleCmd.Flags().StringVarP(&ModuleCreateDescription, "description", "d", "", "Description of the new module")
 	createModuleCmd.Flags().StringVarP(&ModuleCreateSource, "source", "s", "", "Source of the new module")
 	createModuleCmd.Flags().StringVarP(&ModuleCreateProvider, "provider", "p", "", "Provider of the new module")
@@ -44,6 +43,11 @@ func init() {
 func createModule() {
 	client := newClient()
 	ctx := getContext()
+	orgID, err := resolveOrg(ctx, client, ModuleCreateOrgId)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	module := &terrakube.Module{
 		Name:        ModuleCreateName,
@@ -54,7 +58,7 @@ func createModule() {
 		Folder:      ptrOrNil(ModuleCreateFolder),
 	}
 
-	resp, err := client.Modules.Create(ctx, ModuleCreateOrgId, module)
+	resp, err := client.Modules.Create(ctx, orgID, module)
 
 	if err != nil {
 		fmt.Println(err)

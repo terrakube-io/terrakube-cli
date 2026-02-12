@@ -19,7 +19,7 @@ func TestCmdAgentListE2E(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "organization/org-123/agent") {
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/agent") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -30,7 +30,7 @@ func TestCmdAgentListE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("agent", "list", "--organization-id", "org-123")
+	out, err := executeCommand("agent", "list", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestCmdAgentGetE2E(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "organization/org-123/agent/agent-456") {
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/agent/agent-456") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -61,7 +61,7 @@ func TestCmdAgentGetE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("agent", "get", "--organization-id", "org-123", "--id", "agent-456")
+	out, err := executeCommand("agent", "get", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--id", "agent-456")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestCmdAgentCreateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"agent", "create",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--name", "k8s-runner",
 		"--description", "Kubernetes-based runner agent",
 		"--url", "https://agent.example.com",
@@ -143,7 +143,7 @@ func TestCmdAgentDeleteE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("agent", "delete", "--organization-id", "org-123", "--id", "agent-del")
+	out, err := executeCommand("agent", "delete", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--id", "agent-del")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestCmdAgentListMissingOrg(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for agent list without org flags, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") && !strings.Contains(err.Error(), "organization-name") {
-		t.Errorf("expected error to mention organization flags, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }

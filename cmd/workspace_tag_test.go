@@ -17,7 +17,7 @@ func TestCmdWorkspaceTagListE2E(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "organization/org-abc/workspace/ws-123/workspaceTag") {
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/workspace/b2c3d4e5-f6a7-8901-bcde-f12345678901/workspaceTag") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -34,8 +34,8 @@ func TestCmdWorkspaceTagListE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"workspace-tag", "list",
-		"--organization-id", "org-abc",
-		"--workspace-id", "ws-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--workspace-id", "b2c3d4e5-f6a7-8901-bcde-f12345678901",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -56,7 +56,7 @@ func TestCmdWorkspaceTagCreateE2E(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "organization/org-abc/workspace/ws-123/workspaceTag") {
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/workspace/b2c3d4e5-f6a7-8901-bcde-f12345678901/workspaceTag") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -70,8 +70,8 @@ func TestCmdWorkspaceTagCreateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"workspace-tag", "create",
-		"--organization-id", "org-abc",
-		"--workspace-id", "ws-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--workspace-id", "b2c3d4e5-f6a7-8901-bcde-f12345678901",
 		"--tag-id", "tag-prod-001",
 	)
 	if err != nil {
@@ -90,7 +90,7 @@ func TestCmdWorkspaceTagDeleteE2E(t *testing.T) {
 		if r.Method != http.MethodDelete {
 			t.Errorf("expected DELETE, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "organization/org-abc/workspace/ws-123/workspaceTag/wt-789") {
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/workspace/b2c3d4e5-f6a7-8901-bcde-f12345678901/workspaceTag/wt-789") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -101,8 +101,8 @@ func TestCmdWorkspaceTagDeleteE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"workspace-tag", "delete",
-		"--organization-id", "org-abc",
-		"--workspace-id", "ws-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--workspace-id", "b2c3d4e5-f6a7-8901-bcde-f12345678901",
 		"--id", "wt-789",
 	)
 	if err != nil {
@@ -124,12 +124,12 @@ func TestCmdWorkspaceTagListMissingOrg(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	_, err := executeCommand("workspace-tag", "list", "--workspace-id", "ws-123")
+	_, err := executeCommand("workspace-tag", "list", "--workspace-id", "b2c3d4e5-f6a7-8901-bcde-f12345678901")
 	if err == nil {
 		t.Fatal("expected error for workspace-tag list without org flag, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") && !strings.Contains(err.Error(), "organization-name") {
-		t.Errorf("expected error to mention organization-id or organization-name, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
@@ -143,12 +143,12 @@ func TestCmdWorkspaceTagListMissingWorkspace(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	_, err := executeCommand("workspace-tag", "list", "--organization-id", "org-abc")
+	_, err := executeCommand("workspace-tag", "list", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for workspace-tag list without workspace flag, got nil")
 	}
-	if !strings.Contains(err.Error(), "workspace-id") && !strings.Contains(err.Error(), "workspace-name") {
-		t.Errorf("expected error to mention workspace-id or workspace-name, got: %v", err)
+	if !strings.Contains(err.Error(), "workspace") {
+		t.Errorf("expected error to mention workspace, got: %v", err)
 	}
 }
 
@@ -192,8 +192,8 @@ func TestCmdWorkspaceTagNameResolution(t *testing.T) {
 
 	out, err := executeCommand(
 		"workspace-tag", "list",
-		"--organization-name", "acme",
-		"--workspace-name", "prod",
+		"--organization", "acme",
+		"--workspace", "prod",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

@@ -18,7 +18,7 @@ func orgResolver(ctx context.Context, c *terrakube.Client, _ []string, name stri
 		return "", fmt.Errorf("no organization found with name %q", name)
 	}
 	if len(orgs) > 1 {
-		return "", fmt.Errorf("multiple organizations match name %q, use --organization-id", name)
+		return "", fmt.Errorf("multiple organizations match name %q, use --organization with the ID", name)
 	}
 	return orgs[0].ID, nil
 }
@@ -31,12 +31,14 @@ func init() {
 			GetOutput:  func() string { return output },
 		},
 		Name:    "template",
-		Aliases: []string{"tpl"},
+		Aliases: []string{"tpl", "templates"},
 		Parents: []resource.ParentScope{{
-			Name:     "organization",
-			IDFlag:   "organization-id",
-			NameFlag: "organization-name",
-			Resolver: orgResolver,
+			Name:      "organization",
+			Flag:      "organization",
+			ShortFlag: "o",
+			Aliases:   []string{"org"},
+			IDFlag:    "organization-id",
+			Resolver:  orgResolver,
 		}},
 		Fields: []resource.FieldDef{
 			{StructField: "Name", Flag: "name", Short: "n", Type: resource.String, Required: true, Description: "Template name"},

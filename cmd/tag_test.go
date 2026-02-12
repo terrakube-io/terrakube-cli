@@ -19,7 +19,7 @@ func TestCmdTagListE2E(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "organization/org-123/tag") {
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/tag") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -30,7 +30,7 @@ func TestCmdTagListE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("tag", "list", "--organization-id", "org-123")
+	out, err := executeCommand("tag", "list", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestCmdTagGetE2E(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "organization/org-123/tag/tag-456") {
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/tag/tag-456") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -61,7 +61,7 @@ func TestCmdTagGetE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("tag", "get", "--organization-id", "org-123", "--id", "tag-456")
+	out, err := executeCommand("tag", "get", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--id", "tag-456")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestCmdTagCreateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"tag", "create",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--name", "production",
 	)
 	if err != nil {
@@ -135,7 +135,7 @@ func TestCmdTagDeleteE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("tag", "delete", "--organization-id", "org-123", "--id", "tag-del")
+	out, err := executeCommand("tag", "delete", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--id", "tag-del")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestCmdTagListMissingOrg(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for tag list without org flags, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") && !strings.Contains(err.Error(), "organization-name") {
-		t.Errorf("expected error to mention organization flags, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }

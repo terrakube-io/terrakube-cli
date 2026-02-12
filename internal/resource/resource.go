@@ -8,6 +8,7 @@ import (
 
 	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"terrakube/internal/output"
 )
@@ -23,10 +24,12 @@ const (
 
 // ParentScope defines a parent resource for name-to-ID resolution.
 type ParentScope struct {
-	Name     string // e.g. "organization"
-	IDFlag   string // e.g. "organization-id"
-	NameFlag string // e.g. "organization-name" (empty disables name resolution)
-	Resolver func(ctx context.Context, c *terrakube.Client, resolvedParentIDs []string, name string) (string, error)
+	Name      string   // e.g. "organization"
+	Flag      string   // unified flag name, e.g. "organization" (accepts UUID or name)
+	ShortFlag string   // short flag, e.g. "o"
+	Aliases   []string // flag aliases, e.g. ["org"]
+	IDFlag    string   // hidden backwards-compat alias, e.g. "organization-id"
+	Resolver  func(ctx context.Context, c *terrakube.Client, resolvedParentIDs []string, name string) (string, error)
 }
 
 // FieldDef maps a CLI flag to a struct field.
@@ -252,11 +255,24 @@ func newDeleteCmd[T any](cfg Config[T]) *cobra.Command {
 }
 
 func addParentFlags(cmd *cobra.Command, parents []ParentScope) {
+	aliases := make(map[string]string)
 	for _, p := range parents {
-		cmd.Flags().String(p.IDFlag, "", fmt.Sprintf("%s ID", p.Name))
-		if p.NameFlag != "" {
-			cmd.Flags().String(p.NameFlag, "", fmt.Sprintf("%s name (resolved to ID)", p.Name))
+		cmd.Flags().StringP(p.Flag, p.ShortFlag, "", fmt.Sprintf("%s ID or name", p.Name))
+		if p.IDFlag != "" && p.IDFlag != p.Flag {
+			aliases[p.IDFlag] = p.Flag
 		}
+		for _, a := range p.Aliases {
+			aliases[a] = p.Flag
+		}
+	}
+	if len(aliases) > 0 {
+		prev := cmd.Flags().GetNormalizeFunc()
+		cmd.Flags().SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
+			if mapped, ok := aliases[name]; ok {
+				return pflag.NormalizedName(mapped)
+			}
+			return prev(f, name)
+		})
 	}
 }
 

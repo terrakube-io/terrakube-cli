@@ -32,6 +32,7 @@ var rootCmd = &cobra.Command{
 	Long: `
 terrakube is a CLI to handle remote terraform workspace and modules in organizations
 and handle all the lifecycle (plan, apply, destroy).`,
+	SilenceErrors: true,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

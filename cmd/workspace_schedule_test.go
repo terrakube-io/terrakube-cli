@@ -16,7 +16,7 @@ func TestCmdWorkspaceScheduleListE2E(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "workspace/ws-123/schedule") {
+		if !strings.Contains(r.URL.Path, "workspace/b2c3d4e5-f6a7-8901-bcde-f12345678901/schedule") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -33,8 +33,8 @@ func TestCmdWorkspaceScheduleListE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"workspace-schedule", "list",
-		"--organization-id", "org-abc",
-		"--workspace-id", "ws-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--workspace-id", "b2c3d4e5-f6a7-8901-bcde-f12345678901",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -55,7 +55,7 @@ func TestCmdWorkspaceScheduleDeleteE2E(t *testing.T) {
 		if r.Method != http.MethodDelete {
 			t.Errorf("expected DELETE, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "workspace/ws-123/schedule/sched-789") {
+		if !strings.Contains(r.URL.Path, "workspace/b2c3d4e5-f6a7-8901-bcde-f12345678901/schedule/sched-789") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -66,8 +66,8 @@ func TestCmdWorkspaceScheduleDeleteE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"workspace-schedule", "delete",
-		"--organization-id", "org-abc",
-		"--workspace-id", "ws-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--workspace-id", "b2c3d4e5-f6a7-8901-bcde-f12345678901",
 		"--id", "sched-789",
 	)
 	if err != nil {
@@ -88,11 +88,11 @@ func TestCmdWorkspaceScheduleListMissingOrg(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	_, err := executeCommand("workspace-schedule", "list", "--workspace-id", "ws-123")
+	_, err := executeCommand("workspace-schedule", "list", "--workspace-id", "b2c3d4e5-f6a7-8901-bcde-f12345678901")
 	if err == nil {
 		t.Fatal("expected error for workspace-schedule list without org flag, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") && !strings.Contains(err.Error(), "organization-name") {
-		t.Errorf("expected error to mention organization-id or organization-name, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }

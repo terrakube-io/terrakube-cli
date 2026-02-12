@@ -17,10 +17,12 @@ func init() {
 		},
 		Name: "vcs",
 		Parents: []resource.ParentScope{{
-			Name:     "organization",
-			IDFlag:   "organization-id",
-			NameFlag: "organization-name",
-			Resolver: orgResolver,
+			Name:      "organization",
+			Flag:      "organization",
+			ShortFlag: "o",
+			Aliases:   []string{"org"},
+			IDFlag:    "organization-id",
+			Resolver:  orgResolver,
 		}},
 		Fields: []resource.FieldDef{
 			{StructField: "Name", Flag: "name", Short: "n", Type: resource.String, Required: true, Description: "VCS connection name"},

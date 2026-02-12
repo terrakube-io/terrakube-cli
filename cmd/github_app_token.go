@@ -15,7 +15,8 @@ func init() {
 			GetContext: getContext,
 			GetOutput:  func() string { return output },
 		},
-		Name: "github-app-token",
+		Name:    "github-app-token",
+		Aliases: []string{"github-app-tokens"},
 		Fields: []resource.FieldDef{
 			{StructField: "AppID", Flag: "app-id", Type: resource.String, Required: true, Description: "GitHub App ID"},
 			{StructField: "InstallationID", Flag: "installation-id", Type: resource.String, Required: true, Description: "GitHub App installation ID"},

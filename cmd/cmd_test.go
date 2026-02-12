@@ -258,16 +258,16 @@ func TestCmdWorkspaceListMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("workspace", "list")
 	if err == nil {
-		t.Fatal("expected error for workspace list without --organization-id, got nil")
+		t.Fatal("expected error for workspace list without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
 func TestCmdWorkspaceCreateMissingName(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "create", "--organization-id", "some-org-id")
+	_, err := executeCommand("workspace", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for workspace create without --name, got nil")
 	}
@@ -280,10 +280,10 @@ func TestCmdWorkspaceCreateMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("workspace", "create", "--name", "test-ws")
 	if err == nil {
-		t.Fatal("expected error for workspace create without --organization-id, got nil")
+		t.Fatal("expected error for workspace create without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
@@ -311,18 +311,18 @@ func TestCmdOrganizationDeleteMissingId(t *testing.T) {
 
 func TestCmdWorkspaceDeleteMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "delete", "--id", "ws-123")
+	_, err := executeCommand("workspace", "delete", "--id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
-		t.Fatal("expected error for workspace delete without --organization-id, got nil")
+		t.Fatal("expected error for workspace delete without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
 func TestCmdWorkspaceDeleteMissingId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "delete", "--organization-id", "org-123")
+	_, err := executeCommand("workspace", "delete", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for workspace delete without --id, got nil")
 	}
@@ -333,7 +333,7 @@ func TestCmdWorkspaceDeleteMissingId(t *testing.T) {
 
 func TestCmdModuleCreateMissingName(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("module", "create", "--organization-id", "org-123")
+	_, err := executeCommand("module", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for module create without --name, got nil")
 	}
@@ -346,16 +346,16 @@ func TestCmdModuleCreateMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("module", "create", "--name", "mod1")
 	if err == nil {
-		t.Fatal("expected error for module create without --organization-id, got nil")
+		t.Fatal("expected error for module create without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
 func TestCmdTeamCreateMissingName(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("team", "create", "--organization-id", "org-123")
+	_, err := executeCommand("team", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for team create without --name, got nil")
 	}
@@ -368,16 +368,16 @@ func TestCmdTeamCreateMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("team", "create", "--name", "team1")
 	if err == nil {
-		t.Fatal("expected error for team create without --organization-id, got nil")
+		t.Fatal("expected error for team create without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
 func TestCmdJobCreateMissingCommand(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("job", "create", "--organization-id", "org-123", "--workspace-id", "ws-123")
+	_, err := executeCommand("job", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
 		t.Fatal("expected error for job create without --command, got nil")
 	}
@@ -388,34 +388,34 @@ func TestCmdJobCreateMissingCommand(t *testing.T) {
 
 func TestCmdJobCreateMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("job", "create", "--command", "plan", "--workspace-id", "ws-123")
+	_, err := executeCommand("job", "create", "--command", "plan", "--workspace", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
-		t.Fatal("expected error for job create without --organization-id, got nil")
+		t.Fatal("expected error for job create without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
 func TestCmdVariableListMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "variable", "list", "--workspace-id", "ws-123")
+	_, err := executeCommand("workspace", "variable", "list", "--workspace", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
-		t.Fatal("expected error for variable list without --organization-id, got nil")
+		t.Fatal("expected error for variable list without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
 func TestCmdVariableListMissingWorkspaceId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "variable", "list", "--organization-id", "org-123")
+	_, err := executeCommand("workspace", "variable", "list", "--organization", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
-		t.Fatal("expected error for variable list without --workspace-id, got nil")
+		t.Fatal("expected error for variable list without --workspace, got nil")
 	}
-	if !strings.Contains(err.Error(), "workspace-id") {
-		t.Errorf("expected error to mention workspace-id, got: %v", err)
+	if !strings.Contains(err.Error(), "workspace") {
+		t.Errorf("expected error to mention workspace, got: %v", err)
 	}
 }
 
@@ -505,7 +505,7 @@ func TestCmdWorkspaceCreateCliFlag(t *testing.T) {
 	out, err := executeCommand(
 		"workspace", "create",
 		"--name", "cli-ws",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--cli",
 	)
 	if err != nil {
@@ -540,7 +540,7 @@ func TestCmdWorkspaceCreateWithoutCliFlag(t *testing.T) {
 	out, err := executeCommand(
 		"workspace", "create",
 		"--name", "vcs-ws",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--source", "https://github.com/example/repo.git",
 		"--branch", "main",
 	)
@@ -624,10 +624,10 @@ func TestCmdAliasWrkRoutes(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("wrk", "list")
 	if err == nil {
-		t.Fatal("expected error for wrk list without --organization-id, got nil")
+		t.Fatal("expected error for wrk list without --organization, got nil")
 	}
 	// The fact that we get a "required flag" error means the alias routed correctly
-	if !strings.Contains(err.Error(), "organization-id") {
+	if !strings.Contains(err.Error(), "organization") {
 		t.Errorf("expected alias 'wrk' to route to workspace command, got error: %v", err)
 	}
 }
@@ -645,7 +645,7 @@ func TestCmdAliasOrgRoutes(t *testing.T) {
 
 func TestCmdAliasModRoutes(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("mod", "create", "--organization-id", "org-123")
+	_, err := executeCommand("mod", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for mod create without --name, got nil")
 	}
@@ -850,7 +850,7 @@ func TestCmdOrganizationCreateInvalidExecutionMode(t *testing.T) {
 
 func TestCmdOrganizationUpdateInvalidExecutionMode(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("organization", "update", "--id", "org-123", "--executionMode", "bogus")
+	_, err := executeCommand("organization", "update", "--id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--executionMode", "bogus")
 	if err == nil {
 		t.Fatal("expected error for invalid execution mode on update, got nil")
 	}
@@ -868,7 +868,7 @@ func TestCmdWorkspaceListE2E(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "organization/org-123/workspace") {
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/workspace") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		if r.Header.Get("Authorization") != "Bearer test-token" {
@@ -883,7 +883,7 @@ func TestCmdWorkspaceListE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("workspace", "list", "--organization-id", "org-123")
+	out, err := executeCommand("workspace", "list", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -963,7 +963,7 @@ func TestCmdWorkspaceCreateE2E(t *testing.T) {
 	out, err := executeCommand(
 		"workspace", "create",
 		"--name", "test-ws",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--folder", "/modules",
 		"--source", "https://github.com/example/repo.git",
 		"--branch", "main",
@@ -1028,7 +1028,7 @@ func TestCmdWorkspaceListAPIError(t *testing.T) {
 
 	// The command should not return an error from cobra (it prints the error itself)
 	// but the output should indicate something went wrong or at least not crash
-	_, err := executeCommand("workspace", "list", "--organization-id", "org-123")
+	_, err := executeCommand("workspace", "list", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	// Even with a 500 response, cobra itself doesn't error out - the command
 	// prints the error internally. So we just verify no panic occurred.
 	_ = err
@@ -1051,7 +1051,7 @@ func TestCmdWorkspaceCreateOutputContainsJSON(t *testing.T) {
 	out, err := executeCommand(
 		"workspace", "create",
 		"--name", "json-ws",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1104,7 +1104,7 @@ func TestCmdWorkspaceCreateSendsCorrectBody(t *testing.T) {
 	_, err := executeCommand(
 		"workspace", "create",
 		"--name", "body-test",
-		"--organization-id", "org-abc",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--source", "https://github.com/test/repo.git",
 		"--branch", "develop",
 		"--iac-version", "1.5.0",
@@ -1224,23 +1224,37 @@ func TestCmdUnknownCommandErrors(t *testing.T) {
 	}
 }
 
-// ----- Team has no alias (verify negative) -----
+// ----- Team alias -----
 
-func TestCmdTeamHasNoAlias(t *testing.T) {
+func TestCmdTeamAlias(t *testing.T) {
 	resetGlobalFlags()
 
-	if len(teamCmd.Aliases) != 0 {
-		t.Errorf("expected team command to have no aliases, got: %v", teamCmd.Aliases)
+	found := false
+	for _, a := range teamCmd.Aliases {
+		if a == "teams" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected team command to have alias 'teams', got aliases: %v", teamCmd.Aliases)
 	}
 }
 
-// ----- Job has no alias (verify negative) -----
+// ----- Job alias -----
 
-func TestCmdJobHasNoAlias(t *testing.T) {
+func TestCmdJobAlias(t *testing.T) {
 	resetGlobalFlags()
 
-	if len(jobCmd.Aliases) != 0 {
-		t.Errorf("expected job command to have no aliases, got: %v", jobCmd.Aliases)
+	found := false
+	for _, a := range jobCmd.Aliases {
+		if a == "jobs" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected job command to have alias 'jobs', got aliases: %v", jobCmd.Aliases)
 	}
 }
 
@@ -1292,18 +1306,18 @@ func TestCmdOrganizationCreateValidExecutionModes(t *testing.T) {
 
 func TestCmdWorkspaceUpdateMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "update", "--id", "ws-123")
+	_, err := executeCommand("workspace", "update", "--id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
-		t.Fatal("expected error for workspace update without --organization-id, got nil")
+		t.Fatal("expected error for workspace update without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
 func TestCmdWorkspaceUpdateMissingId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "update", "--organization-id", "org-123")
+	_, err := executeCommand("workspace", "update", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for workspace update without --id, got nil")
 	}
@@ -1318,10 +1332,10 @@ func TestCmdModuleListMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("module", "list")
 	if err == nil {
-		t.Fatal("expected error for module list without --organization-id, got nil")
+		t.Fatal("expected error for module list without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
@@ -1331,10 +1345,10 @@ func TestCmdTeamListMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("team", "list")
 	if err == nil {
-		t.Fatal("expected error for team list without --organization-id, got nil")
+		t.Fatal("expected error for team list without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
@@ -1344,10 +1358,10 @@ func TestCmdJobListMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("job", "list")
 	if err == nil {
-		t.Fatal("expected error for job list without --organization-id, got nil")
+		t.Fatal("expected error for job list without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
@@ -1368,7 +1382,7 @@ func TestCmdWorkspaceCreateShortFlags(t *testing.T) {
 	_, err := executeCommand(
 		"workspace", "create",
 		"-n", "short-ws",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"-b", "main",
 		"-s", "https://github.com/test/repo.git",
 		"-f", "/modules",
@@ -1400,7 +1414,7 @@ func TestCmdTeamCreatePermissionsInBody(t *testing.T) {
 	_, err := executeCommand(
 		"team", "create",
 		"--name", "test-team",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--manage-workspace",
 	)
 	if err != nil {
@@ -1422,7 +1436,7 @@ func TestCmdTeamCreatePermissionsInBody(t *testing.T) {
 	_, err = executeCommand(
 		"team", "create",
 		"--name", "test-team-no-perms",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1460,7 +1474,7 @@ func TestCmdOrganizationUpdateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"organization", "update",
-		"--id", "org-123",
+		"--id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--name", "updated-org",
 		"--description", "new desc",
 	)
@@ -1471,8 +1485,8 @@ func TestCmdOrganizationUpdateE2E(t *testing.T) {
 	if receivedMethod != http.MethodPatch {
 		t.Errorf("expected PATCH, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-123") {
-		t.Errorf("expected path to contain organization/org-123, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890") {
+		t.Errorf("expected path to contain organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890, got %s", receivedPath)
 	}
 	var bodyMap map[string]interface{}
 	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
@@ -1543,7 +1557,7 @@ func TestCmdWorkspaceUpdateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"workspace", "update",
-		"--organization-id", "org-abc",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--id", "ws-789",
 		"--name", "updated-ws",
 		"--branch", "develop",
@@ -1561,8 +1575,8 @@ func TestCmdWorkspaceUpdateE2E(t *testing.T) {
 	// client builds a path with an empty workspace ID. The --id flag value is
 	// stored in WorkspaceUpdateId but never placed into the Workspace model.
 	// We test the actual (buggy) behavior here.
-	if !strings.Contains(receivedPath, "organization/org-abc/workspace/") {
-		t.Errorf("expected path to contain organization/org-abc/workspace/, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/, got %s", receivedPath)
 	}
 	var bodyMap map[string]interface{}
 	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
@@ -1608,7 +1622,7 @@ func TestCmdWorkspaceDeleteE2E(t *testing.T) {
 
 	_, err := executeCommand(
 		"workspace", "delete",
-		"--organization-id", "org-abc",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--id", "ws-789",
 	)
 	if err != nil {
@@ -1618,8 +1632,8 @@ func TestCmdWorkspaceDeleteE2E(t *testing.T) {
 	if receivedMethod != http.MethodDelete {
 		t.Errorf("expected DELETE, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/workspace/ws-789") {
-		t.Errorf("expected path to contain organization/org-abc/workspace/ws-789, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/ws-789") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/ws-789, got %s", receivedPath)
 	}
 }
 
@@ -1646,7 +1660,7 @@ func TestCmdModuleCreateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"module", "create",
-		"--organization-id", "org-abc",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--name", "test-mod",
 		"--description", "a test module",
 		"--source", "https://github.com/test/repo.git",
@@ -1659,8 +1673,8 @@ func TestCmdModuleCreateE2E(t *testing.T) {
 	if receivedMethod != http.MethodPost {
 		t.Errorf("expected POST, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/module") {
-		t.Errorf("expected path to contain organization/org-abc/module, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/module") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/module, got %s", receivedPath)
 	}
 	var bodyMap map[string]interface{}
 	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
@@ -1704,7 +1718,7 @@ func TestCmdModuleListE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("module", "list", "--organization-id", "org-abc")
+	out, err := executeCommand("module", "list", "--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1712,8 +1726,8 @@ func TestCmdModuleListE2E(t *testing.T) {
 	if receivedMethod != http.MethodGet {
 		t.Errorf("expected GET, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/module") {
-		t.Errorf("expected path to contain organization/org-abc/module, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/module") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/module, got %s", receivedPath)
 	}
 	if !strings.Contains(out, "mod-1") {
 		t.Errorf("expected output to contain 'mod-1', got: %s", out)
@@ -1744,8 +1758,8 @@ func TestCmdVariableListE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"workspace", "variable", "list",
-		"--organization-id", "org-abc",
-		"--workspace-id", "ws-123",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
+		"--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1754,8 +1768,8 @@ func TestCmdVariableListE2E(t *testing.T) {
 	if receivedMethod != http.MethodGet {
 		t.Errorf("expected GET, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/workspace/ws-123/variable") {
-		t.Errorf("expected path to contain organization/org-abc/workspace/ws-123/variable, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable, got %s", receivedPath)
 	}
 	if !strings.Contains(out, "var-1") {
 		t.Errorf("expected output to contain 'var-1', got: %s", out)
@@ -1785,8 +1799,8 @@ func TestCmdVariableCreateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"workspace", "variable", "create",
-		"--organization-id", "org-abc",
-		"--workspace-id", "ws-123",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
+		"--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd",
 		"--key", "MY_VAR",
 		"--value", "my-value",
 		"--category", "TERRAFORM",
@@ -1800,8 +1814,8 @@ func TestCmdVariableCreateE2E(t *testing.T) {
 	if receivedMethod != http.MethodPost {
 		t.Errorf("expected POST, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/workspace/ws-123/variable") {
-		t.Errorf("expected path to contain organization/org-abc/workspace/ws-123/variable, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable, got %s", receivedPath)
 	}
 	var bodyMap map[string]interface{}
 	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
@@ -1852,8 +1866,8 @@ func TestCmdJobCreateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"job", "create",
-		"--organization-id", "org-abc",
-		"--workspace-id", "ws-123",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
+		"--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd",
 		"--command", "plan",
 	)
 	if err != nil {
@@ -1863,8 +1877,8 @@ func TestCmdJobCreateE2E(t *testing.T) {
 	if receivedMethod != http.MethodPost {
 		t.Errorf("expected POST, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/job") {
-		t.Errorf("expected path to contain organization/org-abc/job, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/job") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/job, got %s", receivedPath)
 	}
 	var bodyMap map[string]interface{}
 	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
@@ -1894,8 +1908,8 @@ func TestCmdJobCreateE2E(t *testing.T) {
 	if !ok {
 		t.Fatal("expected workspace relationship to have data")
 	}
-	if wsData["id"] != "ws-123" {
-		t.Errorf("expected workspace relationship ID 'ws-123', got %v", wsData["id"])
+	if wsData["id"] != "38b6635a-d38e-46f2-a95e-d00a416de4fd" {
+		t.Errorf("expected workspace relationship ID '38b6635a-d38e-46f2-a95e-d00a416de4fd', got %v", wsData["id"])
 	}
 	if !strings.Contains(out, "job-new") {
 		t.Errorf("expected output to contain 'job-new', got: %s", out)
@@ -1925,7 +1939,7 @@ func TestCmdTeamCreateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"team", "create",
-		"--organization-id", "org-abc",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--name", "test-team",
 	)
 	if err != nil {
@@ -1935,8 +1949,8 @@ func TestCmdTeamCreateE2E(t *testing.T) {
 	if receivedMethod != http.MethodPost {
 		t.Errorf("expected POST, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/team") {
-		t.Errorf("expected path to contain organization/org-abc/team, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/team") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/team, got %s", receivedPath)
 	}
 	var bodyMap map[string]interface{}
 	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
@@ -1977,7 +1991,7 @@ func TestCmdTeamCreateWithPermissionsE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"team", "create",
-		"--organization-id", "org-abc",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--name", "perms-team",
 		"--manage-workspace=true",
 		"--manage-module=true",
@@ -2147,7 +2161,7 @@ func TestCmdModuleUpdateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"module", "update",
-		"--organization-id", "org-abc",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--id", "mod-789",
 		"--name", "updated-mod",
 		"--description", "new desc",
@@ -2161,8 +2175,8 @@ func TestCmdModuleUpdateE2E(t *testing.T) {
 	if receivedMethod != http.MethodPatch {
 		t.Errorf("expected PATCH, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/module/mod-789") {
-		t.Errorf("expected path to contain organization/org-abc/module/mod-789, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/module/mod-789") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/module/mod-789, got %s", receivedPath)
 	}
 	var bodyMap map[string]interface{}
 	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
@@ -2211,7 +2225,7 @@ func TestCmdModuleDeleteE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"module", "delete",
-		"--organization-id", "org-abc",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--id", "mod-789",
 	)
 	if err != nil {
@@ -2221,8 +2235,8 @@ func TestCmdModuleDeleteE2E(t *testing.T) {
 	if receivedMethod != http.MethodDelete {
 		t.Errorf("expected DELETE, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/module/mod-789") {
-		t.Errorf("expected path to contain organization/org-abc/module/mod-789, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/module/mod-789") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/module/mod-789, got %s", receivedPath)
 	}
 	if !strings.Contains(out, "deleted") {
 		t.Errorf("expected 'deleted' in output, got: %s", out)
@@ -2250,7 +2264,7 @@ func TestCmdTeamUpdateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"team", "update",
-		"--organization-id", "org-abc",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--id", "team-789",
 		"--name", "updated-team",
 		"--manage-workspace",
@@ -2263,8 +2277,8 @@ func TestCmdTeamUpdateE2E(t *testing.T) {
 	if receivedMethod != http.MethodPatch {
 		t.Errorf("expected PATCH, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/team/team-789") {
-		t.Errorf("expected path to contain organization/org-abc/team/team-789, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/team/team-789") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/team/team-789, got %s", receivedPath)
 	}
 
 	// Verify body content via raw JSON
@@ -2312,7 +2326,7 @@ func TestCmdTeamDeleteE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"team", "delete",
-		"--organization-id", "org-abc",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--id", "team-789",
 	)
 	if err != nil {
@@ -2322,8 +2336,8 @@ func TestCmdTeamDeleteE2E(t *testing.T) {
 	if receivedMethod != http.MethodDelete {
 		t.Errorf("expected DELETE, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/team/team-789") {
-		t.Errorf("expected path to contain organization/org-abc/team/team-789, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/team/team-789") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/team/team-789, got %s", receivedPath)
 	}
 	if !strings.Contains(out, "deleted") {
 		t.Errorf("expected 'deleted' in output, got: %s", out)
@@ -2352,8 +2366,8 @@ func TestCmdVariableUpdateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"workspace", "variable", "update",
-		"--organization-id", "org-abc",
-		"--workspace-id", "ws-123",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
+		"--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd",
 		"--id", "var-789",
 		"--key", "UPDATED_KEY",
 		"--value", "new-value",
@@ -2366,8 +2380,8 @@ func TestCmdVariableUpdateE2E(t *testing.T) {
 	if receivedMethod != http.MethodPatch {
 		t.Errorf("expected PATCH, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/workspace/ws-123/variable/var-789") {
-		t.Errorf("expected path to contain organization/org-abc/workspace/ws-123/variable/var-789, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable/var-789") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable/var-789, got %s", receivedPath)
 	}
 	var bodyMap map[string]interface{}
 	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
@@ -2415,8 +2429,8 @@ func TestCmdVariableDeleteE2E(t *testing.T) {
 
 	_, err := executeCommand(
 		"workspace", "variable", "delete",
-		"--organization-id", "org-abc",
-		"--workspace-id", "ws-123",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
+		"--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd",
 		"--id", "var-789",
 	)
 	if err != nil {
@@ -2426,8 +2440,8 @@ func TestCmdVariableDeleteE2E(t *testing.T) {
 	if receivedMethod != http.MethodDelete {
 		t.Errorf("expected DELETE, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/workspace/ws-123/variable/var-789") {
-		t.Errorf("expected path to contain organization/org-abc/workspace/ws-123/variable/var-789, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable/var-789") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable/var-789, got %s", receivedPath)
 	}
 	// No output assertion — variable_delete.go has no fmt.Print on success (BUG)
 }
@@ -2454,7 +2468,7 @@ func TestCmdJobListE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("job", "list", "--organization-id", "org-abc")
+	out, err := executeCommand("job", "list", "--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -2462,8 +2476,8 @@ func TestCmdJobListE2E(t *testing.T) {
 	if receivedMethod != http.MethodGet {
 		t.Errorf("expected GET, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/job") {
-		t.Errorf("expected path to contain organization/org-abc/job, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/job") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/job, got %s", receivedPath)
 	}
 	if !strings.Contains(out, "job-1") {
 		t.Errorf("expected output to contain 'job-1', got: %s", out)
@@ -2477,7 +2491,7 @@ func TestCmdJobListE2E(t *testing.T) {
 
 func TestCmdModuleUpdateMissingId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("module", "update", "--organization-id", "org-123")
+	_, err := executeCommand("module", "update", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for module update without --id, got nil")
 	}
@@ -2488,12 +2502,12 @@ func TestCmdModuleUpdateMissingId(t *testing.T) {
 
 func TestCmdModuleUpdateMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("module", "update", "--id", "mod-123")
+	_, err := executeCommand("module", "update", "--id", "f6a7b8c9-d0e1-2345-fabc-456789012345")
 	if err == nil {
-		t.Fatal("expected error for module update without --organization-id, got nil")
+		t.Fatal("expected error for module update without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
@@ -2501,7 +2515,7 @@ func TestCmdModuleUpdateMissingOrgId(t *testing.T) {
 
 func TestCmdModuleDeleteMissingId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("module", "delete", "--organization-id", "org-123")
+	_, err := executeCommand("module", "delete", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for module delete without --id, got nil")
 	}
@@ -2512,12 +2526,12 @@ func TestCmdModuleDeleteMissingId(t *testing.T) {
 
 func TestCmdModuleDeleteMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("module", "delete", "--id", "mod-123")
+	_, err := executeCommand("module", "delete", "--id", "f6a7b8c9-d0e1-2345-fabc-456789012345")
 	if err == nil {
-		t.Fatal("expected error for module delete without --organization-id, got nil")
+		t.Fatal("expected error for module delete without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
@@ -2525,7 +2539,7 @@ func TestCmdModuleDeleteMissingOrgId(t *testing.T) {
 
 func TestCmdTeamUpdateMissingId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("team", "update", "--organization-id", "org-123")
+	_, err := executeCommand("team", "update", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for team update without --id, got nil")
 	}
@@ -2538,10 +2552,10 @@ func TestCmdTeamUpdateMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("team", "update", "--id", "team-123")
 	if err == nil {
-		t.Fatal("expected error for team update without --organization-id, got nil")
+		t.Fatal("expected error for team update without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
@@ -2549,7 +2563,7 @@ func TestCmdTeamUpdateMissingOrgId(t *testing.T) {
 
 func TestCmdTeamDeleteMissingId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("team", "delete", "--organization-id", "org-123")
+	_, err := executeCommand("team", "delete", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for team delete without --id, got nil")
 	}
@@ -2562,10 +2576,10 @@ func TestCmdTeamDeleteMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("team", "delete", "--id", "team-123")
 	if err == nil {
-		t.Fatal("expected error for team delete without --organization-id, got nil")
+		t.Fatal("expected error for team delete without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
@@ -2573,7 +2587,7 @@ func TestCmdTeamDeleteMissingOrgId(t *testing.T) {
 
 func TestCmdVariableUpdateMissingId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "variable", "update", "--organization-id", "org-123", "--workspace-id", "ws-123")
+	_, err := executeCommand("workspace", "variable", "update", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
 		t.Fatal("expected error for variable update without --id, got nil")
 	}
@@ -2584,23 +2598,23 @@ func TestCmdVariableUpdateMissingId(t *testing.T) {
 
 func TestCmdVariableUpdateMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "variable", "update", "--id", "var-123", "--workspace-id", "ws-123")
+	_, err := executeCommand("workspace", "variable", "update", "--id", "var-123", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
-		t.Fatal("expected error for variable update without --organization-id, got nil")
+		t.Fatal("expected error for variable update without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
 func TestCmdVariableUpdateMissingWorkspaceId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "variable", "update", "--organization-id", "org-123", "--id", "var-123")
+	_, err := executeCommand("workspace", "variable", "update", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--id", "var-123")
 	if err == nil {
 		t.Fatal("expected error for variable update without --workspace-id, got nil")
 	}
-	if !strings.Contains(err.Error(), "workspace-id") {
-		t.Errorf("expected error to mention workspace-id, got: %v", err)
+	if !strings.Contains(err.Error(), "workspace") {
+		t.Errorf("expected error to mention workspace, got: %v", err)
 	}
 }
 
@@ -2608,7 +2622,7 @@ func TestCmdVariableUpdateMissingWorkspaceId(t *testing.T) {
 
 func TestCmdVariableDeleteMissingId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "variable", "delete", "--organization-id", "org-123", "--workspace-id", "ws-123")
+	_, err := executeCommand("workspace", "variable", "delete", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
 		t.Fatal("expected error for variable delete without --id, got nil")
 	}
@@ -2619,22 +2633,22 @@ func TestCmdVariableDeleteMissingId(t *testing.T) {
 
 func TestCmdVariableDeleteMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "variable", "delete", "--id", "var-123", "--workspace-id", "ws-123")
+	_, err := executeCommand("workspace", "variable", "delete", "--id", "var-123", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
-		t.Fatal("expected error for variable delete without --organization-id, got nil")
+		t.Fatal("expected error for variable delete without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
 func TestCmdVariableDeleteMissingWorkspaceId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "variable", "delete", "--organization-id", "org-123", "--id", "var-123")
+	_, err := executeCommand("workspace", "variable", "delete", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--id", "var-123")
 	if err == nil {
 		t.Fatal("expected error for variable delete without --workspace-id, got nil")
 	}
-	if !strings.Contains(err.Error(), "workspace-id") {
-		t.Errorf("expected error to mention workspace-id, got: %v", err)
+	if !strings.Contains(err.Error(), "workspace") {
+		t.Errorf("expected error to mention workspace, got: %v", err)
 	}
 }

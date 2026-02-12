@@ -18,7 +18,7 @@ func workspaceResolver(ctx context.Context, c *terrakube.Client, resolvedParentI
 		return "", fmt.Errorf("no workspace found with name %q", name)
 	}
 	if len(wss) > 1 {
-		return "", fmt.Errorf("multiple workspaces match name %q, use --workspace-id", name)
+		return "", fmt.Errorf("multiple workspaces match name %q, use --workspace with the ID", name)
 	}
 	return wss[0].ID, nil
 }
@@ -31,19 +31,23 @@ func init() {
 			GetOutput:  func() string { return output },
 		},
 		Name:    "workspace-tag",
-		Aliases: []string{"wstag"},
+		Aliases: []string{"wstag", "workspace-tags", "wstags"},
 		Parents: []resource.ParentScope{
 			{
-				Name:     "organization",
-				IDFlag:   "organization-id",
-				NameFlag: "organization-name",
-				Resolver: orgResolver,
+				Name:      "organization",
+				Flag:      "organization",
+				ShortFlag: "o",
+				Aliases:   []string{"org"},
+				IDFlag:    "organization-id",
+				Resolver:  orgResolver,
 			},
 			{
-				Name:     "workspace",
-				IDFlag:   "workspace-id",
-				NameFlag: "workspace-name",
-				Resolver: workspaceResolver,
+				Name:      "workspace",
+				Flag:      "workspace",
+				ShortFlag: "w",
+				Aliases:   []string{"ws"},
+				IDFlag:    "workspace-id",
+				Resolver:  workspaceResolver,
 			},
 		},
 		Fields: []resource.FieldDef{

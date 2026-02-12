@@ -15,7 +15,8 @@ func init() {
 			GetContext: getContext,
 			GetOutput:  func() string { return output },
 		},
-		Name: "action",
+		Name:    "action",
+		Aliases: []string{"actions"},
 		Fields: []resource.FieldDef{
 			{StructField: "Action", Flag: "action", Type: resource.String, Description: "Action identifier"},
 			{StructField: "Active", Flag: "active", Type: resource.Bool, Description: "Whether the action is active"},

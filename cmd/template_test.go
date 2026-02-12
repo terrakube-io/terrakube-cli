@@ -20,7 +20,7 @@ func TestCmdTemplateListE2E(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "organization/org-123/template") {
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/template") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -31,7 +31,7 @@ func TestCmdTemplateListE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("template", "list", "--organization-id", "org-123")
+	out, err := executeCommand("template", "list", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestCmdTemplateGetE2E(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "organization/org-123/template/tpl-456") {
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/template/tpl-456") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -62,7 +62,7 @@ func TestCmdTemplateGetE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("template", "get", "--organization-id", "org-123", "--id", "tpl-456")
+	out, err := executeCommand("template", "get", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--id", "tpl-456")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestCmdTemplateCreateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"template", "create",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--name", "standard-plan",
 		"--content", "flow:\n  - type: terraformPlan",
 		"--description", "Standard Terraform plan template",
@@ -148,7 +148,7 @@ func TestCmdTemplateDeleteE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("template", "delete", "--organization-id", "org-123", "--id", "tpl-del")
+	out, err := executeCommand("template", "delete", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--id", "tpl-del")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -170,8 +170,8 @@ func TestCmdTemplateListMissingOrg(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for template list without org flags, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") && !strings.Contains(err.Error(), "organization-name") {
-		t.Errorf("expected error to mention organization flags, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
@@ -209,7 +209,7 @@ func TestCmdTemplateNameResolution(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("template", "list", "--organization-name", "acme-corp")
+	out, err := executeCommand("template", "list", "--organization", "acme-corp")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestCmdTemplateAliasTplRoutes(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for tpl list without org flags, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") && !strings.Contains(err.Error(), "organization-name") {
+	if !strings.Contains(err.Error(), "organization") {
 		t.Errorf("expected alias 'tpl' to route to template command, got error: %v", err)
 	}
 }

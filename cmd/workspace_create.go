@@ -8,7 +8,7 @@ import (
 )
 
 var WorkspaceCreateExample string = `Create a new workspace
-    %[1]v workspace create --organization-id 312b4415-806b-47a9-9452-b71f0753136e -n myWorkspace -s https://github.com/terrakube-io/terraform-sample-repository.git -b master -t 0.15.0`
+    %[1]v workspace create -o 312b4415-806b-47a9-9452-b71f0753136e -n myWorkspace -s https://github.com/terrakube-io/terraform-sample-repository.git -b master -t 0.15.0`
 
 var WorkspaceCreateName string
 var WorkspaceDescription string
@@ -41,8 +41,7 @@ func init() {
 	workspaceCmd.AddCommand(createWorkspaceCmd)
 	createWorkspaceCmd.Flags().StringVarP(&WorkspaceCreateName, "name", "n", "", "Name of the new workspace (required)")
 	_ = createWorkspaceCmd.MarkFlagRequired("name")
-	createWorkspaceCmd.Flags().StringVarP(&WorkspaceCreateOrgId, "organization-id", "", "", "Id of the organization (required)")
-	_ = createWorkspaceCmd.MarkFlagRequired("organization-id")
+	registerOrgFlag(createWorkspaceCmd, &WorkspaceCreateOrgId)
 	createWorkspaceCmd.Flags().StringVarP(&WorkspaceCreateBranch, "branch", "b", "", "Branch of the new workspace")
 	createWorkspaceCmd.Flags().StringVarP(&WorkspaceCreateSource, "source", "s", "", "Source of the new workspace")
 	createWorkspaceCmd.Flags().StringVarP(&WorkspaceCreateIacV, "iac-version", "v", "", "Terraform/tofu Version use in the new workspace")
@@ -56,6 +55,11 @@ func init() {
 func createWorkspace() {
 	client := newClient()
 	ctx := getContext()
+	orgID, err := resolveOrg(ctx, client, WorkspaceCreateOrgId)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	workspace := &terrakube.Workspace{
 		Name:          WorkspaceCreateName,
@@ -68,7 +72,7 @@ func createWorkspace() {
 		IaCVersion:    WorkspaceCreateIacV,
 	}
 
-	resp, err := client.Workspaces.Create(ctx, WorkspaceCreateOrgId, workspace)
+	resp, err := client.Workspaces.Create(ctx, orgID, workspace)
 
 	if err != nil {
 		fmt.Println(err)

@@ -8,7 +8,7 @@ import (
 )
 
 var VariableCreateExample string = `Create a new variable
-    %[1]v workspace variable create --organization-id e5ad0642-f9b3-48b3-9bf4-35997febe1fb -w 38b6635a-d38e-46f2-a95e-d00a416de4fd -k tag_name -v "Hola mundo" --hcl=false --sensitive=false --category TERRAFORM `
+    %[1]v workspace variable create -o e5ad0642-f9b3-48b3-9bf4-35997febe1fb -w 38b6635a-d38e-46f2-a95e-d00a416de4fd -k tag_name -v "Hola mundo" --hcl=false --sensitive=false --category TERRAFORM `
 
 var VariableCreateKey string
 var VariableCreateValue string
@@ -32,8 +32,7 @@ func init() {
 	variableCmd.AddCommand(createVariableCmd)
 	createVariableCmd.Flags().StringVarP(&VariableCreateKey, "key", "k", "", "Key of the new variable (required)")
 	_ = createVariableCmd.MarkFlagRequired("key")
-	createVariableCmd.Flags().StringVarP(&VariableCreateOrgId, "organization-id", "", "", "Organization Id (required)")
-	_ = createVariableCmd.MarkFlagRequired("organization-id")
+	registerOrgFlag(createVariableCmd, &VariableCreateOrgId)
 	createVariableCmd.Flags().StringVarP(&VariableCreateValue, "value", "v", "", "Value for the new variable")
 	_ = createVariableCmd.MarkFlagRequired("value")
 	createVariableCmd.Flags().StringVarP(&VariableCreateDescription, "description", "d", "", "Description of the new variable")
@@ -43,13 +42,22 @@ func init() {
 	_ = createVariableCmd.MarkFlagRequired("sensitive")
 	createVariableCmd.Flags().BoolVarP(&VariableCreateHcl, "hcl", "", false, "Whether to evaluate the value of the variable as a string of HCL code. Has no effect for environment variables.")
 	_ = createVariableCmd.MarkFlagRequired("hcl")
-	createVariableCmd.Flags().StringVarP(&VariableCreateWorkspaceId, "workspace-id", "w", "", "Workspace Id (required)")
-	_ = createVariableCmd.MarkFlagRequired("workspace-id")
+	registerWsFlag(createVariableCmd, &VariableCreateWorkspaceId)
 }
 
 func createVariable() {
 	client := newClient()
 	ctx := getContext()
+	orgID, err := resolveOrg(ctx, client, VariableCreateOrgId)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	wsID, err := resolveWs(ctx, client, orgID, VariableCreateWorkspaceId)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	variable := &terrakube.Variable{
 		Key:         VariableCreateKey,
@@ -60,7 +68,7 @@ func createVariable() {
 		Category:    VariableCreateCategory,
 	}
 
-	resp, err := client.Variables.Create(ctx, VariableCreateOrgId, VariableCreateWorkspaceId, variable)
+	resp, err := client.Variables.Create(ctx, orgID, wsID, variable)
 
 	if err != nil {
 		fmt.Println(err)

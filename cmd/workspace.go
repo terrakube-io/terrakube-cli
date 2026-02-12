@@ -13,7 +13,7 @@ var workspaceCmd = &cobra.Command{
 	Use:     "workspace create|update|delete|list [ARGS]",
 	Short:   "create, update, delete and list workspaces",
 	Long:    workspaceLong,
-	Aliases: []string{"wrk"},
+	Aliases: []string{"wrk", "ws", "workspaces"},
 }
 
 func init() {

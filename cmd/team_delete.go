@@ -7,7 +7,7 @@ import (
 )
 
 var TeamDeleteExample string = `Delete a Team
-    %[1]v team delete --organization-id e5ad0642-f9b3-48b3-9bf4-35997febe1fb --id 38b6635a-d38e-46f2-a95e-d00a416de4fd `
+    %[1]v team delete -o e5ad0642-f9b3-48b3-9bf4-35997febe1fb --id 38b6635a-d38e-46f2-a95e-d00a416de4fd `
 
 var TeamDeleteId string
 var TeamDeleteOrgId string
@@ -23,8 +23,7 @@ var deleteTeamCmd = &cobra.Command{
 
 func init() {
 	teamCmd.AddCommand(deleteTeamCmd)
-	deleteTeamCmd.Flags().StringVarP(&TeamDeleteOrgId, "organization-id", "", "", "Organization Id (required)")
-	_ = deleteTeamCmd.MarkFlagRequired("organization-id")
+	registerOrgFlag(deleteTeamCmd, &TeamDeleteOrgId)
 	deleteTeamCmd.Flags().StringVarP(&TeamDeleteId, "id", "", "", "Id of the Team (required)")
 	_ = deleteTeamCmd.MarkFlagRequired("id")
 }
@@ -32,8 +31,13 @@ func init() {
 func deleteTeam() {
 	client := newClient()
 	ctx := getContext()
+	orgID, err := resolveOrg(ctx, client, TeamDeleteOrgId)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
-	err := client.Teams.Delete(ctx, TeamDeleteOrgId, TeamDeleteId)
+	err = client.Teams.Delete(ctx, orgID, TeamDeleteId)
 
 	if err != nil {
 		fmt.Println(err)
