@@ -2,13 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"terrakube/client/models"
 
+	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
 var VariableUpdateExample string = `Update the value of the variable using id
-    %[1]v workspace variable update --organization-id e5ad0642-f9b3-48b3-9bf4-35997febe1fb -w 38b6635a-d38e-46f2-a95e-d00a416de4fd --id 38b6635a-d38e-46f2-a95e-d00a416de4fd -v "new value" `
+    %[1]v workspace variable update -o e5ad0642-f9b3-48b3-9bf4-35997febe1fb -w 38b6635a-d38e-46f2-a95e-d00a416de4fd --id 38b6635a-d38e-46f2-a95e-d00a416de4fd -v "new value" `
 
 var VariableId string
 var VariableUpdateKey string
@@ -31,38 +31,42 @@ var updateVariableCmd = &cobra.Command{
 
 func init() {
 	variableCmd.AddCommand(updateVariableCmd)
-	updateVariableCmd.AddCommand(updateOrganizationCmd)
 	updateVariableCmd.Flags().StringVarP(&VariableId, "id", "", "", "Id of the variable (required)")
 	_ = updateVariableCmd.MarkFlagRequired("id")
 	updateVariableCmd.Flags().StringVarP(&VariableUpdateKey, "key", "k", "", "Key of the variable")
 	updateVariableCmd.Flags().StringVarP(&VariableUpdateValue, "value", "v", "", "Value of the variable")
-	updateVariableCmd.Flags().StringVarP(&VariableUpdateOrgId, "organization-id", "", "", "Organization Id (required)")
-	_ = updateVariableCmd.MarkFlagRequired("organization-id")
-	updateVariableCmd.Flags().StringVarP(&VariableUpdateWorkspaceId, "workspace-id", "w", "", "Workspace Id (required)")
-	_ = updateVariableCmd.MarkFlagRequired("workspace-id")
+	registerOrgFlag(updateVariableCmd, &VariableUpdateOrgId)
+	registerWsFlag(updateVariableCmd, &VariableUpdateWorkspaceId)
 	updateVariableCmd.Flags().StringVarP(&VariableUpdateDescription, "description", "d", "", "Description of the variable")
 	updateVariableCmd.Flags().StringVarP(&VariableUpdateCategory, "category", "c", "", "Category of the variable. Valid values are TERRAFORM or ENV")
 	updateVariableCmd.Flags().BoolVarP(&VariableUpdateSensitive, "sensitive", "s", false, "Whether the value is sensitive. If true then the variable is written once and not visible thereafter.")
 	updateVariableCmd.Flags().BoolVarP(&VariableUpdateHcl, "hcl", "", false, "Whether to evaluate the value of the variable as a string of HCL code. Has no effect for environment variables.")
-
 }
 
 func updateVariable() {
 	client := newClient()
-
-	variable := models.Variable{
-		Attributes: &models.VariableAttributes{
-			Key:         VariableUpdateKey,
-			Value:       VariableUpdateValue,
-			Description: VariableUpdateDescription,
-			Sensitive:   VariableUpdateSensitive,
-			Hcl:         VariableUpdateHcl,
-			Category:    VariableUpdateCategory,
-		},
-		ID:   VariableId,
-		Type: "variable",
+	ctx := getContext()
+	orgID, err := resolveOrg(ctx, client, VariableUpdateOrgId)
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
-	err := client.Variable.Update(VariableUpdateOrgId, VariableUpdateWorkspaceId, variable)
+	wsID, err := resolveWs(ctx, client, orgID, VariableUpdateWorkspaceId)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	variable := &terrakube.Variable{
+		ID:          VariableId,
+		Key:         VariableUpdateKey,
+		Value:       VariableUpdateValue,
+		Description: VariableUpdateDescription,
+		Sensitive:   VariableUpdateSensitive,
+		Hcl:         VariableUpdateHcl,
+		Category:    VariableUpdateCategory,
+	}
+	_, err = client.Variables.Update(ctx, orgID, wsID, variable)
 
 	if err != nil {
 		fmt.Println(err)

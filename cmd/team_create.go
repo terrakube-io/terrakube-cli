@@ -2,13 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"terrakube/client/models"
 
+	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
 var TeamCreateExample string = `Create a new Team
-    %[1]v team create --organization-id e5ad0642-f9b3-48b3-9bf4-35997febe1fb -n AZB_USER --manage-workspace=true --manage-module=true --manage-provider=true`
+    %[1]v team create -o e5ad0642-f9b3-48b3-9bf4-35997febe1fb -n AZB_USER --manage-workspace=true --manage-module=true --manage-provider=true`
 
 var TeamCreateName string
 var TeamCreateOrgId string
@@ -33,8 +33,7 @@ func init() {
 	teamCmd.AddCommand(createTeamCmd)
 	createTeamCmd.Flags().StringVarP(&TeamCreateName, "name", "n", "", "Name of the new Team (required)")
 	_ = createTeamCmd.MarkFlagRequired("name")
-	createTeamCmd.Flags().StringVarP(&TeamCreateOrgId, "organization-id", "", "", "Organization Id (required)")
-	_ = createTeamCmd.MarkFlagRequired("organization-id")
+	registerOrgFlag(createTeamCmd, &TeamCreateOrgId)
 	createTeamCmd.Flags().BoolVarP(&TeamCreateManageProvider, "manage-provider", "", false, "Manage Provider Permissions")
 	createTeamCmd.Flags().BoolVarP(&TeamCreateManageModule, "manage-module", "", false, "Manage Module Permissions")
 	createTeamCmd.Flags().BoolVarP(&TeamCreateManageWorkspace, "manage-workspace", "", false, "Manage Workspaces Permissions")
@@ -47,22 +46,25 @@ func init() {
 
 func createTeam() {
 	client := newClient()
-
-	team := models.Team{
-		Attributes: &models.TeamAttributes{
-			Name:             TeamCreateName,
-			ManageWorkspace:  TeamCreateManageWorkspace,
-			ManageModule:     TeamCreateManageModule,
-			ManageProvider:   TeamCreateManageProvider,
-			ManageState:      TeamCreateManageState,
-			ManageCollection: TeamCreateManageCollection,
-			ManageVcs:        TeamCreateManageVcs,
-			ManageTemplate:   TeamCreateManageTemplate,
-		},
-		Type: "team",
+	ctx := getContext()
+	orgID, err := resolveOrg(ctx, client, TeamCreateOrgId)
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 
-	resp, err := client.Team.Create(TeamCreateOrgId, team)
+	team := &terrakube.Team{
+		Name:             TeamCreateName,
+		ManageWorkspace:  TeamCreateManageWorkspace,
+		ManageModule:     TeamCreateManageModule,
+		ManageProvider:   TeamCreateManageProvider,
+		ManageState:      TeamCreateManageState,
+		ManageCollection: TeamCreateManageCollection,
+		ManageVcs:        TeamCreateManageVcs,
+		ManageTemplate:   TeamCreateManageTemplate,
+	}
+
+	resp, err := client.Teams.Create(ctx, orgID, team)
 
 	if err != nil {
 		fmt.Println(err)

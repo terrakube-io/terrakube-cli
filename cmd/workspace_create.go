@@ -2,13 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"terrakube/client/models"
 
+	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
 var WorkspaceCreateExample string = `Create a new workspace
-    %[1]v workspace create --organization-id 312b4415-806b-47a9-9452-b71f0753136e -n myWorkspace -s https://github.com/terrakube-io/terraform-sample-repository.git -b master -t 0.15.0`
+    %[1]v workspace create -o 312b4415-806b-47a9-9452-b71f0753136e -n myWorkspace -s https://github.com/terrakube-io/terraform-sample-repository.git -b master -t 0.15.0`
 
 var WorkspaceCreateName string
 var WorkspaceDescription string
@@ -41,8 +41,7 @@ func init() {
 	workspaceCmd.AddCommand(createWorkspaceCmd)
 	createWorkspaceCmd.Flags().StringVarP(&WorkspaceCreateName, "name", "n", "", "Name of the new workspace (required)")
 	_ = createWorkspaceCmd.MarkFlagRequired("name")
-	createWorkspaceCmd.Flags().StringVarP(&WorkspaceCreateOrgId, "organization-id", "", "", "Id of the organization (required)")
-	_ = createWorkspaceCmd.MarkFlagRequired("organization-id")
+	registerOrgFlag(createWorkspaceCmd, &WorkspaceCreateOrgId)
 	createWorkspaceCmd.Flags().StringVarP(&WorkspaceCreateBranch, "branch", "b", "", "Branch of the new workspace")
 	createWorkspaceCmd.Flags().StringVarP(&WorkspaceCreateSource, "source", "s", "", "Source of the new workspace")
 	createWorkspaceCmd.Flags().StringVarP(&WorkspaceCreateIacV, "iac-version", "v", "", "Terraform/tofu Version use in the new workspace")
@@ -55,22 +54,25 @@ func init() {
 
 func createWorkspace() {
 	client := newClient()
-
-	workspace := models.Workspace{
-		Attributes: &models.WorkspaceAttributes{
-			Name:             WorkspaceCreateName,
-			Description:      WorkspaceDescription,
-			Folder:           WorkspaceCreateFolder,
-			Source:           WorkspaceCreateSource,
-			Branch:           WorkspaceCreateBranch,
-			IacType:          WorkspaceCreateIacType,
-			ExecutionMode:    WorkspaceExecutionMode,
-			TerraformVersion: WorkspaceCreateIacV,
-		},
-		Type: "workspace",
+	ctx := getContext()
+	orgID, err := resolveOrg(ctx, client, WorkspaceCreateOrgId)
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 
-	resp, err := client.Workspace.Create(WorkspaceCreateOrgId, workspace)
+	workspace := &terrakube.Workspace{
+		Name:          WorkspaceCreateName,
+		Description:   ptrOrNil(WorkspaceDescription),
+		Folder:        WorkspaceCreateFolder,
+		Source:        WorkspaceCreateSource,
+		Branch:        WorkspaceCreateBranch,
+		IaCType:       WorkspaceCreateIacType,
+		ExecutionMode: WorkspaceExecutionMode,
+		IaCVersion:    WorkspaceCreateIacV,
+	}
+
+	resp, err := client.Workspaces.Create(ctx, orgID, workspace)
 
 	if err != nil {
 		fmt.Println(err)
