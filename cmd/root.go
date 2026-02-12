@@ -18,7 +18,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	terrakube "github.com/denniswebb/terrakube-go"
+	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
 var cfgFile string

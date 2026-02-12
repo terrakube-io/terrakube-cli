@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	terrakube "github.com/denniswebb/terrakube-go"
+	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
 func collectionResolver(ctx context.Context, c *terrakube.Client, resolvedParentIDs []string, name string) (string, error) {

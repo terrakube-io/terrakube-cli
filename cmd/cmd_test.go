@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	terrakube "github.com/denniswebb/terrakube-go"
+	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/google/jsonapi"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	terrakube "github.com/denniswebb/terrakube-go"
+	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

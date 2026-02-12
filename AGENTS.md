@@ -7,7 +7,7 @@ Terrakube CLI (`terrakube`) is a command-line tool for managing Terrakube Server
 - **Language**: Go 1.25
 - **Module path**: `terrakube`
 - **CLI framework**: [cobra](https://github.com/spf13/cobra) + [viper](https://github.com/spf13/viper)
-- **API client**: [github.com/denniswebb/terrakube-go](https://github.com/denniswebb/terrakube-go) (JSON:API via [google/jsonapi](https://github.com/google/jsonapi))
+- **API client**: [github.com/terrakube-io/terrakube-go](https://github.com/terrakube-io/terrakube-go) (JSON:API via [google/jsonapi](https://github.com/google/jsonapi))
 - **Config**: `~/.terrakube-cli.yaml` or `--config` flag
 - **Auth**: Bearer token via config or `TERRAKUBE_TOKEN` env var
 - **Output formats**: json (default), yaml, table, tsv, none

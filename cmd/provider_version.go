@@ -3,7 +3,7 @@ package cmd
 import (
 	"context"
 
-	terrakube "github.com/denniswebb/terrakube-go"
+	terrakube "github.com/terrakube-io/terrakube-go"
 
 	"terrakube/internal/resource"
 )

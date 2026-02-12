@@ -1,7 +1,7 @@
 package testutil
 
 import (
-	terrakube "github.com/denniswebb/terrakube-go"
+	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
 func strPtr(s string) *string { return &s }

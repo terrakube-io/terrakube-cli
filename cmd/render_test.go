@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	terrakube "github.com/denniswebb/terrakube-go"
+	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
 func captureStdout(t *testing.T, fn func()) string {

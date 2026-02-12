@@ -6,7 +6,7 @@ import (
 	"os"
 	"reflect"
 
-	terrakube "github.com/denniswebb/terrakube-go"
+	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
 
 	"terrakube/internal/output"
