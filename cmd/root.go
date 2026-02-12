@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -12,17 +11,18 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/kataras/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
 	"github.com/spf13/viper"
 
 	terrakube "github.com/terrakube-io/terrakube-go"
+
+	outputpkg "terrakube/internal/output"
 )
 
 var cfgFile string
 var output string
+var hideNulls bool
 var envPrefix string = "TERRAKUBE"
 
 // rootCmd represents the base command when called without any subcommands
@@ -45,8 +45,10 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.terrakube-cli.yaml)")
-	rootCmd.PersistentFlags().StringVar(&output, "output", "json", "Use json, table, tsv or none to format CLI output")
+	rootCmd.PersistentFlags().StringVar(&output, "output", "json", "Output format: json, yaml, table, tsv, or none")
+	rootCmd.PersistentFlags().BoolVar(&hideNulls, "hide-nulls", true, "Hide null values in JSON output")
 	_ = viper.BindPFlag("output", rootCmd.Flags().Lookup("output"))
+	_ = viper.BindPFlag("hide-nulls", rootCmd.PersistentFlags().Lookup("hide-nulls"))
 	_ = rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
 	cobra.AddTemplateFunc("StyleHeading", color.New(color.FgCyan).SprintFunc())
@@ -84,6 +86,8 @@ func initConfig() {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 
+	outputpkg.HideNulls = viper.GetBool("hide-nulls")
+
 	postInitCommands(rootCmd.Commands())
 }
 
@@ -111,31 +115,8 @@ func ptrOrNil(s string) *string {
 }
 
 func renderOutput(result interface{}, format string) {
-	switch format {
-	case "json":
-		printJSON, err := json.MarshalIndent(result, "", "    ")
-		if err != nil {
-			log.Fatal("Failed to generate json", err)
-		}
-		fmt.Printf("%s\n", string(printJSON))
-	case "tsv":
-		data, _ := splitInterface(result)
-		for _, v := range data {
-			fmt.Println(strings.Join(v[:], "\t"))
-		}
-	case "table":
-		data, header := splitInterface(result)
-		if len(data) > 0 {
-			table := tablewriter.NewWriter(os.Stdout)
-			table.AppendBulk(data)
-			table.SetHeader(header)
-			table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
-			table.SetCaption(true, " ")
-			table.SetCenterSeparator("|")
-			table.Render()
-		}
-	case "none":
-
+	if err := outputpkg.Render(os.Stdout, result, format); err != nil {
+		log.Fatal("Failed to render output: ", err)
 	}
 }
 

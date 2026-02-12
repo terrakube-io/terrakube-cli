@@ -52,18 +52,26 @@ func TestRenderJSON_Single(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	// JSON output uses JSON:API format: {type, id, attributes: {...}}
 	var m map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &m); err != nil {
 		t.Fatalf("output is not valid json: %v", err)
 	}
-	if m["ID"] != "abc-123" {
-		t.Errorf("expected ID abc-123, got %v", m["ID"])
+	if m["id"] != "abc-123" {
+		t.Errorf("expected id abc-123, got %v", m["id"])
 	}
-	if m["Name"] != "test-item" {
-		t.Errorf("expected Name test-item, got %v", m["Name"])
+	if m["type"] != "sample" {
+		t.Errorf("expected type sample, got %v", m["type"])
 	}
-	if m["Active"] != true {
-		t.Errorf("expected Active true, got %v", m["Active"])
+	attrs, ok := m["attributes"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected attributes object, got %T", m["attributes"])
+	}
+	if attrs["name"] != "test-item" {
+		t.Errorf("expected name test-item, got %v", attrs["name"])
+	}
+	if attrs["active"] != true {
+		t.Errorf("expected active true, got %v", attrs["active"])
 	}
 }
 
@@ -74,12 +82,19 @@ func TestRenderJSON_Slice(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	// JSON output is a JSON:API array of resource objects
 	var items []map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &items); err != nil {
 		t.Fatalf("output is not valid json array: %v", err)
 	}
 	if len(items) != 2 {
 		t.Errorf("expected 2 items, got %d", len(items))
+	}
+	if items[0]["id"] != "abc-123" {
+		t.Errorf("expected first item id abc-123, got %v", items[0]["id"])
+	}
+	if items[1]["id"] != "def-456" {
+		t.Errorf("expected second item id def-456, got %v", items[1]["id"])
 	}
 }
 
