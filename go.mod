@@ -3,7 +3,7 @@ module terrakube
 go 1.25
 
 require (
-	github.com/denniswebb/terrakube-go v0.0.0-20260211172012-f909fdf49962
+	github.com/denniswebb/terrakube-go v0.0.0-20260211221500-213b10cfcfa7
 	github.com/fatih/color v1.18.0
 	github.com/google/jsonapi v1.0.0
 	github.com/kataras/tablewriter v0.0.0-20180708051242-e063d29b7c23
