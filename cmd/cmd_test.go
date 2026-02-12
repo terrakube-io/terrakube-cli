@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"terrakube/client/models"
-
+	terrakube "github.com/terrakube-io/terrakube-go"
+	"github.com/google/jsonapi"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -182,11 +182,12 @@ func resetGlobalFlags() {
 	// Without this, a value set in one test (via flag parsing -> viper binding) bleeds
 	// into subsequent tests because presetRequiredFlags reads viper state.
 	viperKeysToReset := []string{
-		"organization-id", "workspace-id", "id", "name", "api-url", "pat",
+		"organization-id", "organization-name", "workspace-id", "workspace-name",
+		"id", "name", "api-url", "pat",
 		"api_url", "token", "command", "key", "value", "category",
 		"sensitive", "hcl", "filter", "source", "branch", "folder",
 		"execution-mode", "iac-type", "iac-version", "description",
-		"executionMode", "icon", "provider", "tag-prefix",
+		"executionMode", "icon", "provider", "tag-prefix", "tag-id",
 		"manage-provider", "manage-module", "manage-workspace",
 		"manage-state", "manage-collection", "manage-vcs", "manage-template",
 		"cli",
@@ -257,16 +258,16 @@ func TestCmdWorkspaceListMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("workspace", "list")
 	if err == nil {
-		t.Fatal("expected error for workspace list without --organization-id, got nil")
+		t.Fatal("expected error for workspace list without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
 func TestCmdWorkspaceCreateMissingName(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "create", "--organization-id", "some-org-id")
+	_, err := executeCommand("workspace", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for workspace create without --name, got nil")
 	}
@@ -279,10 +280,10 @@ func TestCmdWorkspaceCreateMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("workspace", "create", "--name", "test-ws")
 	if err == nil {
-		t.Fatal("expected error for workspace create without --organization-id, got nil")
+		t.Fatal("expected error for workspace create without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
@@ -310,18 +311,18 @@ func TestCmdOrganizationDeleteMissingId(t *testing.T) {
 
 func TestCmdWorkspaceDeleteMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "delete", "--id", "ws-123")
+	_, err := executeCommand("workspace", "delete", "--id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
-		t.Fatal("expected error for workspace delete without --organization-id, got nil")
+		t.Fatal("expected error for workspace delete without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
 func TestCmdWorkspaceDeleteMissingId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "delete", "--organization-id", "org-123")
+	_, err := executeCommand("workspace", "delete", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for workspace delete without --id, got nil")
 	}
@@ -332,7 +333,7 @@ func TestCmdWorkspaceDeleteMissingId(t *testing.T) {
 
 func TestCmdModuleCreateMissingName(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("module", "create", "--organization-id", "org-123")
+	_, err := executeCommand("module", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for module create without --name, got nil")
 	}
@@ -345,16 +346,16 @@ func TestCmdModuleCreateMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("module", "create", "--name", "mod1")
 	if err == nil {
-		t.Fatal("expected error for module create without --organization-id, got nil")
+		t.Fatal("expected error for module create without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
 func TestCmdTeamCreateMissingName(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("team", "create", "--organization-id", "org-123")
+	_, err := executeCommand("team", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for team create without --name, got nil")
 	}
@@ -367,16 +368,16 @@ func TestCmdTeamCreateMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("team", "create", "--name", "team1")
 	if err == nil {
-		t.Fatal("expected error for team create without --organization-id, got nil")
+		t.Fatal("expected error for team create without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
 func TestCmdJobCreateMissingCommand(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("job", "create", "--organization-id", "org-123", "--workspace-id", "ws-123")
+	_, err := executeCommand("job", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
 		t.Fatal("expected error for job create without --command, got nil")
 	}
@@ -387,34 +388,34 @@ func TestCmdJobCreateMissingCommand(t *testing.T) {
 
 func TestCmdJobCreateMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("job", "create", "--command", "plan", "--workspace-id", "ws-123")
+	_, err := executeCommand("job", "create", "--command", "plan", "--workspace", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
-		t.Fatal("expected error for job create without --organization-id, got nil")
+		t.Fatal("expected error for job create without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
 func TestCmdVariableListMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "variable", "list", "--workspace-id", "ws-123")
+	_, err := executeCommand("workspace", "variable", "list", "--workspace", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
-		t.Fatal("expected error for variable list without --organization-id, got nil")
+		t.Fatal("expected error for variable list without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
 func TestCmdVariableListMissingWorkspaceId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "variable", "list", "--organization-id", "org-123")
+	_, err := executeCommand("workspace", "variable", "list", "--organization", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
-		t.Fatal("expected error for variable list without --workspace-id, got nil")
+		t.Fatal("expected error for variable list without --workspace, got nil")
 	}
-	if !strings.Contains(err.Error(), "workspace-id") {
-		t.Errorf("expected error to mention workspace-id, got: %v", err)
+	if !strings.Contains(err.Error(), "workspace") {
+		t.Errorf("expected error to mention workspace, got: %v", err)
 	}
 }
 
@@ -478,32 +479,24 @@ func TestCmdWorkspaceCreateCliFlag(t *testing.T) {
 	resetGlobalFlags()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var reqBody models.PostBodyWorkspace
 		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &reqBody)
+		var bodyMap map[string]interface{}
+		_ = json.Unmarshal(body, &bodyMap)
 
-		if reqBody.Data != nil && reqBody.Data.Attributes != nil {
-			if reqBody.Data.Attributes.Source != "empty" {
-				t.Errorf("expected source 'empty' when --cli is set, got %q", reqBody.Data.Attributes.Source)
-			}
-			if reqBody.Data.Attributes.Branch != "remote-content" {
-				t.Errorf("expected branch 'remote-content' when --cli is set, got %q", reqBody.Data.Attributes.Branch)
+		if data, ok := bodyMap["data"].(map[string]interface{}); ok {
+			if attrs, ok := data["attributes"].(map[string]interface{}); ok {
+				if attrs["source"] != "empty" {
+					t.Errorf("expected source 'empty' when --cli is set, got %q", attrs["source"])
+				}
+				if attrs["branch"] != "remote-content" {
+					t.Errorf("expected branch 'remote-content' when --cli is set, got %q", attrs["branch"])
+				}
 			}
 		}
 
-		resp := models.PostBodyWorkspace{
-			Data: &models.Workspace{
-				ID: "ws-new",
-				Attributes: &models.WorkspaceAttributes{
-					Name:   "cli-ws",
-					Source: "empty",
-					Branch: "remote-content",
-				},
-				Type: "workspace",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		ws := &terrakube.Workspace{ID: "ws-new", Name: "cli-ws", Source: "empty", Branch: "remote-content"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, ws)
 	})
 
 	ts := setupTestServer(handler)
@@ -512,7 +505,7 @@ func TestCmdWorkspaceCreateCliFlag(t *testing.T) {
 	out, err := executeCommand(
 		"workspace", "create",
 		"--name", "cli-ws",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--cli",
 	)
 	if err != nil {
@@ -536,19 +529,9 @@ func TestCmdWorkspaceCreateWithoutCliFlag(t *testing.T) {
 	resetGlobalFlags()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := models.PostBodyWorkspace{
-			Data: &models.Workspace{
-				ID: "ws-new",
-				Attributes: &models.WorkspaceAttributes{
-					Name:   "vcs-ws",
-					Source: "https://github.com/example/repo.git",
-					Branch: "main",
-				},
-				Type: "workspace",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		ws := &terrakube.Workspace{ID: "ws-new", Name: "vcs-ws", Source: "https://github.com/example/repo.git", Branch: "main"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, ws)
 	})
 
 	ts := setupTestServer(handler)
@@ -557,7 +540,7 @@ func TestCmdWorkspaceCreateWithoutCliFlag(t *testing.T) {
 	out, err := executeCommand(
 		"workspace", "create",
 		"--name", "vcs-ws",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--source", "https://github.com/example/repo.git",
 		"--branch", "main",
 	)
@@ -641,10 +624,10 @@ func TestCmdAliasWrkRoutes(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("wrk", "list")
 	if err == nil {
-		t.Fatal("expected error for wrk list without --organization-id, got nil")
+		t.Fatal("expected error for wrk list without --organization, got nil")
 	}
 	// The fact that we get a "required flag" error means the alias routed correctly
-	if !strings.Contains(err.Error(), "organization-id") {
+	if !strings.Contains(err.Error(), "organization") {
 		t.Errorf("expected alias 'wrk' to route to workspace command, got error: %v", err)
 	}
 }
@@ -662,7 +645,7 @@ func TestCmdAliasOrgRoutes(t *testing.T) {
 
 func TestCmdAliasModRoutes(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("mod", "create", "--organization-id", "org-123")
+	_, err := executeCommand("mod", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for mod create without --name, got nil")
 	}
@@ -828,13 +811,15 @@ func TestCmdRootTopLevelCommands(t *testing.T) {
 	resetGlobalFlags()
 
 	expected := map[string]bool{
-		"workspace":    false,
-		"organization": false,
-		"module":       false,
-		"team":         false,
-		"job":          false,
-		"login":        false,
-		"logout":       false,
+		"workspace":     false,
+		"organization":  false,
+		"module":        false,
+		"team":          false,
+		"job":           false,
+		"template":      false,
+		"workspace-tag": false,
+		"login":         false,
+		"logout":        false,
 	}
 
 	for _, sub := range rootCmd.Commands() {
@@ -865,7 +850,7 @@ func TestCmdOrganizationCreateInvalidExecutionMode(t *testing.T) {
 
 func TestCmdOrganizationUpdateInvalidExecutionMode(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("organization", "update", "--id", "org-123", "--executionMode", "bogus")
+	_, err := executeCommand("organization", "update", "--id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--executionMode", "bogus")
 	if err == nil {
 		t.Fatal("expected error for invalid execution mode on update, got nil")
 	}
@@ -883,34 +868,22 @@ func TestCmdWorkspaceListE2E(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "organization/org-123/workspace") {
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/workspace") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		if r.Header.Get("Authorization") != "Bearer test-token" {
 			t.Errorf("unexpected auth header: %s", r.Header.Get("Authorization"))
 		}
 
-		resp := models.GetBodyWorkspace{
-			Data: []*models.Workspace{
-				{
-					ID: "ws-1",
-					Attributes: &models.WorkspaceAttributes{
-						Name:   "workspace-one",
-						Source: "https://github.com/example/repo.git",
-						Branch: "main",
-					},
-					Type: "workspace",
-				},
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		workspaces := []*terrakube.Workspace{{ID: "ws-1", Name: "workspace-one", Source: "https://github.com/example/repo.git", Branch: "main"}}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, workspaces)
 	})
 
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("workspace", "list", "--organization-id", "org-123")
+	out, err := executeCommand("workspace", "list", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -928,20 +901,9 @@ func TestCmdOrganizationListE2E(t *testing.T) {
 
 	desc := "test desc"
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := models.GetBodyOrganization{
-			Data: []*models.Organization{
-				{
-					ID: "org-1",
-					Attributes: &models.OrganizationAttributes{
-						Name:        "org-one",
-						Description: &desc,
-					},
-					Type: "organization",
-				},
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		orgs := []*terrakube.Organization{{ID: "org-1", Name: "org-one", Description: &desc}}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, orgs)
 	})
 
 	ts := setupTestServer(handler)
@@ -960,24 +922,14 @@ func TestCmdOrganizationListE2E(t *testing.T) {
 func TestCmdOrganizationCreateE2E(t *testing.T) {
 	resetGlobalFlags()
 
-	var receivedBody models.PostBodyOrganization
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		// consume body
+		_, _ = io.ReadAll(r.Body)
 
 		desc := "test org"
-		resp := models.PostBodyOrganization{
-			Data: &models.Organization{
-				ID: "org-new",
-				Attributes: &models.OrganizationAttributes{
-					Name:        "new-org",
-					Description: &desc,
-				},
-				Type: "organization",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		org := &terrakube.Organization{ID: "org-new", Name: "new-org", Description: &desc}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, org)
 	})
 
 	ts := setupTestServer(handler)
@@ -996,25 +948,13 @@ func TestCmdOrganizationCreateE2E(t *testing.T) {
 func TestCmdWorkspaceCreateE2E(t *testing.T) {
 	resetGlobalFlags()
 
-	var receivedBody models.PostBodyWorkspace
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		// consume body
+		_, _ = io.ReadAll(r.Body)
 
-		resp := models.PostBodyWorkspace{
-			Data: &models.Workspace{
-				ID: "ws-new",
-				Attributes: &models.WorkspaceAttributes{
-					Name:          "test-ws",
-					Folder:        "/modules",
-					ExecutionMode: "remote",
-					IacType:       "terraform",
-				},
-				Type: "workspace",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		ws := &terrakube.Workspace{ID: "ws-new", Name: "test-ws", Folder: "/modules", ExecutionMode: "remote", IaCType: "terraform"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, ws)
 	})
 
 	ts := setupTestServer(handler)
@@ -1023,7 +963,7 @@ func TestCmdWorkspaceCreateE2E(t *testing.T) {
 	out, err := executeCommand(
 		"workspace", "create",
 		"--name", "test-ws",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--folder", "/modules",
 		"--source", "https://github.com/example/repo.git",
 		"--branch", "main",
@@ -1088,7 +1028,7 @@ func TestCmdWorkspaceListAPIError(t *testing.T) {
 
 	// The command should not return an error from cobra (it prints the error itself)
 	// but the output should indicate something went wrong or at least not crash
-	_, err := executeCommand("workspace", "list", "--organization-id", "org-123")
+	_, err := executeCommand("workspace", "list", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	// Even with a 500 response, cobra itself doesn't error out - the command
 	// prints the error internally. So we just verify no panic occurred.
 	_ = err
@@ -1100,18 +1040,9 @@ func TestCmdWorkspaceCreateOutputContainsJSON(t *testing.T) {
 	resetGlobalFlags()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := models.PostBodyWorkspace{
-			Data: &models.Workspace{
-				ID: "ws-json-test",
-				Attributes: &models.WorkspaceAttributes{
-					Name:   "json-ws",
-					Folder: "/",
-				},
-				Type: "workspace",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		ws := &terrakube.Workspace{ID: "ws-json-test", Name: "json-ws", Folder: "/"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, ws)
 	})
 
 	ts := setupTestServer(handler)
@@ -1120,7 +1051,7 @@ func TestCmdWorkspaceCreateOutputContainsJSON(t *testing.T) {
 	out, err := executeCommand(
 		"workspace", "create",
 		"--name", "json-ws",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1154,24 +1085,17 @@ func TestCmdWorkspaceCreateOutputContainsJSON(t *testing.T) {
 func TestCmdWorkspaceCreateSendsCorrectBody(t *testing.T) {
 	resetGlobalFlags()
 
-	var receivedBody models.PostBodyWorkspace
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
 
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 
-		resp := models.PostBodyWorkspace{
-			Data: &models.Workspace{
-				ID:         "ws-resp",
-				Attributes: &models.WorkspaceAttributes{Name: "body-test"},
-				Type:       "workspace",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		ws := &terrakube.Workspace{ID: "ws-resp", Name: "body-test"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, ws)
 	})
 
 	ts := setupTestServer(handler)
@@ -1180,7 +1104,7 @@ func TestCmdWorkspaceCreateSendsCorrectBody(t *testing.T) {
 	_, err := executeCommand(
 		"workspace", "create",
 		"--name", "body-test",
-		"--organization-id", "org-abc",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--source", "https://github.com/test/repo.git",
 		"--branch", "develop",
 		"--iac-version", "1.5.0",
@@ -1193,57 +1117,55 @@ func TestCmdWorkspaceCreateSendsCorrectBody(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if receivedBody.Data == nil {
-		t.Fatal("expected request body to contain data, got nil")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	attrs := receivedBody.Data.Attributes
-	if attrs == nil {
-		t.Fatal("expected request body data to contain attributes, got nil")
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body to contain data")
 	}
-	if attrs.Name != "body-test" {
-		t.Errorf("expected name 'body-test', got %q", attrs.Name)
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
 	}
-	if attrs.Source != "https://github.com/test/repo.git" {
-		t.Errorf("expected source 'https://github.com/test/repo.git', got %q", attrs.Source)
+	if attrs["name"] != "body-test" {
+		t.Errorf("expected name 'body-test', got %v", attrs["name"])
 	}
-	if attrs.Branch != "develop" {
-		t.Errorf("expected branch 'develop', got %q", attrs.Branch)
+	if attrs["source"] != "https://github.com/test/repo.git" {
+		t.Errorf("expected source 'https://github.com/test/repo.git', got %v", attrs["source"])
 	}
-	if attrs.TerraformVersion != "1.5.0" {
-		t.Errorf("expected iac-version '1.5.0', got %q", attrs.TerraformVersion)
+	if attrs["branch"] != "develop" {
+		t.Errorf("expected branch 'develop', got %v", attrs["branch"])
 	}
-	if attrs.Folder != "/infra" {
-		t.Errorf("expected folder '/infra', got %q", attrs.Folder)
+	if attrs["terraformVersion"] != "1.5.0" {
+		t.Errorf("expected iac-version '1.5.0', got %v", attrs["terraformVersion"])
 	}
-	if attrs.ExecutionMode != "local" {
-		t.Errorf("expected execution-mode 'local', got %q", attrs.ExecutionMode)
+	if attrs["folder"] != "/infra" {
+		t.Errorf("expected folder '/infra', got %v", attrs["folder"])
 	}
-	if attrs.IacType != "tofu" {
-		t.Errorf("expected iac-type 'tofu', got %q", attrs.IacType)
+	if attrs["executionMode"] != "local" {
+		t.Errorf("expected execution-mode 'local', got %v", attrs["executionMode"])
 	}
-	if attrs.Description != "a test workspace" {
-		t.Errorf("expected description 'a test workspace', got %q", attrs.Description)
+	if attrs["iacType"] != "tofu" {
+		t.Errorf("expected iac-type 'tofu', got %v", attrs["iacType"])
+	}
+	if attrs["description"] != "a test workspace" {
+		t.Errorf("expected description 'a test workspace', got %v", attrs["description"])
 	}
 }
 
 func TestCmdOrganizationCreateSendsCorrectBody(t *testing.T) {
 	resetGlobalFlags()
 
-	var receivedBody models.PostBodyOrganization
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 
 		desc := "org desc"
-		resp := models.PostBodyOrganization{
-			Data: &models.Organization{
-				ID:         "org-resp",
-				Attributes: &models.OrganizationAttributes{Name: "body-org", Description: &desc},
-				Type:       "organization",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		org := &terrakube.Organization{ID: "org-resp", Name: "body-org", Description: &desc}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, org)
 	})
 
 	ts := setupTestServer(handler)
@@ -1259,15 +1181,20 @@ func TestCmdOrganizationCreateSendsCorrectBody(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if receivedBody.Data == nil {
-		t.Fatal("expected request body to contain data, got nil")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	attrs := receivedBody.Data.Attributes
-	if attrs == nil {
-		t.Fatal("expected request body data to contain attributes, got nil")
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body to contain data")
 	}
-	if attrs.Name != "body-org" {
-		t.Errorf("expected name 'body-org', got %q", attrs.Name)
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
+	}
+	if attrs["name"] != "body-org" {
+		t.Errorf("expected name 'body-org', got %v", attrs["name"])
 	}
 }
 
@@ -1297,23 +1224,37 @@ func TestCmdUnknownCommandErrors(t *testing.T) {
 	}
 }
 
-// ----- Team has no alias (verify negative) -----
+// ----- Team alias -----
 
-func TestCmdTeamHasNoAlias(t *testing.T) {
+func TestCmdTeamAlias(t *testing.T) {
 	resetGlobalFlags()
 
-	if len(teamCmd.Aliases) != 0 {
-		t.Errorf("expected team command to have no aliases, got: %v", teamCmd.Aliases)
+	found := false
+	for _, a := range teamCmd.Aliases {
+		if a == "teams" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected team command to have alias 'teams', got aliases: %v", teamCmd.Aliases)
 	}
 }
 
-// ----- Job has no alias (verify negative) -----
+// ----- Job alias -----
 
-func TestCmdJobHasNoAlias(t *testing.T) {
+func TestCmdJobAlias(t *testing.T) {
 	resetGlobalFlags()
 
-	if len(jobCmd.Aliases) != 0 {
-		t.Errorf("expected job command to have no aliases, got: %v", jobCmd.Aliases)
+	found := false
+	for _, a := range jobCmd.Aliases {
+		if a == "jobs" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected job command to have alias 'jobs', got aliases: %v", jobCmd.Aliases)
 	}
 }
 
@@ -1341,15 +1282,9 @@ func TestCmdOrganizationCreateValidExecutionModes(t *testing.T) {
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		desc := ""
-		resp := models.PostBodyOrganization{
-			Data: &models.Organization{
-				ID:         "org-ok",
-				Attributes: &models.OrganizationAttributes{Name: "ok-org", Description: &desc},
-				Type:       "organization",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		org := &terrakube.Organization{ID: "org-ok", Name: "ok-org", Description: &desc}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, org)
 	})
 
 	ts := setupTestServer(handler)
@@ -1371,18 +1306,18 @@ func TestCmdOrganizationCreateValidExecutionModes(t *testing.T) {
 
 func TestCmdWorkspaceUpdateMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "update", "--id", "ws-123")
+	_, err := executeCommand("workspace", "update", "--id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
-		t.Fatal("expected error for workspace update without --organization-id, got nil")
+		t.Fatal("expected error for workspace update without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
 func TestCmdWorkspaceUpdateMissingId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "update", "--organization-id", "org-123")
+	_, err := executeCommand("workspace", "update", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
 	if err == nil {
 		t.Fatal("expected error for workspace update without --id, got nil")
 	}
@@ -1397,10 +1332,10 @@ func TestCmdModuleListMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("module", "list")
 	if err == nil {
-		t.Fatal("expected error for module list without --organization-id, got nil")
+		t.Fatal("expected error for module list without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
@@ -1410,10 +1345,10 @@ func TestCmdTeamListMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("team", "list")
 	if err == nil {
-		t.Fatal("expected error for team list without --organization-id, got nil")
+		t.Fatal("expected error for team list without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
@@ -1423,10 +1358,10 @@ func TestCmdJobListMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
 	_, err := executeCommand("job", "list")
 	if err == nil {
-		t.Fatal("expected error for job list without --organization-id, got nil")
+		t.Fatal("expected error for job list without --organization, got nil")
 	}
-	if !strings.Contains(err.Error(), "organization-id") {
-		t.Errorf("expected error to mention organization-id, got: %v", err)
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
 
@@ -1436,15 +1371,9 @@ func TestCmdWorkspaceCreateShortFlags(t *testing.T) {
 	resetGlobalFlags()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := models.PostBodyWorkspace{
-			Data: &models.Workspace{
-				ID:         "ws-short",
-				Attributes: &models.WorkspaceAttributes{Name: "short-ws"},
-				Type:       "workspace",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		ws := &terrakube.Workspace{ID: "ws-short", Name: "short-ws"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, ws)
 	})
 
 	ts := setupTestServer(handler)
@@ -1453,7 +1382,7 @@ func TestCmdWorkspaceCreateShortFlags(t *testing.T) {
 	_, err := executeCommand(
 		"workspace", "create",
 		"-n", "short-ws",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"-b", "main",
 		"-s", "https://github.com/test/repo.git",
 		"-f", "/modules",
@@ -1474,18 +1403,9 @@ func TestCmdTeamCreatePermissionsInBody(t *testing.T) {
 	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		capturedBody, _ = io.ReadAll(r.Body)
-		resp := models.PostBodyTeam{
-			Data: &models.Team{
-				ID: "team-new",
-				Attributes: &models.TeamAttributes{
-					Name:            "test-team",
-					ManageWorkspace: true,
-				},
-				Type: "team",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		team := &terrakube.Team{ID: "team-new", Name: "test-team", ManageWorkspace: true}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, team)
 	})
 
 	ts := setupTestServer(handler)
@@ -1494,7 +1414,7 @@ func TestCmdTeamCreatePermissionsInBody(t *testing.T) {
 	_, err := executeCommand(
 		"team", "create",
 		"--name", "test-team",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--manage-workspace",
 	)
 	if err != nil {
@@ -1505,9 +1425,8 @@ func TestCmdTeamCreatePermissionsInBody(t *testing.T) {
 		t.Errorf("expected request body to contain \"manageWorkspace\":true, got: %s", capturedBody)
 	}
 
-	// Test 2: Without --manage-workspace flag, the field is ABSENT (not false).
-	// BUG: omitempty drops false booleans, so there is no way to distinguish
-	// "user didn't set the flag" from "user explicitly wants false".
+	// Test 2: Without --manage-workspace flag, the field is present as false.
+	// terrakube-go has no omitempty on booleans, so false values are properly sent.
 	resetGlobalFlags()
 	viper.Set("api_url", ts.URL)
 	viper.Set("token", "test-token")
@@ -1517,7 +1436,7 @@ func TestCmdTeamCreatePermissionsInBody(t *testing.T) {
 	_, err = executeCommand(
 		"team", "create",
 		"--name", "test-team-no-perms",
-		"--organization-id", "org-123",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1530,8 +1449,8 @@ func TestCmdTeamCreatePermissionsInBody(t *testing.T) {
 	data := body["data"].(map[string]interface{})
 	attrs := data["attributes"].(map[string]interface{})
 
-	if _, exists := attrs["manageWorkspace"]; exists {
-		t.Error("expected manageWorkspace to be absent when flag not set (omitempty drops false), but it was present")
+	if _, exists := attrs["manageWorkspace"]; !exists {
+		t.Error("expected manageWorkspace to be present (false value sent by terrakube-go), but it was absent")
 	}
 }
 
@@ -1542,12 +1461,11 @@ func TestCmdOrganizationUpdateE2E(t *testing.T) {
 
 	var receivedMethod string
 	var receivedPath string
-	var receivedBody models.PostBodyOrganization
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -1556,7 +1474,7 @@ func TestCmdOrganizationUpdateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"organization", "update",
-		"--id", "org-123",
+		"--id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--name", "updated-org",
 		"--description", "new desc",
 	)
@@ -1567,14 +1485,23 @@ func TestCmdOrganizationUpdateE2E(t *testing.T) {
 	if receivedMethod != http.MethodPatch {
 		t.Errorf("expected PATCH, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-123") {
-		t.Errorf("expected path to contain organization/org-123, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890") {
+		t.Errorf("expected path to contain organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890, got %s", receivedPath)
 	}
-	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
-		t.Fatal("expected request body with data and attributes")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	if receivedBody.Data.Attributes.Name != "updated-org" {
-		t.Errorf("expected name 'updated-org', got %q", receivedBody.Data.Attributes.Name)
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
+	}
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
+	}
+	if attrs["name"] != "updated-org" {
+		t.Errorf("expected name 'updated-org', got %v", attrs["name"])
 	}
 	if !strings.Contains(out, "Updated") {
 		t.Errorf("expected 'Updated' in output, got: %s", out)
@@ -1617,12 +1544,11 @@ func TestCmdWorkspaceUpdateE2E(t *testing.T) {
 
 	var receivedMethod string
 	var receivedPath string
-	var receivedBody models.PostBodyWorkspace
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 		w.WriteHeader(http.StatusOK)
 	})
 
@@ -1631,7 +1557,7 @@ func TestCmdWorkspaceUpdateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"workspace", "update",
-		"--organization-id", "org-abc",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--id", "ws-789",
 		"--name", "updated-ws",
 		"--branch", "develop",
@@ -1649,20 +1575,29 @@ func TestCmdWorkspaceUpdateE2E(t *testing.T) {
 	// client builds a path with an empty workspace ID. The --id flag value is
 	// stored in WorkspaceUpdateId but never placed into the Workspace model.
 	// We test the actual (buggy) behavior here.
-	if !strings.Contains(receivedPath, "organization/org-abc/workspace/") {
-		t.Errorf("expected path to contain organization/org-abc/workspace/, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/, got %s", receivedPath)
 	}
-	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
-		t.Fatal("expected request body with data and attributes")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	if receivedBody.Data.Attributes.Name != "updated-ws" {
-		t.Errorf("expected name 'updated-ws', got %q", receivedBody.Data.Attributes.Name)
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
 	}
-	if receivedBody.Data.Attributes.Branch != "develop" {
-		t.Errorf("expected branch 'develop', got %q", receivedBody.Data.Attributes.Branch)
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
 	}
-	if receivedBody.Data.Attributes.TerraformVersion != "1.6.0" {
-		t.Errorf("expected iac-version '1.6.0', got %q", receivedBody.Data.Attributes.TerraformVersion)
+	if attrs["name"] != "updated-ws" {
+		t.Errorf("expected name 'updated-ws', got %v", attrs["name"])
+	}
+	if attrs["branch"] != "develop" {
+		t.Errorf("expected branch 'develop', got %v", attrs["branch"])
+	}
+	if attrs["terraformVersion"] != "1.6.0" {
+		t.Errorf("expected iac-version '1.6.0', got %v", attrs["terraformVersion"])
 	}
 	if !strings.Contains(out, "Updated") {
 		t.Errorf("expected 'Updated' in output, got: %s", out)
@@ -1687,7 +1622,7 @@ func TestCmdWorkspaceDeleteE2E(t *testing.T) {
 
 	_, err := executeCommand(
 		"workspace", "delete",
-		"--organization-id", "org-abc",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--id", "ws-789",
 	)
 	if err != nil {
@@ -1697,8 +1632,8 @@ func TestCmdWorkspaceDeleteE2E(t *testing.T) {
 	if receivedMethod != http.MethodDelete {
 		t.Errorf("expected DELETE, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/workspace/ws-789") {
-		t.Errorf("expected path to contain organization/org-abc/workspace/ws-789, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/ws-789") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/ws-789, got %s", receivedPath)
 	}
 }
 
@@ -1709,26 +1644,15 @@ func TestCmdModuleCreateE2E(t *testing.T) {
 
 	var receivedMethod string
 	var receivedPath string
-	var receivedBody models.PostBodyModule
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 
-		resp := models.PostBodyModule{
-			Data: &models.Module{
-				ID: "mod-new",
-				Attributes: &models.ModuleAttributes{
-					Name:     "test-mod",
-					Provider: "azurerm",
-					Source:   "https://github.com/test/repo.git",
-				},
-				Type: "module",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		mod := &terrakube.Module{ID: "mod-new", Name: "test-mod", Provider: "azurerm", Source: "https://github.com/test/repo.git"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, mod)
 	})
 
 	ts := setupTestServer(handler)
@@ -1736,7 +1660,7 @@ func TestCmdModuleCreateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"module", "create",
-		"--organization-id", "org-abc",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--name", "test-mod",
 		"--description", "a test module",
 		"--source", "https://github.com/test/repo.git",
@@ -1749,17 +1673,26 @@ func TestCmdModuleCreateE2E(t *testing.T) {
 	if receivedMethod != http.MethodPost {
 		t.Errorf("expected POST, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/module") {
-		t.Errorf("expected path to contain organization/org-abc/module, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/module") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/module, got %s", receivedPath)
 	}
-	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
-		t.Fatal("expected request body with data and attributes")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	if receivedBody.Data.Attributes.Name != "test-mod" {
-		t.Errorf("expected name 'test-mod', got %q", receivedBody.Data.Attributes.Name)
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
 	}
-	if receivedBody.Data.Attributes.Provider != "azurerm" {
-		t.Errorf("expected provider 'azurerm', got %q", receivedBody.Data.Attributes.Provider)
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
+	}
+	if attrs["name"] != "test-mod" {
+		t.Errorf("expected name 'test-mod', got %v", attrs["name"])
+	}
+	if attrs["provider"] != "azurerm" {
+		t.Errorf("expected provider 'azurerm', got %v", attrs["provider"])
 	}
 	if !strings.Contains(out, "mod-new") {
 		t.Errorf("expected output to contain 'mod-new', got: %s", out)
@@ -1777,26 +1710,15 @@ func TestCmdModuleListE2E(t *testing.T) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
 
-		resp := models.GetBodyModule{
-			Data: []*models.Module{
-				{
-					ID: "mod-1",
-					Attributes: &models.ModuleAttributes{
-						Name:     "module-one",
-						Provider: "aws",
-					},
-					Type: "module",
-				},
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		modules := []*terrakube.Module{{ID: "mod-1", Name: "module-one", Provider: "aws"}}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, modules)
 	})
 
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("module", "list", "--organization-id", "org-abc")
+	out, err := executeCommand("module", "list", "--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1804,8 +1726,8 @@ func TestCmdModuleListE2E(t *testing.T) {
 	if receivedMethod != http.MethodGet {
 		t.Errorf("expected GET, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/module") {
-		t.Errorf("expected path to contain organization/org-abc/module, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/module") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/module, got %s", receivedPath)
 	}
 	if !strings.Contains(out, "mod-1") {
 		t.Errorf("expected output to contain 'mod-1', got: %s", out)
@@ -1826,21 +1748,9 @@ func TestCmdVariableListE2E(t *testing.T) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
 
-		resp := models.GetBodyVariable{
-			Data: []*models.Variable{
-				{
-					ID: "var-1",
-					Attributes: &models.VariableAttributes{
-						Key:      "TF_VAR_name",
-						Value:    "hello",
-						Category: "TERRAFORM",
-					},
-					Type: "variable",
-				},
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		variables := []*terrakube.Variable{{ID: "var-1", Key: "TF_VAR_name", Value: "hello", Category: "TERRAFORM"}}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, variables)
 	})
 
 	ts := setupTestServer(handler)
@@ -1848,8 +1758,8 @@ func TestCmdVariableListE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"workspace", "variable", "list",
-		"--organization-id", "org-abc",
-		"--workspace-id", "ws-123",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
+		"--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1858,8 +1768,8 @@ func TestCmdVariableListE2E(t *testing.T) {
 	if receivedMethod != http.MethodGet {
 		t.Errorf("expected GET, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/workspace/ws-123/variable") {
-		t.Errorf("expected path to contain organization/org-abc/workspace/ws-123/variable, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable, got %s", receivedPath)
 	}
 	if !strings.Contains(out, "var-1") {
 		t.Errorf("expected output to contain 'var-1', got: %s", out)
@@ -1873,26 +1783,15 @@ func TestCmdVariableCreateE2E(t *testing.T) {
 
 	var receivedMethod string
 	var receivedPath string
-	var receivedBody models.PostBodyVariable
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 
-		resp := models.PostBodyVariable{
-			Data: &models.Variable{
-				ID: "var-new",
-				Attributes: &models.VariableAttributes{
-					Key:      "MY_VAR",
-					Value:    "my-value",
-					Category: "TERRAFORM",
-				},
-				Type: "variable",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		v := &terrakube.Variable{ID: "var-new", Key: "MY_VAR", Value: "my-value", Category: "TERRAFORM"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, v)
 	})
 
 	ts := setupTestServer(handler)
@@ -1900,8 +1799,8 @@ func TestCmdVariableCreateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"workspace", "variable", "create",
-		"--organization-id", "org-abc",
-		"--workspace-id", "ws-123",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
+		"--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd",
 		"--key", "MY_VAR",
 		"--value", "my-value",
 		"--category", "TERRAFORM",
@@ -1915,20 +1814,29 @@ func TestCmdVariableCreateE2E(t *testing.T) {
 	if receivedMethod != http.MethodPost {
 		t.Errorf("expected POST, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/workspace/ws-123/variable") {
-		t.Errorf("expected path to contain organization/org-abc/workspace/ws-123/variable, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable, got %s", receivedPath)
 	}
-	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
-		t.Fatal("expected request body with data and attributes")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	if receivedBody.Data.Attributes.Key != "MY_VAR" {
-		t.Errorf("expected key 'MY_VAR', got %q", receivedBody.Data.Attributes.Key)
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
 	}
-	if receivedBody.Data.Attributes.Value != "my-value" {
-		t.Errorf("expected value 'my-value', got %q", receivedBody.Data.Attributes.Value)
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
 	}
-	if receivedBody.Data.Attributes.Category != "TERRAFORM" {
-		t.Errorf("expected category 'TERRAFORM', got %q", receivedBody.Data.Attributes.Category)
+	if attrs["key"] != "MY_VAR" {
+		t.Errorf("expected key 'MY_VAR', got %v", attrs["key"])
+	}
+	if attrs["value"] != "my-value" {
+		t.Errorf("expected value 'my-value', got %v", attrs["value"])
+	}
+	if attrs["category"] != "TERRAFORM" {
+		t.Errorf("expected category 'TERRAFORM', got %v", attrs["category"])
 	}
 	if !strings.Contains(out, "var-new") {
 		t.Errorf("expected output to contain 'var-new', got: %s", out)
@@ -1942,25 +1850,15 @@ func TestCmdJobCreateE2E(t *testing.T) {
 
 	var receivedMethod string
 	var receivedPath string
-	var receivedBody models.PostBodyJob
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 
-		resp := models.PostBodyJob{
-			Data: &models.Job{
-				ID: "job-new",
-				Attributes: &models.JobAttributes{
-					Command: "plan",
-					Status:  "pending",
-				},
-				Type: "job",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		job := &terrakube.Job{ID: "job-new", Command: "plan", Status: "pending"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, job)
 	})
 
 	ts := setupTestServer(handler)
@@ -1968,8 +1866,8 @@ func TestCmdJobCreateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"job", "create",
-		"--organization-id", "org-abc",
-		"--workspace-id", "ws-123",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
+		"--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd",
 		"--command", "plan",
 	)
 	if err != nil {
@@ -1979,23 +1877,39 @@ func TestCmdJobCreateE2E(t *testing.T) {
 	if receivedMethod != http.MethodPost {
 		t.Errorf("expected POST, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/job") {
-		t.Errorf("expected path to contain organization/org-abc/job, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/job") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/job, got %s", receivedPath)
 	}
-	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
-		t.Fatal("expected request body with data and attributes")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	if receivedBody.Data.Attributes.Command != "plan" {
-		t.Errorf("expected command 'plan', got %q", receivedBody.Data.Attributes.Command)
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
+	}
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
+	}
+	if attrs["command"] != "plan" {
+		t.Errorf("expected command 'plan', got %v", attrs["command"])
 	}
 	// Verify workspace relationship is set
-	if receivedBody.Data.Relationships == nil ||
-		receivedBody.Data.Relationships.Workspace == nil ||
-		receivedBody.Data.Relationships.Workspace.Data == nil {
+	rels, ok := data["relationships"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected job to have relationships")
+	}
+	wsRel, ok := rels["workspace"].(map[string]interface{})
+	if !ok {
 		t.Fatal("expected job to have workspace relationship")
 	}
-	if receivedBody.Data.Relationships.Workspace.Data.ID != "ws-123" {
-		t.Errorf("expected workspace relationship ID 'ws-123', got %q", receivedBody.Data.Relationships.Workspace.Data.ID)
+	wsData, ok := wsRel["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected workspace relationship to have data")
+	}
+	if wsData["id"] != "38b6635a-d38e-46f2-a95e-d00a416de4fd" {
+		t.Errorf("expected workspace relationship ID '38b6635a-d38e-46f2-a95e-d00a416de4fd', got %v", wsData["id"])
 	}
 	if !strings.Contains(out, "job-new") {
 		t.Errorf("expected output to contain 'job-new', got: %s", out)
@@ -2009,24 +1923,15 @@ func TestCmdTeamCreateE2E(t *testing.T) {
 
 	var receivedMethod string
 	var receivedPath string
-	var receivedBody models.PostBodyTeam
+	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedMethod = r.Method
 		receivedPath = r.URL.Path
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedBody, _ = io.ReadAll(r.Body)
 
-		resp := models.PostBodyTeam{
-			Data: &models.Team{
-				ID: "team-new",
-				Attributes: &models.TeamAttributes{
-					Name: "test-team",
-				},
-				Type: "team",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		team := &terrakube.Team{ID: "team-new", Name: "test-team"}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, team)
 	})
 
 	ts := setupTestServer(handler)
@@ -2034,7 +1939,7 @@ func TestCmdTeamCreateE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"team", "create",
-		"--organization-id", "org-abc",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--name", "test-team",
 	)
 	if err != nil {
@@ -2044,14 +1949,23 @@ func TestCmdTeamCreateE2E(t *testing.T) {
 	if receivedMethod != http.MethodPost {
 		t.Errorf("expected POST, got %s", receivedMethod)
 	}
-	if !strings.Contains(receivedPath, "organization/org-abc/team") {
-		t.Errorf("expected path to contain organization/org-abc/team, got %s", receivedPath)
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/team") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/team, got %s", receivedPath)
 	}
-	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
-		t.Fatal("expected request body with data and attributes")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	if receivedBody.Data.Attributes.Name != "test-team" {
-		t.Errorf("expected name 'test-team', got %q", receivedBody.Data.Attributes.Name)
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
+	}
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
+	}
+	if attrs["name"] != "test-team" {
+		t.Errorf("expected name 'test-team', got %v", attrs["name"])
 	}
 	if !strings.Contains(out, "team-new") {
 		t.Errorf("expected output to contain 'team-new', got: %s", out)
@@ -2063,24 +1977,13 @@ func TestCmdTeamCreateE2E(t *testing.T) {
 func TestCmdTeamCreateWithPermissionsE2E(t *testing.T) {
 	resetGlobalFlags()
 
-	var receivedBody models.PostBodyTeam
+	var capturedPermsBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		_ = json.Unmarshal(body, &receivedBody)
+		capturedPermsBody, _ = io.ReadAll(r.Body)
 
-		resp := models.PostBodyTeam{
-			Data: &models.Team{
-				ID: "team-perms",
-				Attributes: &models.TeamAttributes{
-					Name:            "perms-team",
-					ManageWorkspace: true,
-					ManageModule:    true,
-				},
-				Type: "team",
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		team := &terrakube.Team{ID: "team-perms", Name: "perms-team", ManageWorkspace: true, ManageModule: true}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, team)
 	})
 
 	ts := setupTestServer(handler)
@@ -2088,7 +1991,7 @@ func TestCmdTeamCreateWithPermissionsE2E(t *testing.T) {
 
 	out, err := executeCommand(
 		"team", "create",
-		"--organization-id", "org-abc",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--name", "perms-team",
 		"--manage-workspace=true",
 		"--manage-module=true",
@@ -2098,13 +2001,22 @@ func TestCmdTeamCreateWithPermissionsE2E(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if receivedBody.Data == nil || receivedBody.Data.Attributes == nil {
-		t.Fatal("expected request body with data and attributes")
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedPermsBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
 	}
-	if !receivedBody.Data.Attributes.ManageWorkspace {
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
+	}
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
+	}
+	if attrs["manageWorkspace"] != true {
 		t.Error("expected ManageWorkspace to be true")
 	}
-	if !receivedBody.Data.Attributes.ManageModule {
+	if attrs["manageModule"] != true {
 		t.Error("expected ManageModule to be true")
 	}
 	if !strings.Contains(out, "team-perms") {
@@ -2159,20 +2071,9 @@ func TestCmdLoginWritesConfig(t *testing.T) {
 	desc := "test org"
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// The login command calls Organization.List("") to verify connection.
-		resp := models.GetBodyOrganization{
-			Data: []*models.Organization{
-				{
-					ID: "org-1",
-					Attributes: &models.OrganizationAttributes{
-						Name:        "test-org",
-						Description: &desc,
-					},
-					Type: "organization",
-				},
-			},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		orgs := []*terrakube.Organization{{ID: "org-1", Name: "test-org", Description: &desc}}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, orgs)
 	})
 
 	ts := setupTestServer(handler)
@@ -2216,11 +2117,9 @@ func TestCmdNewClientUsesViperURL(t *testing.T) {
 	var receivedHost string
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedHost = r.Host
-		resp := models.GetBodyOrganization{
-			Data: []*models.Organization{},
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		orgs := []*terrakube.Organization{}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, orgs)
 	})
 
 	ts := setupTestServer(handler)
@@ -2236,5 +2135,520 @@ func TestCmdNewClientUsesViperURL(t *testing.T) {
 	// The request should have gone to the test server, confirming viper URL is used.
 	if receivedHost == "" {
 		t.Error("expected request to reach test server (proving newClient uses viper api_url), but no request was received")
+	}
+}
+
+// ----- Module Update E2E -----
+
+// BUG: module_update.go:33 — updateModuleCmd.AddCommand(updateOrganizationCmd) registers
+// the wrong subcommand (organization update) under module update. This doesn't break
+// the update command itself, but pollutes the command tree.
+func TestCmdModuleUpdateE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	var capturedBody []byte
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		capturedBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand(
+		"module", "update",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
+		"--id", "mod-789",
+		"--name", "updated-mod",
+		"--description", "new desc",
+		"--source", "https://github.com/test/repo.git",
+		"--provider", "azurerm",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if receivedMethod != http.MethodPatch {
+		t.Errorf("expected PATCH, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/module/mod-789") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/module/mod-789, got %s", receivedPath)
+	}
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
+	}
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
+	}
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
+	}
+	if attrs["name"] != "updated-mod" {
+		t.Errorf("expected name 'updated-mod', got %v", attrs["name"])
+	}
+	if attrs["description"] != "new desc" {
+		t.Errorf("expected description 'new desc', got %v", attrs["description"])
+	}
+	if attrs["source"] != "https://github.com/test/repo.git" {
+		t.Errorf("expected source 'https://github.com/test/repo.git', got %v", attrs["source"])
+	}
+	if attrs["provider"] != "azurerm" {
+		t.Errorf("expected provider 'azurerm', got %v", attrs["provider"])
+	}
+	if !strings.Contains(out, "Updated") {
+		t.Errorf("expected 'Updated' in output, got: %s", out)
+	}
+}
+
+// ----- Module Delete E2E -----
+
+func TestCmdModuleDeleteE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand(
+		"module", "delete",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
+		"--id", "mod-789",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if receivedMethod != http.MethodDelete {
+		t.Errorf("expected DELETE, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/module/mod-789") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/module/mod-789, got %s", receivedPath)
+	}
+	if !strings.Contains(out, "deleted") {
+		t.Errorf("expected 'deleted' in output, got: %s", out)
+	}
+}
+
+// ----- Team Update E2E -----
+
+// Migrated to terrakube-go: fixes wrong subcommand registration, Type casing, and boolean omitempty bugs.
+func TestCmdTeamUpdateE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	var capturedBody []byte
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		capturedBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand(
+		"team", "update",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
+		"--id", "team-789",
+		"--name", "updated-team",
+		"--manage-workspace",
+		"--manage-module",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if receivedMethod != http.MethodPatch {
+		t.Errorf("expected PATCH, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/team/team-789") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/team/team-789, got %s", receivedPath)
+	}
+
+	// Verify body content via raw JSON
+	var body map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &body); err != nil {
+		t.Fatalf("failed to parse body: %v", err)
+	}
+	data := body["data"].(map[string]interface{})
+	attrs := data["attributes"].(map[string]interface{})
+	if attrs["name"] != "updated-team" {
+		t.Errorf("expected name 'updated-team', got %v", attrs["name"])
+	}
+	if attrs["manageWorkspace"] != true {
+		t.Errorf("expected manageWorkspace true, got %v", attrs["manageWorkspace"])
+	}
+	if attrs["manageModule"] != true {
+		t.Errorf("expected manageModule true, got %v", attrs["manageModule"])
+	}
+
+	// terrakube-go correctly uses type "team" (lowercase)
+	if data["type"] != "team" {
+		t.Errorf("expected type 'team', got %v", data["type"])
+	}
+
+	if !strings.Contains(out, "Updated") {
+		t.Errorf("expected 'Updated' in output, got: %s", out)
+	}
+}
+
+// ----- Team Delete E2E -----
+
+func TestCmdTeamDeleteE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand(
+		"team", "delete",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
+		"--id", "team-789",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if receivedMethod != http.MethodDelete {
+		t.Errorf("expected DELETE, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/team/team-789") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/team/team-789, got %s", receivedPath)
+	}
+	if !strings.Contains(out, "deleted") {
+		t.Errorf("expected 'deleted' in output, got: %s", out)
+	}
+}
+
+// ----- Variable Update E2E -----
+
+// BUG: variable_update.go:34 — updateVariableCmd.AddCommand(updateOrganizationCmd) registers
+// the wrong subcommand (organization update) under variable update.
+func TestCmdVariableUpdateE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	var capturedBody []byte
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		capturedBody, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand(
+		"workspace", "variable", "update",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
+		"--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd",
+		"--id", "var-789",
+		"--key", "UPDATED_KEY",
+		"--value", "new-value",
+		"--category", "ENV",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if receivedMethod != http.MethodPatch {
+		t.Errorf("expected PATCH, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable/var-789") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable/var-789, got %s", receivedPath)
+	}
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
+	}
+	data, ok := bodyMap["data"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body with data")
+	}
+	attrs, ok := data["attributes"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected request body data to contain attributes")
+	}
+	if attrs["key"] != "UPDATED_KEY" {
+		t.Errorf("expected key 'UPDATED_KEY', got %v", attrs["key"])
+	}
+	if attrs["value"] != "new-value" {
+		t.Errorf("expected value 'new-value', got %v", attrs["value"])
+	}
+	if attrs["category"] != "ENV" {
+		t.Errorf("expected category 'ENV', got %v", attrs["category"])
+	}
+	if !strings.Contains(out, "Updated") {
+		t.Errorf("expected 'Updated' in output, got: %s", out)
+	}
+}
+
+// ----- Variable Delete E2E -----
+
+// BUG: variable_delete.go prints nothing on success — no "deleted" message.
+// This test documents the silent-success behavior.
+func TestCmdVariableDeleteE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	_, err := executeCommand(
+		"workspace", "variable", "delete",
+		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
+		"--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd",
+		"--id", "var-789",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if receivedMethod != http.MethodDelete {
+		t.Errorf("expected DELETE, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable/var-789") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable/var-789, got %s", receivedPath)
+	}
+	// No output assertion — variable_delete.go has no fmt.Print on success (BUG)
+}
+
+// ----- Job List E2E -----
+
+func TestCmdJobListE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+
+		jobs := []*terrakube.Job{
+			{ID: "job-1", Command: "plan", Status: "completed"},
+			{ID: "job-2", Command: "apply", Status: "pending"},
+		}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, jobs)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand("job", "list", "--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if receivedMethod != http.MethodGet {
+		t.Errorf("expected GET, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/job") {
+		t.Errorf("expected path to contain organization/e5ad0642-f9b3-48b3-9bf4-35997febe1fb/job, got %s", receivedPath)
+	}
+	if !strings.Contains(out, "job-1") {
+		t.Errorf("expected output to contain 'job-1', got: %s", out)
+	}
+	if !strings.Contains(out, "job-2") {
+		t.Errorf("expected output to contain 'job-2', got: %s", out)
+	}
+}
+
+// ----- Module Update Missing Flags -----
+
+func TestCmdModuleUpdateMissingId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("module", "update", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+	if err == nil {
+		t.Fatal("expected error for module update without --id, got nil")
+	}
+	if !strings.Contains(err.Error(), "id") {
+		t.Errorf("expected error to mention id, got: %v", err)
+	}
+}
+
+func TestCmdModuleUpdateMissingOrgId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("module", "update", "--id", "f6a7b8c9-d0e1-2345-fabc-456789012345")
+	if err == nil {
+		t.Fatal("expected error for module update without --organization, got nil")
+	}
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
+	}
+}
+
+// ----- Module Delete Missing Flags -----
+
+func TestCmdModuleDeleteMissingId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("module", "delete", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+	if err == nil {
+		t.Fatal("expected error for module delete without --id, got nil")
+	}
+	if !strings.Contains(err.Error(), "id") {
+		t.Errorf("expected error to mention id, got: %v", err)
+	}
+}
+
+func TestCmdModuleDeleteMissingOrgId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("module", "delete", "--id", "f6a7b8c9-d0e1-2345-fabc-456789012345")
+	if err == nil {
+		t.Fatal("expected error for module delete without --organization, got nil")
+	}
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
+	}
+}
+
+// ----- Team Update Missing Flags -----
+
+func TestCmdTeamUpdateMissingId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("team", "update", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+	if err == nil {
+		t.Fatal("expected error for team update without --id, got nil")
+	}
+	if !strings.Contains(err.Error(), "id") {
+		t.Errorf("expected error to mention id, got: %v", err)
+	}
+}
+
+func TestCmdTeamUpdateMissingOrgId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("team", "update", "--id", "team-123")
+	if err == nil {
+		t.Fatal("expected error for team update without --organization, got nil")
+	}
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
+	}
+}
+
+// ----- Team Delete Missing Flags -----
+
+func TestCmdTeamDeleteMissingId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("team", "delete", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+	if err == nil {
+		t.Fatal("expected error for team delete without --id, got nil")
+	}
+	if !strings.Contains(err.Error(), "id") {
+		t.Errorf("expected error to mention id, got: %v", err)
+	}
+}
+
+func TestCmdTeamDeleteMissingOrgId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("team", "delete", "--id", "team-123")
+	if err == nil {
+		t.Fatal("expected error for team delete without --organization, got nil")
+	}
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
+	}
+}
+
+// ----- Variable Update Missing Flags -----
+
+func TestCmdVariableUpdateMissingId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("workspace", "variable", "update", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
+	if err == nil {
+		t.Fatal("expected error for variable update without --id, got nil")
+	}
+	if !strings.Contains(err.Error(), "id") {
+		t.Errorf("expected error to mention id, got: %v", err)
+	}
+}
+
+func TestCmdVariableUpdateMissingOrgId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("workspace", "variable", "update", "--id", "var-123", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
+	if err == nil {
+		t.Fatal("expected error for variable update without --organization, got nil")
+	}
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
+	}
+}
+
+func TestCmdVariableUpdateMissingWorkspaceId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("workspace", "variable", "update", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--id", "var-123")
+	if err == nil {
+		t.Fatal("expected error for variable update without --workspace-id, got nil")
+	}
+	if !strings.Contains(err.Error(), "workspace") {
+		t.Errorf("expected error to mention workspace, got: %v", err)
+	}
+}
+
+// ----- Variable Delete Missing Flags -----
+
+func TestCmdVariableDeleteMissingId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("workspace", "variable", "delete", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
+	if err == nil {
+		t.Fatal("expected error for variable delete without --id, got nil")
+	}
+	if !strings.Contains(err.Error(), "id") {
+		t.Errorf("expected error to mention id, got: %v", err)
+	}
+}
+
+func TestCmdVariableDeleteMissingOrgId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("workspace", "variable", "delete", "--id", "var-123", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
+	if err == nil {
+		t.Fatal("expected error for variable delete without --organization, got nil")
+	}
+	if !strings.Contains(err.Error(), "organization") {
+		t.Errorf("expected error to mention organization, got: %v", err)
+	}
+}
+
+func TestCmdVariableDeleteMissingWorkspaceId(t *testing.T) {
+	resetGlobalFlags()
+	_, err := executeCommand("workspace", "variable", "delete", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--id", "var-123")
+	if err == nil {
+		t.Fatal("expected error for variable delete without --workspace-id, got nil")
+	}
+	if !strings.Contains(err.Error(), "workspace") {
+		t.Errorf("expected error to mention workspace, got: %v", err)
 	}
 }

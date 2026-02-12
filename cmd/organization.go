@@ -13,7 +13,7 @@ var organizationCmd = &cobra.Command{
 	Use:     "organization create|update|delete|list [ARGS]",
 	Short:   "create, update, delete and list organizations",
 	Long:    organizationLong,
-	Aliases: []string{"org"},
+	Aliases: []string{"org", "orgs", "organizations"},
 }
 
 func init() {

@@ -29,10 +29,10 @@ var moduleCmd = &cobra.Command{
 	Use:     "module create|update|delete|list [ARGS]",
 	Short:   "create, update, delete and list modules",
 	Long:    moduleLong,
-	Aliases: []string{"mod"},
+	Aliases: []string{"mod", "modules"},
 }
 
 func init() {
 	rootCmd.AddCommand(moduleCmd)
-	_ = viper.BindEnv("organization-id", "TERRAKUBE_ORGANIZATION_ID")
+	_ = viper.BindEnv("organization", "TERRAKUBE_ORGANIZATION_ID")
 }

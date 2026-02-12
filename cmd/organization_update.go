@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"terrakube/client/models"
 
+	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
@@ -45,18 +45,16 @@ func init() {
 
 func updateOrganization() {
 	client := newClient()
+	ctx := getContext()
 
-	organization := models.Organization{
-		Attributes: &models.OrganizationAttributes{
-			Name:          OrganizationUpdateName,
-			Description:   &OrganizationUpdateDescription,
-			ExecutionMode: &OrganizationUpdateExecutionMode,
-			Icon:          &OrganizationUpdateIcon,
-		},
-		Type: "organization",
-		ID:   OrganizationId,
+	organization := &terrakube.Organization{
+		ID:            OrganizationId,
+		Name:          OrganizationUpdateName,
+		Description:   ptrOrNil(OrganizationUpdateDescription),
+		ExecutionMode: OrganizationUpdateExecutionMode,
+		Icon:          ptrOrNil(OrganizationUpdateIcon),
 	}
-	err := client.Organization.Update(organization)
+	_, err := client.Organizations.Update(ctx, organization)
 
 	if err != nil {
 		fmt.Println(err)
@@ -64,5 +62,4 @@ func updateOrganization() {
 	}
 
 	fmt.Printf("Updated")
-
 }

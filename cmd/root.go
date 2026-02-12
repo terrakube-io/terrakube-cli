@@ -1,10 +1,10 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -18,7 +18,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"terrakube/client/client"
+	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
 var cfgFile string
@@ -30,8 +30,9 @@ var rootCmd = &cobra.Command{
 	Use:   "terrakube",
 	Short: "terrakube command line tool",
 	Long: `
-terrakube is a CLI to handle remote terraform workspace and modules in organizations 
+terrakube is a CLI to handle remote terraform workspace and modules in organizations
 and handle all the lifecycle (plan, apply, destroy).`,
+	SilenceErrors: true,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -86,14 +87,27 @@ func initConfig() {
 	postInitCommands(rootCmd.Commands())
 }
 
-func newClient() *client.Client {
-	baseURL, err := url.Parse(viper.GetString("api_url"))
+func newClient() *terrakube.Client {
+	c, err := terrakube.NewClient(
+		terrakube.WithEndpoint(viper.GetString("api_url")),
+		terrakube.WithToken(viper.GetString("token")),
+	)
 	if err != nil {
-		fmt.Printf("Error parsing API URL: %v\n", err)
+		fmt.Printf("Error creating client: %v\n", err)
 		os.Exit(1)
 	}
+	return c
+}
 
-	return client.NewClient(nil, viper.GetString("token"), baseURL)
+func getContext() context.Context {
+	return context.Background()
+}
+
+func ptrOrNil(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func renderOutput(result interface{}, format string) {
@@ -127,90 +141,68 @@ func renderOutput(result interface{}, format string) {
 
 func splitInterface(input interface{}) ([][]string, []string) {
 	reflectData := reflect.ValueOf(input)
-	headers := make([]string, 0)
-	headers = append(headers, "ID")
+	headers := []string{"ID"}
 	result := make([][]string, 0)
+
 	if reflectData.Kind() == reflect.Slice {
 		for i := 0; i < reflectData.Len(); i++ {
 			data := reflectData.Index(i).Interface()
 			d := reflect.Indirect(reflect.ValueOf(data))
-
-			row := make([]string, 0)
-			id := d.FieldByName("ID").String()
-			row = append(row, id)
-
-			attr := reflect.Indirect(reflect.ValueOf(d.FieldByName("Attributes").Interface()))
-			for j := 0; j < attr.NumField(); j++ {
-				if i == 0 {
-					headers = append(headers, attr.Type().Field(j).Name)
-				}
-				fieldValue := attr.Field(j)
-				var valueStr string
-				switch fieldValue.Kind() {
-				case reflect.Bool:
-					valueStr = fmt.Sprintf("%t", fieldValue.Bool())
-				case reflect.Ptr:
-					if fieldValue.IsNil() {
-						valueStr = ""
-					} else {
-						// Dereference the pointer and get its value
-						derefValue := fieldValue.Elem()
-						switch derefValue.Kind() {
-						case reflect.String:
-							valueStr = derefValue.String()
-						case reflect.Bool:
-							valueStr = fmt.Sprintf("%t", derefValue.Bool())
-						default:
-							valueStr = fmt.Sprintf("%v", derefValue.Interface())
-						}
-					}
-				default:
-					valueStr = fieldValue.String()
-				}
-
-				row = append(row, valueStr)
-			}
+			row := []string{d.FieldByName("ID").String()}
+			row, headers = appendFields(d, row, headers, i == 0)
 			result = append(result, row)
 		}
 	} else {
 		d := reflect.Indirect(reflectData)
-		row := make([]string, 0)
-		id := d.FieldByName("ID").String()
-		row = append(row, id)
-
-		attr := reflect.Indirect(reflect.ValueOf(d.FieldByName("Attributes").Interface()))
-		for j := 0; j < attr.NumField(); j++ {
-			headers = append(headers, attr.Type().Field(j).Name)
-			fieldValue := attr.Field(j)
-			var valueStr string
-			switch fieldValue.Kind() {
-			case reflect.Bool:
-				valueStr = fmt.Sprintf("%t", fieldValue.Bool())
-			case reflect.Ptr:
-				if fieldValue.IsNil() {
-					valueStr = ""
-				} else {
-					// Dereference the pointer and get its value
-					derefValue := fieldValue.Elem()
-					switch derefValue.Kind() {
-					case reflect.String:
-						valueStr = derefValue.String()
-
-					case reflect.Bool:
-						valueStr = fmt.Sprintf("%t", derefValue.Bool())
-					default:
-						valueStr = fmt.Sprintf("%v", derefValue.Interface())
-					}
-				}
-			default:
-				valueStr = fieldValue.String()
-			}
-			row = append(row, valueStr)
-		}
+		row := []string{d.FieldByName("ID").String()}
+		row, headers = appendFields(d, row, headers, true)
 		result = append(result, row)
-
 	}
 	return result, headers
+}
+
+// appendFields extracts columns from a flat struct, skipping the ID field
+// (already handled) and any jsonapi relation fields.
+func appendFields(d reflect.Value, row []string, headers []string, buildHeaders bool) ([]string, []string) {
+	for j := 0; j < d.NumField(); j++ {
+		field := d.Type().Field(j)
+		if field.Name == "ID" || !field.IsExported() {
+			continue
+		}
+		tag := field.Tag.Get("jsonapi")
+		if strings.HasPrefix(tag, "relation,") {
+			continue
+		}
+		if buildHeaders {
+			headers = append(headers, field.Name)
+		}
+		row = append(row, formatFieldValue(d.Field(j)))
+	}
+	return row, headers
+}
+
+func formatFieldValue(fieldValue reflect.Value) string {
+	switch fieldValue.Kind() {
+	case reflect.Bool:
+		return fmt.Sprintf("%t", fieldValue.Bool())
+	case reflect.Ptr:
+		if fieldValue.IsNil() {
+			return ""
+		}
+		derefValue := fieldValue.Elem()
+		switch derefValue.Kind() {
+		case reflect.String:
+			return derefValue.String()
+		case reflect.Bool:
+			return fmt.Sprintf("%t", derefValue.Bool())
+		default:
+			return fmt.Sprintf("%v", derefValue.Interface())
+		}
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return fmt.Sprintf("%d", fieldValue.Int())
+	default:
+		return fieldValue.String()
+	}
 }
 
 func postInitCommands(commands []*cobra.Command) {

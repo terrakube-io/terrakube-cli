@@ -11,12 +11,13 @@ It can be used to create, update, delete and list teams.
 `
 
 var teamCmd = &cobra.Command{
-	Use:   "team create|update|delete|list [ARGS]",
-	Short: "create, update, delete and list teams",
-	Long:  teamLong,
+	Use:     "team create|update|delete|list [ARGS]",
+	Short:   "create, update, delete and list teams",
+	Long:    teamLong,
+	Aliases: []string{"teams"},
 }
 
 func init() {
 	rootCmd.AddCommand(teamCmd)
-	_ = viper.BindEnv("organization-id", "TERRAKUBE_ORGANIZATION_ID")
+	_ = viper.BindEnv("organization", "TERRAKUBE_ORGANIZATION_ID")
 }

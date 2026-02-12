@@ -2,13 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"terrakube/client/models"
 
+	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
 )
 
 var WorkspaceUpdateExample string = `Update Terraform version in workspace
-    %[1]v workspace update --organization-id 312b4415-806b-47a9-9452-b71f0753136e --id 38b6635a-d38e-46f2-a95e-d00a416de4fd -t 0.14.0 `
+    %[1]v workspace update -o 312b4415-806b-47a9-9452-b71f0753136e --id 38b6635a-d38e-46f2-a95e-d00a416de4fd -t 0.14.0 `
 
 var WorkspaceUpdateName string
 var WorkspaceUpdateSource string
@@ -33,8 +33,7 @@ var updateWorkspaceCmd = &cobra.Command{
 func init() {
 	workspaceCmd.AddCommand(updateWorkspaceCmd)
 	updateWorkspaceCmd.Flags().StringVarP(&WorkspaceUpdateName, "name", "n", "", "Name of the workspace (required)")
-	updateWorkspaceCmd.Flags().StringVarP(&WorkspaceUpdateOrgId, "organization-id", "", "", "Id of the organization (required)")
-	_ = updateWorkspaceCmd.MarkFlagRequired("organization-id")
+	registerOrgFlag(updateWorkspaceCmd, &WorkspaceUpdateOrgId)
 	updateWorkspaceCmd.Flags().StringVarP(&WorkspaceUpdateId, "id", "", "", "Id of the workspace (required)")
 	_ = updateWorkspaceCmd.MarkFlagRequired("id")
 	updateWorkspaceCmd.Flags().StringVarP(&WorkspaceUpdateBranch, "branch", "b", "", "Branch of the workspace")
@@ -48,22 +47,26 @@ func init() {
 
 func updateWorkspace() {
 	client := newClient()
-
-	workspace := models.Workspace{
-		Attributes: &models.WorkspaceAttributes{
-			Name:             WorkspaceUpdateName,
-			Description:      WorkspaceUpdateDescription,
-			Folder:           WorkspaceUpdateFolder,
-			IacType:          WorkspaceUpdateIacType,
-			ExecutionMode:    WorkspaceExecutionMode,
-			Branch:           WorkspaceUpdateBranch,
-			Source:           WorkspaceUpdateSource,
-			TerraformVersion: WorkspaceUpdateTerraformV,
-		},
-		Type: "workspace",
+	ctx := getContext()
+	orgID, err := resolveOrg(ctx, client, WorkspaceUpdateOrgId)
+	if err != nil {
+		fmt.Println(err)
+		return
 	}
 
-	err := client.Workspace.Update(WorkspaceUpdateOrgId, workspace)
+	workspace := &terrakube.Workspace{
+		ID:            WorkspaceUpdateId,
+		Name:          WorkspaceUpdateName,
+		Description:   ptrOrNil(WorkspaceUpdateDescription),
+		Folder:        WorkspaceUpdateFolder,
+		IaCType:       WorkspaceUpdateIacType,
+		ExecutionMode: WorkspaceUpdateExecutionMode,
+		Branch:        WorkspaceUpdateBranch,
+		Source:        WorkspaceUpdateSource,
+		IaCVersion:    WorkspaceUpdateTerraformV,
+	}
+
+	_, err = client.Workspaces.Update(ctx, orgID, workspace)
 
 	if err != nil {
 		fmt.Println(err)

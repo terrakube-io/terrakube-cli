@@ -13,7 +13,7 @@ var variableCmd = &cobra.Command{
 	Use:     "variable create|update|delete|list [ARGS]",
 	Short:   "create, update, delete and list variables",
 	Long:    variableLong,
-	Aliases: []string{"var"},
+	Aliases: []string{"var", "vars", "variables"},
 }
 
 func init() {

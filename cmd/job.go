@@ -25,9 +25,10 @@ It can be used to create, update, delete and list jobs.
 `
 
 var jobCmd = &cobra.Command{
-	Use:   "job create|list [ARGS]",
-	Short: "create and list jobs",
-	Long:  jobLong,
+	Use:     "job create|list [ARGS]",
+	Short:   "create and list jobs",
+	Long:    jobLong,
+	Aliases: []string{"jobs"},
 }
 
 func init() {

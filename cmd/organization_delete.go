@@ -27,8 +27,9 @@ func init() {
 
 func deleteOrganization() {
 	client := newClient()
+	ctx := getContext()
 
-	err := client.Organization.Delete(OrganizationDeleteId)
+	err := client.Organizations.Delete(ctx, OrganizationDeleteId)
 
 	if err != nil {
 		fmt.Println(err)

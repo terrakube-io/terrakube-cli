@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 
+	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -57,18 +57,18 @@ func login() {
 	apiURL = strings.TrimSuffix(apiURL, "/api/v1")
 	apiURL = strings.TrimSuffix(apiURL, "/api/v1/")
 
-	baseURL, err := url.Parse(apiURL)
+	client, err := terrakube.NewClient(
+		terrakube.WithEndpoint(apiURL),
+		terrakube.WithToken(patToken),
+	)
 	if err != nil {
-		fmt.Printf("Error parsing API URL: %v\n", err)
+		fmt.Printf("Error creating client: %v\n", err)
 		return
 	}
 
-	client := newClient()
-	client.Token = patToken
-	client.BaseURL = baseURL
-
 	// Test the connection by listing organizations
-	_, err = client.Organization.List("")
+	ctx := getContext()
+	_, err = client.Organizations.List(ctx, nil)
 	if err != nil {
 		fmt.Printf("Error connecting to Terrakube server: %v\n", err)
 		return
