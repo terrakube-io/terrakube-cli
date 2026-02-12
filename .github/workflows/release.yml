@@ -44,7 +44,7 @@ jobs:
         id: meta
         with:
           images: |
-            docker.io/${{ secrets.DOCKERHUB_USERNAME }}/terrakube-cli
+            docker.io/azbuilder/terrakube-cli
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
