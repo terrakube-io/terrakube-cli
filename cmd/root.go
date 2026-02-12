@@ -23,6 +23,7 @@ import (
 var cfgFile string
 var output string
 var hideNulls bool
+var verbose bool
 var envPrefix string = "TERRAKUBE"
 
 // rootCmd represents the base command when called without any subcommands
@@ -47,6 +48,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.terrakube-cli.yaml)")
 	rootCmd.PersistentFlags().StringVar(&output, "output", "json", "Output format: json, yaml, table, tsv, or none")
 	rootCmd.PersistentFlags().BoolVar(&hideNulls, "hide-nulls", true, "Hide null values in JSON output")
+	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "Enable verbose output")
 	_ = viper.BindPFlag("output", rootCmd.Flags().Lookup("output"))
 	_ = viper.BindPFlag("hide-nulls", rootCmd.PersistentFlags().Lookup("hide-nulls"))
 	_ = rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
@@ -83,7 +85,9 @@ func initConfig() {
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+		if verbose {
+			fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+		}
 	}
 
 	outputpkg.HideNulls = viper.GetBool("hide-nulls")
