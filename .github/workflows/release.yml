@@ -1,4 +1,6 @@
-on: 
+name: Release
+
+on:
   release:
     types: [created]
 
@@ -8,21 +10,26 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        # build and publish in parallel: linux/386, linux/amd64, windows/386, windows/amd64, darwin/amd64 
+        # Added darwin/arm64 to support modern Apple Silicon Macs
         goos: [linux, windows, darwin]
-        goarch: ["386", amd64]
-        exclude:  
+        goarch: ["386", amd64, arm64]
+        exclude:
           - goarch: "386"
-            goos: darwin 
+            goos: darwin
+          - goarch: arm64
+            goos: windows
+          - goarch: "386"
+            goos: linux # Optional: removes linux 32-bit if you don't need it
     steps:
-    - uses: actions/checkout@v4
-    - uses: wangyoucao577/go-release-action@v1.55
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        goos: ${{ matrix.goos }}
-        goarch: ${{ matrix.goarch }}
-        goversion: go.mod
-        binary_name: "terrakube"
+      - uses: actions/checkout@v4
+      - uses: wangyoucao577/go-release-action@v1.55
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          goos: ${{ matrix.goos }}
+          goarch: ${{ matrix.goarch }}
+          goversion: go.mod
+          binary_name: "terrakube"
+
   docker:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
@@ -62,13 +69,25 @@ jobs:
     needs: releases-matrix
     name: Bump Homebrew formula
     runs-on: ubuntu-latest
+    strategy:
+      # Max-parallel 1 ensures they don't conflict trying to push to your tap repo at the exact same millisecond
+      max-parallel: 1
+      matrix:
+        include:
+          - os: darwin
+            arch: amd64
+          - os: darwin
+            arch: arm64
+          - os: linux
+            arch: amd64
     steps:
       - uses: mislav/bump-homebrew-formula-action@v3
         with:
           formula-name: terrakube
           homebrew-tap: terrakube-io/homebrew-cli
-          download-url: https://github.com/terrakube-io/terrakube-cli/releases/download/${{ github.event.release.tag_name }}/terrakube-${{ github.event.release.tag_name }}-darwin-amd64.tar.gz
+          # Dynamically builds the download URL based on the matrix platform loop
+          download-url: https://github.com/terrakube-io/terrakube-cli/releases/download/${{ github.event.release.tag_name }}/terrakube-${{ github.event.release.tag_name }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
           commit-message: |
-            Updated {{formulaName}} to {{version}}
+            Updated {{formulaName}} to {{version}} (${{ matrix.os }}-${{ matrix.arch }})
         env:
           COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TOKEN }}
