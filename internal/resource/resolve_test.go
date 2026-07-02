@@ -183,3 +183,47 @@ func TestResolveParents_ResolverError(t *testing.T) {
 		t.Errorf("unexpected error: %v", got)
 	}
 }
+
+func TestResolveParents_RawIDPassthrough(t *testing.T) {
+	cmd := &cobra.Command{Use: "test"}
+	cmd.Flags().String("job", "", "")
+	_ = cmd.Flags().Set("job", "35")
+
+	parents := []ParentScope{{
+		Name: "job", Flag: "job", IDFlag: "job-id", RawID: true,
+	}}
+
+	ids, err := resolveParents(context.Background(), nil, cmd, parents)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(ids) != 1 || ids[0] != "35" {
+		t.Errorf("expected raw ID passthrough, got %v", ids)
+	}
+}
+
+func TestResolveParents_RawIDSkipsResolver(t *testing.T) {
+	cmd := &cobra.Command{Use: "test"}
+	cmd.Flags().String("job", "", "")
+	_ = cmd.Flags().Set("job", "35")
+
+	called := false
+	parents := []ParentScope{{
+		Name: "job", Flag: "job", IDFlag: "job-id", RawID: true,
+		Resolver: func(_ context.Context, _ *terrakube.Client, _ []string, _ string) (string, error) {
+			called = true
+			return "resolved", nil
+		},
+	}}
+
+	ids, err := resolveParents(context.Background(), nil, cmd, parents)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ids[0] != "35" {
+		t.Errorf("expected raw ID passthrough, got %s", ids[0])
+	}
+	if called {
+		t.Error("resolver should not be called for RawID parent")
+	}
+}
