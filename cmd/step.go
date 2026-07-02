@@ -31,6 +31,7 @@ func init() {
 				Flag:      "job",
 				ShortFlag: "j",
 				IDFlag:    "job-id",
+				RawID:     true,
 			},
 		},
 		Fields: []resource.FieldDef{

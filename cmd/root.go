@@ -170,7 +170,7 @@ func formatFieldValue(fieldValue reflect.Value) string {
 	switch fieldValue.Kind() {
 	case reflect.Bool:
 		return fmt.Sprintf("%t", fieldValue.Bool())
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if fieldValue.IsNil() {
 			return ""
 		}

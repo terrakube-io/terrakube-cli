@@ -11,6 +11,7 @@ import (
 
 // resolveParents resolves parent resource IDs from flags.
 // Each parent's unified flag accepts either a UUID (used directly) or a name (resolved via Resolver).
+// Parents with RawID set (e.g. jobs, whose IDs are numeric) use the flag value as the ID directly.
 func resolveParents(ctx context.Context, client *terrakube.Client, cmd *cobra.Command, parents []ParentScope) ([]string, error) {
 	ids := make([]string, 0, len(parents))
 
@@ -31,7 +32,7 @@ func resolveParent(ctx context.Context, client *terrakube.Client, cmd *cobra.Com
 		return "", fmt.Errorf("--%s is required", p.Flag)
 	}
 
-	if IsUUID(val) {
+	if p.RawID || IsUUID(val) {
 		return val, nil
 	}
 

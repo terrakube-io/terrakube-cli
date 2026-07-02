@@ -29,6 +29,7 @@ type ParentScope struct {
 	ShortFlag string   // short flag, e.g. "o"
 	Aliases   []string // flag aliases, e.g. ["org"]
 	IDFlag    string   // hidden backwards-compat alias, e.g. "organization-id"
+	RawID     bool     // parent IDs are not UUIDs (e.g. numeric job IDs); use the flag value as the ID directly, no name resolution
 	Resolver  func(ctx context.Context, c *terrakube.Client, resolvedParentIDs []string, name string) (string, error)
 }
 
@@ -257,7 +258,11 @@ func newDeleteCmd[T any](cfg Config[T]) *cobra.Command {
 func addParentFlags(cmd *cobra.Command, parents []ParentScope) {
 	aliases := make(map[string]string)
 	for _, p := range parents {
-		cmd.Flags().StringP(p.Flag, p.ShortFlag, "", fmt.Sprintf("%s ID or name", p.Name))
+		usage := fmt.Sprintf("%s ID or name", p.Name)
+		if p.RawID {
+			usage = fmt.Sprintf("%s ID", p.Name)
+		}
+		cmd.Flags().StringP(p.Flag, p.ShortFlag, "", usage)
 		if p.IDFlag != "" && p.IDFlag != p.Flag {
 			aliases[p.IDFlag] = p.Flag
 		}
