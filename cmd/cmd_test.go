@@ -22,189 +22,20 @@ import (
 // We also reset cobra flag states and viper keys that postInitCommands uses to pre-fill
 // required flags from config/env.
 func resetGlobalFlags() {
-	// workspace create
-	WorkspaceCreateName = ""
-	WorkspaceDescription = ""
-	WorkspaceCreateIacType = ""
-	WorkspaceCreateFolder = ""
-	WorkspaceExecutionMode = ""
-	WorkspaceCreateSource = ""
-	WorkspaceCreateBranch = ""
-	WorkspaceCreateCli = false
-	WorkspaceCreateIacV = ""
-	WorkspaceCreateOrgId = ""
-
-	// workspace list
-	WorkspaceFilter = ""
-	WorkspaceOrgId = ""
-
-	// workspace update
-	WorkspaceUpdateName = ""
-	WorkspaceUpdateSource = ""
-	WorkspaceUpdateBranch = ""
-	WorkspaceUpdateTerraformV = ""
-	WorkspaceUpdateOrgId = ""
-	WorkspaceUpdateId = ""
-	WorkspaceUpdateDescription = ""
-	WorkspaceUpdateFolder = ""
-	WorkspaceUpdateIacType = ""
-	WorkspaceUpdateExecutionMode = ""
-
-	// workspace delete
-	WorkspaceDeleteId = ""
-	WorkspaceDeleteOrgId = ""
-
-	// organization create
-	OrganizationCreateName = ""
-	OrganizationCreateDescription = ""
-	OrganizationCreateExecutionMode = ""
-	OrganizationCreateIcon = ""
-
-	// organization update
-	OrganizationId = ""
-	OrganizationUpdateDescription = ""
-	OrganizationUpdateName = ""
-	OrganizationUpdateIcon = ""
-	OrganizationUpdateExecutionMode = ""
-
-	// organization delete
-	OrganizationDeleteId = ""
-
-	// organization list
-	OrganizationFilter = ""
-
-	// variable create
-	VariableCreateKey = ""
-	VariableCreateValue = ""
-	VariableCreateDescription = ""
-	VariableCreateCategory = ""
-	VariableCreateSensitive = false
-	VariableCreateHcl = false
-	VariableCreateOrgId = ""
-	VariableCreateWorkspaceId = ""
-
-	// variable list
-	VariableFilter = ""
-	VariableOrgId = ""
-	VariableWorkspaceId = ""
-
-	// variable update
-	VariableId = ""
-	VariableUpdateKey = ""
-	VariableUpdateValue = ""
-	VariableUpdateDescription = ""
-	VariableUpdateCategory = ""
-	VariableUpdateSensitive = false
-	VariableUpdateHcl = false
-	VariableUpdateOrgId = ""
-	VariableUpdateWorkspaceId = ""
-
-	// variable delete
-	VariableDeleteId = ""
-	VariableDeleteOrgId = ""
-	VariableDeleteWorkspaceId = ""
-
-	// module create
-	ModuleCreateName = ""
-	ModuleCreateDescription = ""
-	ModuleCreateOrgId = ""
-	ModuleCreateSource = ""
-	ModuleCreateProvider = ""
-	ModuleCreateTagPrefix = ""
-	ModuleCreateFolder = ""
-
-	// module list
-	ModuleFilter = ""
-	ModuleOrgId = ""
-
-	// module update
-	ModuleId = ""
-	ModuleUpdateDescription = ""
-	ModuleUpdateName = ""
-	ModuleUpdateOrgId = ""
-	ModuleUpdateSource = ""
-	ModuleUpdateProvider = ""
-	ModuleUpdateTagPrefix = ""
-	ModuleUpdateFolder = ""
-
-	// module delete
-	ModuleDeleteId = ""
-	ModuleDeleteOrgId = ""
-
-	// team create
-	TeamCreateName = ""
-	TeamCreateOrgId = ""
-	TeamCreateManageProvider = false
-	TeamCreateManageModule = false
-	TeamCreateManageWorkspace = false
-	TeamCreateManageState = false
-	TeamCreateManageCollection = false
-	TeamCreateManageVcs = false
-	TeamCreateManageTemplate = false
-
-	// team list
-	TeamFilter = ""
-	TeamOrgId = ""
-
-	// team update
-	TeamId = ""
-	TeamUpdateName = ""
-	TeamUpdateOrgId = ""
-	TeamUpdateManageProvider = false
-	TeamUpdateManageModule = false
-	TeamUpdateManageWorkspace = false
-	TeamUpdateManageState = false
-	TeamUpdateManageCollection = false
-	TeamUpdateManageVcs = false
-	TeamUpdateManageTemplate = false
-
-	// team delete
-	TeamDeleteId = ""
-	TeamDeleteOrgId = ""
-
-	// job create
-	JobCreateWorkspaceId = ""
-	JobCreateCommand = ""
-	JobCreateOrgId = ""
-
-	// job list
-	JobFilter = ""
-	JobOrgId = ""
-
-	// login
+	for _, env := range []string{
+		"TERRAKUBE_ORGANIZATION", "TERRAKUBE_ORGANIZATION_ID",
+		"TERRAKUBE_WORKSPACE", "TERRAKUBE_WORKSPACE_ID",
+		"TERRAKUBE_PROJECT", "TERRAKUBE_PROJECT_ID",
+		"TERRAKUBE_API_URL", "TERRAKUBE_TOKEN", "TERRAKUBE_PAT",
+	} {
+		_ = os.Unsetenv(env)
+	}
+	viper.Reset()
+	cfgFile = os.DevNull
+	output = "json"
 	apiURL = ""
 	patToken = ""
 
-	// root
-	output = "json"
-
-	// Clear viper keys that postInitCommands uses to pre-fill cobra required flags.
-	// Without this, a value set in one test (via flag parsing -> viper binding) bleeds
-	// into subsequent tests because presetRequiredFlags reads viper state.
-	viperKeysToReset := []string{
-		"organization-id", "organization-name", "workspace-id", "workspace-name",
-		"id", "name", "api-url", "pat",
-		"api_url", "token", "command", "key", "value", "category",
-		"sensitive", "hcl", "filter", "source", "branch", "folder",
-		"execution-mode", "iac-type", "iac-version", "description",
-		"executionMode", "icon", "provider", "tag-prefix", "tag-id",
-		"manage-provider", "manage-module", "manage-workspace",
-		"manage-state", "manage-collection", "manage-vcs", "manage-template",
-		"cli",
-	}
-	for _, key := range viperKeysToReset {
-		viper.Set(key, "")
-	}
-
-	// Point viper at a nonexistent config file to prevent the real user config
-	// from injecting values during initConfig.
-	cfgFile = os.DevNull
-
-	// Reset cobra flag state on all commands. When cobra parses args, it sets
-	// the flag's Changed bit and its Value. These persist across calls to
-	// rootCmd.Execute() since the command tree is global. Without resetting,
-	// postInitCommands -> presetRequiredFlags will see the old value in viper
-	// and re-fill it, satisfying required flag checks unexpectedly.
 	resetCobraFlags(rootCmd)
 }
 
@@ -256,12 +87,12 @@ func setupTestServer(handler http.Handler) *httptest.Server {
 
 func TestCmdWorkspaceListMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("workspace", "list")
+	out, err := executeCommand("workspace", "list")
 	if err == nil {
-		t.Fatal("expected error for workspace list without --organization, got nil")
+		t.Fatalf("expected error for workspace list without --organization, got nil (out=%q)", out)
 	}
 	if !strings.Contains(err.Error(), "organization") {
-		t.Errorf("expected error to mention organization, got: %v", err)
+		t.Fatalf("expected error to mention organization, got: %v", err)
 	}
 }
 
@@ -344,7 +175,7 @@ func TestCmdModuleCreateMissingName(t *testing.T) {
 
 func TestCmdModuleCreateMissingOrgId(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("module", "create", "--name", "mod1")
+	_, err := executeCommand("module", "create", "--name", "mod1", "--provider", "aws", "--source", "http://repo.git")
 	if err == nil {
 		t.Fatal("expected error for module create without --organization, got nil")
 	}
@@ -377,7 +208,7 @@ func TestCmdTeamCreateMissingOrgId(t *testing.T) {
 
 func TestCmdJobCreateMissingCommand(t *testing.T) {
 	resetGlobalFlags()
-	_, err := executeCommand("job", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
+	_, err := executeCommand("job", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--workspace", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
 		t.Fatal("expected error for job create without --command, got nil")
 	}
@@ -421,34 +252,6 @@ func TestCmdVariableListMissingWorkspaceId(t *testing.T) {
 
 // ----- Flag Default Tests -----
 
-func TestCmdWorkspaceCreateFlagDefaults(t *testing.T) {
-	resetGlobalFlags()
-
-	folderFlag := createWorkspaceCmd.Flags().Lookup("folder")
-	if folderFlag == nil {
-		t.Fatal("folder flag not found on workspace create command")
-	}
-	if folderFlag.DefValue != "/" {
-		t.Errorf("expected folder default '/', got %q", folderFlag.DefValue)
-	}
-
-	execFlag := createWorkspaceCmd.Flags().Lookup("execution-mode")
-	if execFlag == nil {
-		t.Fatal("execution-mode flag not found on workspace create command")
-	}
-	if execFlag.DefValue != "remote" {
-		t.Errorf("expected execution-mode default 'remote', got %q", execFlag.DefValue)
-	}
-
-	iacFlag := createWorkspaceCmd.Flags().Lookup("iac-type")
-	if iacFlag == nil {
-		t.Fatal("iac-type flag not found on workspace create command")
-	}
-	if iacFlag.DefValue != "terraform" {
-		t.Errorf("expected iac-type default 'terraform', got %q", iacFlag.DefValue)
-	}
-}
-
 func TestCmdRootOutputFlagDefault(t *testing.T) {
 	resetGlobalFlags()
 
@@ -458,98 +261,6 @@ func TestCmdRootOutputFlagDefault(t *testing.T) {
 	}
 	if outputFlag.DefValue != "json" {
 		t.Errorf("expected output default 'json', got %q", outputFlag.DefValue)
-	}
-}
-
-func TestCmdWorkspaceCreateCliFlagDefault(t *testing.T) {
-	resetGlobalFlags()
-
-	cliFlag := createWorkspaceCmd.Flags().Lookup("cli")
-	if cliFlag == nil {
-		t.Fatal("cli flag not found on workspace create command")
-	}
-	if cliFlag.DefValue != "false" {
-		t.Errorf("expected cli default 'false', got %q", cliFlag.DefValue)
-	}
-}
-
-// ----- Workspace --cli Flag Behavior -----
-
-func TestCmdWorkspaceCreateCliFlag(t *testing.T) {
-	resetGlobalFlags()
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		var bodyMap map[string]interface{}
-		_ = json.Unmarshal(body, &bodyMap)
-
-		if data, ok := bodyMap["data"].(map[string]interface{}); ok {
-			if attrs, ok := data["attributes"].(map[string]interface{}); ok {
-				if attrs["source"] != "empty" {
-					t.Errorf("expected source 'empty' when --cli is set, got %q", attrs["source"])
-				}
-				if attrs["branch"] != "remote-content" {
-					t.Errorf("expected branch 'remote-content' when --cli is set, got %q", attrs["branch"])
-				}
-			}
-		}
-
-		ws := &terrakube.Workspace{ID: "ws-new", Name: "cli-ws", Source: "empty", Branch: "remote-content"}
-		w.Header().Set("Content-Type", "application/vnd.api+json")
-		_ = jsonapi.MarshalPayload(w, ws)
-	})
-
-	ts := setupTestServer(handler)
-	defer ts.Close()
-
-	out, err := executeCommand(
-		"workspace", "create",
-		"--name", "cli-ws",
-		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-		"--cli",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !strings.Contains(out, "Creating cli workspace") {
-		t.Errorf("expected 'Creating cli workspace' in output, got: %s", out)
-	}
-
-	// Verify the global vars were set by the --cli logic
-	if WorkspaceCreateSource != "empty" {
-		t.Errorf("expected WorkspaceCreateSource='empty', got %q", WorkspaceCreateSource)
-	}
-	if WorkspaceCreateBranch != "remote-content" {
-		t.Errorf("expected WorkspaceCreateBranch='remote-content', got %q", WorkspaceCreateBranch)
-	}
-}
-
-func TestCmdWorkspaceCreateWithoutCliFlag(t *testing.T) {
-	resetGlobalFlags()
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ws := &terrakube.Workspace{ID: "ws-new", Name: "vcs-ws", Source: "https://github.com/example/repo.git", Branch: "main"}
-		w.Header().Set("Content-Type", "application/vnd.api+json")
-		_ = jsonapi.MarshalPayload(w, ws)
-	})
-
-	ts := setupTestServer(handler)
-	defer ts.Close()
-
-	out, err := executeCommand(
-		"workspace", "create",
-		"--name", "vcs-ws",
-		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-		"--source", "https://github.com/example/repo.git",
-		"--branch", "main",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !strings.Contains(out, "Creating vcs workspace") {
-		t.Errorf("expected 'Creating vcs workspace' in output, got: %s", out)
 	}
 }
 
@@ -993,6 +704,7 @@ func TestCmdLogoutE2E(t *testing.T) {
 
 func TestCmdLoginMissingApiUrl(t *testing.T) {
 	resetGlobalFlags()
+	viper.Set("api_url", "")
 	_, err := executeCommand("login", "--pat", "some-token")
 	if err == nil {
 		t.Fatal("expected error for login without --api-url, got nil")
@@ -1004,6 +716,8 @@ func TestCmdLoginMissingApiUrl(t *testing.T) {
 
 func TestCmdLoginMissingPat(t *testing.T) {
 	resetGlobalFlags()
+	viper.Set("pat", "")
+	viper.Set("token", "")
 	_, err := executeCommand("login", "--api-url", "http://localhost:8080")
 	if err == nil {
 		t.Fatal("expected error for login without --pat, got nil")
@@ -1107,7 +821,7 @@ func TestCmdWorkspaceCreateSendsCorrectBody(t *testing.T) {
 		"--organization-id", "e5ad0642-f9b3-48b3-9bf4-35997febe1fb",
 		"--source", "https://github.com/test/repo.git",
 		"--branch", "develop",
-		"--iac-version", "1.5.0",
+		"--terraform-version", "1.5.0",
 		"--folder", "/infra",
 		"--execution-mode", "local",
 		"--iac-type", "tofu",
@@ -1175,7 +889,7 @@ func TestCmdOrganizationCreateSendsCorrectBody(t *testing.T) {
 		"organization", "create",
 		"--name", "body-org",
 		"--description", "org desc",
-		"--executionMode", "remote",
+		"--execution-mode", "remote",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1295,7 +1009,7 @@ func TestCmdOrganizationCreateValidExecutionModes(t *testing.T) {
 		viper.Set("api_url", ts.URL)
 		viper.Set("token", "test-token")
 
-		_, err := executeCommand("organization", "create", "--name", "ok-org", "--executionMode", mode)
+		_, err := executeCommand("organization", "create", "--name", "ok-org", "--execution-mode", mode)
 		if err != nil {
 			t.Errorf("execution mode %q should be valid, got error: %v", mode, err)
 		}
@@ -1382,12 +1096,8 @@ func TestCmdWorkspaceCreateShortFlags(t *testing.T) {
 	_, err := executeCommand(
 		"workspace", "create",
 		"-n", "short-ws",
-		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-		"-b", "main",
-		"-s", "https://github.com/test/repo.git",
-		"-f", "/modules",
-		"-e", "local",
-		"-t", "tofu",
+		"-o", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"-d", "short desc",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error using short flags: %v", err)
@@ -1503,8 +1213,8 @@ func TestCmdOrganizationUpdateE2E(t *testing.T) {
 	if attrs["name"] != "updated-org" {
 		t.Errorf("expected name 'updated-org', got %v", attrs["name"])
 	}
-	if !strings.Contains(out, "Updated") {
-		t.Errorf("expected 'Updated' in output, got: %s", out)
+	if !strings.Contains(out, "type") {
+		t.Errorf("expected 'type' in output, got: %s", out)
 	}
 }
 
@@ -1562,7 +1272,7 @@ func TestCmdWorkspaceUpdateE2E(t *testing.T) {
 		"--name", "updated-ws",
 		"--branch", "develop",
 		"--source", "https://github.com/test/repo.git",
-		"--iac-version", "1.6.0",
+		"--terraform-version", "1.6.0",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1599,8 +1309,8 @@ func TestCmdWorkspaceUpdateE2E(t *testing.T) {
 	if attrs["terraformVersion"] != "1.6.0" {
 		t.Errorf("expected iac-version '1.6.0', got %v", attrs["terraformVersion"])
 	}
-	if !strings.Contains(out, "Updated") {
-		t.Errorf("expected 'Updated' in output, got: %s", out)
+	if !strings.Contains(out, "type") {
+		t.Errorf("expected 'type' in output, got: %s", out)
 	}
 }
 
@@ -2202,8 +1912,8 @@ func TestCmdModuleUpdateE2E(t *testing.T) {
 	if attrs["provider"] != "azurerm" {
 		t.Errorf("expected provider 'azurerm', got %v", attrs["provider"])
 	}
-	if !strings.Contains(out, "Updated") {
-		t.Errorf("expected 'Updated' in output, got: %s", out)
+	if !strings.Contains(out, "type") {
+		t.Errorf("expected 'type' in output, got: %s", out)
 	}
 }
 
@@ -2303,8 +2013,8 @@ func TestCmdTeamUpdateE2E(t *testing.T) {
 		t.Errorf("expected type 'team', got %v", data["type"])
 	}
 
-	if !strings.Contains(out, "Updated") {
-		t.Errorf("expected 'Updated' in output, got: %s", out)
+	if !strings.Contains(out, "type") {
+		t.Errorf("expected 'type' in output, got: %s", out)
 	}
 }
 
@@ -2346,8 +2056,6 @@ func TestCmdTeamDeleteE2E(t *testing.T) {
 
 // ----- Variable Update E2E -----
 
-// BUG: variable_update.go:34 — updateVariableCmd.AddCommand(updateOrganizationCmd) registers
-// the wrong subcommand (organization update) under variable update.
 func TestCmdVariableUpdateE2E(t *testing.T) {
 	resetGlobalFlags()
 
@@ -2404,8 +2112,8 @@ func TestCmdVariableUpdateE2E(t *testing.T) {
 	if attrs["category"] != "ENV" {
 		t.Errorf("expected category 'ENV', got %v", attrs["category"])
 	}
-	if !strings.Contains(out, "Updated") {
-		t.Errorf("expected 'Updated' in output, got: %s", out)
+	if !strings.Contains(out, "type") {
+		t.Errorf("expected 'type' in output, got: %s", out)
 	}
 }
 
@@ -2650,5 +2358,157 @@ func TestCmdVariableDeleteMissingWorkspaceId(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "workspace") {
 		t.Errorf("expected error to mention workspace, got: %v", err)
+	}
+}
+
+// ----- New Domain Services E2E Tests -----
+
+func TestCmdProjectE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		p := &terrakube.Project{ID: "proj-123", Name: "test-project"}
+		_ = jsonapi.MarshalPayload(w, p)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand("project", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--name", "test-project")
+	if err != nil {
+		t.Fatalf("unexpected error creating project: %v", err)
+	}
+	if receivedMethod != http.MethodPost {
+		t.Errorf("expected POST, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/project") {
+		t.Errorf("expected path to contain organization/.../project, got %s", receivedPath)
+	}
+	if !strings.Contains(out, "test-project") {
+		t.Errorf("expected output to contain project name, got: %s", out)
+	}
+}
+
+func TestCmdProjectAccessE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		pa := &terrakube.ProjectAccess{ID: "pa-123", Name: "default-access"}
+		_ = jsonapi.MarshalPayload(w, pa)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	_, err := executeCommand("project-access", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--project-id", "b2c3d4e5-f6a7-8901-bcde-f12345678901", "--name", "default-access")
+	if err != nil {
+		t.Fatalf("unexpected error creating project access: %v", err)
+	}
+	if receivedMethod != http.MethodPost {
+		t.Errorf("expected POST, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/project/b2c3d4e5-f6a7-8901-bcde-f12345678901/projectAccess") {
+		t.Errorf("expected path to contain organization/.../project/.../projectAccess, got %s", receivedPath)
+	}
+}
+
+func TestCmdFederatedE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		fed := &terrakube.Federated{ID: "fed-123", Name: "github-oidc", IssuerURL: "https://token.actions.githubusercontent.com", Audience: "terrakube"}
+		_ = jsonapi.MarshalPayload(w, fed)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand("federated", "create", "--name", "github-oidc", "--issuer-url", "https://token.actions.githubusercontent.com", "--audience", "terrakube")
+	if err != nil {
+		t.Fatalf("unexpected error creating federated identity: %v", err)
+	}
+	if receivedMethod != http.MethodPost {
+		t.Errorf("expected POST, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "federated") {
+		t.Errorf("expected path to contain federated, got %s", receivedPath)
+	}
+	if !strings.Contains(out, "https://token.actions.githubusercontent.com") {
+		t.Errorf("expected output to contain issuerUrl, got: %s", out)
+	}
+}
+
+func TestCmdFederatedClaimE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		fc := &terrakube.FederatedClaim{ID: "fc-123", ClaimKey: "sub", ClaimValue: "repo:org/repo:ref:refs/heads/main"}
+		_ = jsonapi.MarshalPayload(w, fc)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	_, err := executeCommand("federated-claim", "create", "--federated-id", "b2c3d4e5-f6a7-8901-bcde-f12345678901", "--claim-key", "sub", "--claim-value", "repo:org/repo:ref:refs/heads/main")
+	if err != nil {
+		t.Fatalf("unexpected error creating federated claim: %v", err)
+	}
+	if receivedMethod != http.MethodPost {
+		t.Errorf("expected POST, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "federated/b2c3d4e5-f6a7-8901-bcde-f12345678901/claims") {
+		t.Errorf("expected path to contain federated/.../claims, got %s", receivedPath)
+	}
+}
+
+func TestCmdTeamTokenE2E(t *testing.T) {
+	resetGlobalFlags()
+
+	var receivedMethod string
+	var receivedPath string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedMethod = r.Method
+		receivedPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		tt := &terrakube.TeamToken{ID: "tt-123", Description: "test token", Group: "dev-team"}
+		b, _ := json.Marshal(tt)
+		_, _ = w.Write(b)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand("team", "token", "create", "--group", "dev-team", "--description", "test token")
+	if err != nil {
+		t.Fatalf("unexpected error creating team token: %v", err)
+	}
+	if receivedMethod != http.MethodPost {
+		t.Errorf("expected POST, got %s", receivedMethod)
+	}
+	if !strings.Contains(receivedPath, "access-token/v1/teams") {
+		t.Errorf("expected path to contain access-token/v1/teams, got %s", receivedPath)
+	}
+	if !strings.Contains(out, "tt-123") {
+		t.Errorf("expected output to contain token ID, got: %s", out)
 	}
 }

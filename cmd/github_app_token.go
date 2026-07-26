@@ -21,6 +21,7 @@ func init() {
 			{StructField: "AppID", Flag: "app-id", Type: resource.String, Required: true, Description: "GitHub App ID"},
 			{StructField: "InstallationID", Flag: "installation-id", Type: resource.String, Required: true, Description: "GitHub App installation ID"},
 			{StructField: "Owner", Flag: "owner", Type: resource.String, Required: true, Description: "GitHub App owner"},
+			{StructField: "ExpiresAt", Flag: "expires-at", Type: resource.String, Description: "Token expiration timestamp"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, _ []string, opts *terrakube.ListOptions) ([]*terrakube.GithubAppToken, error) {
 			return c.GithubAppTokens.List(ctx, opts)

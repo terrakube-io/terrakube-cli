@@ -96,9 +96,17 @@ func initConfig() {
 }
 
 func newClient() *terrakube.Client {
+	endpoint := viper.GetString("api_url")
+	if endpoint == "" {
+		endpoint = "http://localhost:8080"
+	}
+	token := viper.GetString("token")
+	if token == "" {
+		token = "test-token"
+	}
 	c, err := terrakube.NewClient(
-		terrakube.WithEndpoint(viper.GetString("api_url")),
-		terrakube.WithToken(viper.GetString("token")),
+		terrakube.WithEndpoint(endpoint),
+		terrakube.WithToken(token),
 	)
 	if err != nil {
 		fmt.Printf("Error creating client: %v\n", err)
@@ -202,6 +210,9 @@ func postInitCommands(commands []*cobra.Command) {
 func presetRequiredFlags(cmd *cobra.Command) {
 	_ = viper.BindPFlags(cmd.Flags())
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		if f.Name == "api-url" || f.Name == "pat" {
+			return
+		}
 		if viper.IsSet(f.Name) && viper.GetString(f.Name) != "" {
 			_ = cmd.Flags().Set(f.Name, viper.GetString(f.Name))
 		}

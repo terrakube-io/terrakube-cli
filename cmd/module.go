@@ -1,38 +1,50 @@
-/*
-Copyright © 2021 NAME HERE <EMAIL ADDRESS>
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package cmd
 
 import (
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
+	"context"
+
+	terrakube "github.com/terrakube-io/terrakube-go"
+
+	"terrakube/internal/resource"
 )
 
-var moduleLong = `
-This command consists of multiple subcommands to interact with modules.
-It can be used to create, update, delete and list modules.
-`
-
-var moduleCmd = &cobra.Command{
-	Use:     "module create|update|delete|list [ARGS]",
-	Short:   "create, update, delete and list modules",
-	Long:    moduleLong,
-	Aliases: []string{"mod", "modules"},
-}
-
-func init() {
-	rootCmd.AddCommand(moduleCmd)
-	_ = viper.BindEnv("organization", "TERRAKUBE_ORGANIZATION_ID")
-}
+var moduleCmd = resource.Register(rootCmd, resource.Config[terrakube.Module]{
+		Runtime: resource.Runtime{
+			NewClient:  newClient,
+			GetContext: getContext,
+			GetOutput:  func() string { return output },
+		},
+		Name:    "module",
+		Aliases: []string{"modules", "mod"},
+		Parents: []resource.ParentScope{{
+			Name:      "organization",
+			Flag:      "organization",
+			ShortFlag: "o",
+			Aliases:   []string{"org"},
+			IDFlag:    "organization-id",
+			Resolver:  orgResolver,
+		}},
+		Fields: []resource.FieldDef{
+			{StructField: "Name", Flag: "name", Short: "n", Type: resource.String, Required: true, Description: "Module name"},
+			{StructField: "Description", Flag: "description", Short: "d", Type: resource.String, Description: "Module description"},
+			{StructField: "Provider", Flag: "provider", Short: "p", Type: resource.String, Required: true, Description: "Provider name (e.g. aws, azurerm)"},
+			{StructField: "Source", Flag: "source", Short: "s", Type: resource.String, Required: true, Description: "Source Git URL"},
+			{StructField: "Folder", Flag: "folder", Type: resource.String, Description: "Folder path inside repo"},
+			{StructField: "TagPrefix", Flag: "tag-prefix", Type: resource.String, Description: "Tag prefix for versioning"},
+		},
+		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Module, error) {
+			return c.Modules.List(ctx, pIDs[0], opts)
+		},
+		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.Module, error) {
+			return c.Modules.Get(ctx, pIDs[0], id)
+		},
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, m *terrakube.Module) (*terrakube.Module, error) {
+			return c.Modules.Create(ctx, pIDs[0], m)
+		},
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, m *terrakube.Module) (*terrakube.Module, error) {
+			return c.Modules.Update(ctx, pIDs[0], m)
+		},
+		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
+			return c.Modules.Delete(ctx, pIDs[0], id)
+		},
+	})
