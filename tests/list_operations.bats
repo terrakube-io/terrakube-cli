@@ -1,0 +1,365 @@
+#!/usr/bin/env bats
+
+# ==============================================================================
+# Terrakube CLI BATS Test Suite — List Operations
+# ==============================================================================
+# Prerequisites:
+#   - TERRAKUBE_API_URL environment variable set (e.g. http://localhost:8080)
+#   - TERRAKUBE_PAT environment variable set (Bearer token)
+#   - TERRAKUBE_BIN optional (defaults to 'terrakube' or './terrakube')
+# ==============================================================================
+
+STATE_FILE="${BATS_FILE_TMPDIR:-/tmp}/terrakube_bats_state.env"
+
+setup_file() {
+    TERRAKUBE_CMD="${TERRAKUBE_BIN:-terrakube}"
+    if [ ! -x "$(command -v "$TERRAKUBE_CMD")" ] && [ -x "./terrakube" ]; then
+        TERRAKUBE_CMD="./terrakube"
+    fi
+
+    # 1. Login verification
+    if [ -z "$TERRAKUBE_API_URL" ] || [ -z "$TERRAKUBE_PAT" ]; then
+        echo "Error: TERRAKUBE_API_URL and TERRAKUBE_PAT environment variables must be set." >&2
+        return 1
+    fi
+
+    run "$TERRAKUBE_CMD" login -a "$TERRAKUBE_API_URL" -t "$TERRAKUBE_PAT"
+    if [ "$status" -ne 0 ]; then
+        echo "Login failed: $output" >&2
+        return 1
+    fi
+
+    # 2. Organization Discovery (starting with --filter name==simple)
+    run "$TERRAKUBE_CMD" organization list --filter "name==simple" --output json
+    ORG_ID=""
+    if [ "$status" -eq 0 ]; then
+        ORG_ID=$(echo "$output" | jq -r '.[0].id // empty' 2>/dev/null || true)
+    fi
+
+    # Fallback to first available organization if 'simple' filter returns empty
+    if [ -z "$ORG_ID" ] || [ "$ORG_ID" = "null" ]; then
+        run "$TERRAKUBE_CMD" organization list --output json
+        if [ "$status" -eq 0 ]; then
+            ORG_ID=$(echo "$output" | jq -r '.[0].id // empty' 2>/dev/null || true)
+        fi
+    fi
+
+    if [ -z "$ORG_ID" ] || [ "$ORG_ID" = "null" ]; then
+        echo "Error: Could not retrieve a valid organization ID." >&2
+        return 1
+    fi
+
+    echo "export TERRAKUBE_TEST_ORG_ID=\"$ORG_ID\"" > "$STATE_FILE"
+
+    # 3. Discover sub-resource parent IDs for Level 3 tests
+    # Workspace
+    run "$TERRAKUBE_CMD" workspace list -o "$ORG_ID" --output json
+    if [ "$status" -eq 0 ]; then
+        WS_ID=$(echo "$output" | jq -r '.[0].id // empty' 2>/dev/null || true)
+        [ -n "$WS_ID" ] && [ "$WS_ID" != "null" ] && echo "export TERRAKUBE_TEST_WS_ID=\"$WS_ID\"" >> "$STATE_FILE"
+    fi
+
+    # Collection
+    run "$TERRAKUBE_CMD" collection list -o "$ORG_ID" --output json
+    if [ "$status" -eq 0 ]; then
+        COL_ID=$(echo "$output" | jq -r '.[0].id // empty' 2>/dev/null || true)
+        [ -n "$COL_ID" ] && [ "$COL_ID" != "null" ] && echo "export TERRAKUBE_TEST_COLLECTION_ID=\"$COL_ID\"" >> "$STATE_FILE"
+    fi
+
+    # Project
+    run "$TERRAKUBE_CMD" project list -o "$ORG_ID" --output json
+    if [ "$status" -eq 0 ]; then
+        PROJ_ID=$(echo "$output" | jq -r '.[0].id // empty' 2>/dev/null || true)
+        [ -n "$PROJ_ID" ] && [ "$PROJ_ID" != "null" ] && echo "export TERRAKUBE_TEST_PROJECT_ID=\"$PROJ_ID\"" >> "$STATE_FILE"
+    fi
+
+    # Provider
+    run "$TERRAKUBE_CMD" provider list -o "$ORG_ID" --output json
+    if [ "$status" -eq 0 ]; then
+        PROV_ID=$(echo "$output" | jq -r '.[0].id // empty' 2>/dev/null || true)
+        [ -n "$PROV_ID" ] && [ "$PROV_ID" != "null" ] && echo "export TERRAKUBE_TEST_PROVIDER_ID=\"$PROV_ID\"" >> "$STATE_FILE"
+    fi
+
+    # Module
+    run "$TERRAKUBE_CMD" module list -o "$ORG_ID" --output json
+    if [ "$status" -eq 0 ]; then
+        MOD_ID=$(echo "$output" | jq -r '.[0].id // empty' 2>/dev/null || true)
+        [ -n "$MOD_ID" ] && [ "$MOD_ID" != "null" ] && echo "export TERRAKUBE_TEST_MODULE_ID=\"$MOD_ID\"" >> "$STATE_FILE"
+    fi
+
+    # VCS
+    run "$TERRAKUBE_CMD" vcs list -o "$ORG_ID" --output json
+    if [ "$status" -eq 0 ]; then
+        VCS_ID=$(echo "$output" | jq -r '.[0].id // empty' 2>/dev/null || true)
+        [ -n "$VCS_ID" ] && [ "$VCS_ID" != "null" ] && echo "export TERRAKUBE_TEST_VCS_ID=\"$VCS_ID\"" >> "$STATE_FILE"
+    fi
+
+    # Webhook
+    run "$TERRAKUBE_CMD" webhook list -o "$ORG_ID" --output json
+    if [ "$status" -eq 0 ]; then
+        WH_ID=$(echo "$output" | jq -r '.[0].id // empty' 2>/dev/null || true)
+        [ -n "$WH_ID" ] && [ "$WH_ID" != "null" ] && echo "export TERRAKUBE_TEST_WEBHOOK_ID=\"$WH_ID\"" >> "$STATE_FILE"
+    fi
+
+    # Job
+    run "$TERRAKUBE_CMD" job list -o "$ORG_ID" --output json
+    if [ "$status" -eq 0 ]; then
+        JOB_ID=$(echo "$output" | jq -r '.[0].id // empty' 2>/dev/null || true)
+        [ -n "$JOB_ID" ] && [ "$JOB_ID" != "null" ] && echo "export TERRAKUBE_TEST_JOB_ID=\"$JOB_ID\"" >> "$STATE_FILE"
+    fi
+}
+
+setup() {
+    TERRAKUBE_CMD="${TERRAKUBE_BIN:-terrakube}"
+    if [ ! -x "$(command -v "$TERRAKUBE_CMD")" ] && [ -x "./terrakube" ]; then
+        TERRAKUBE_CMD="./terrakube"
+    fi
+
+    STATE_FILE="${BATS_FILE_TMPDIR:-/tmp}/terrakube_bats_state.env"
+    if [ -f "$STATE_FILE" ]; then
+        # shellcheck disable=SC1090
+        source "$STATE_FILE"
+    fi
+}
+
+assert_json_array() {
+    [ "$status" -eq 0 ]
+    echo "$output" | jq -e 'type == "array"' >/dev/null
+}
+
+assert_success() {
+    [ "$status" -eq 0 ]
+}
+
+# ==============================================================================
+# Level 1: Top-Level List Resources
+# ==============================================================================
+
+@test "List organizations (JSON)" {
+    run "$TERRAKUBE_CMD" organization list --output json
+    assert_json_array
+}
+
+@test "List organizations (Table)" {
+    run "$TERRAKUBE_CMD" organization list --output table
+    assert_success
+}
+
+@test "List actions (JSON)" {
+    run "$TERRAKUBE_CMD" action list --output json
+    assert_json_array
+}
+
+@test "List federated credentials (JSON)" {
+    run "$TERRAKUBE_CMD" federated list --output json
+    assert_json_array
+}
+
+@test "List github-app-tokens (JSON)" {
+    run "$TERRAKUBE_CMD" github-app-token list --output json
+    assert_json_array
+}
+
+# ==============================================================================
+# Level 2: Organization-Scoped List Resources
+# ==============================================================================
+
+@test "List agents (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    run "$TERRAKUBE_CMD" agent list -o "$TERRAKUBE_TEST_ORG_ID" --output json
+    assert_json_array
+}
+
+@test "List collections (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    run "$TERRAKUBE_CMD" collection list -o "$TERRAKUBE_TEST_ORG_ID" --output json
+    assert_json_array
+}
+
+@test "List federated claims (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    run "$TERRAKUBE_CMD" federated-claim list -o "$TERRAKUBE_TEST_ORG_ID" --output json
+    assert_json_array
+}
+
+@test "List modules (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    run "$TERRAKUBE_CMD" module list -o "$TERRAKUBE_TEST_ORG_ID" --output json
+    assert_json_array
+}
+
+@test "List organization variables (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    run "$TERRAKUBE_CMD" organization-variable list -o "$TERRAKUBE_TEST_ORG_ID" --output json
+    assert_json_array
+}
+
+@test "List projects (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    run "$TERRAKUBE_CMD" project list -o "$TERRAKUBE_TEST_ORG_ID" --output json
+    assert_json_array
+}
+
+@test "List providers (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    run "$TERRAKUBE_CMD" provider list -o "$TERRAKUBE_TEST_ORG_ID" --output json
+    assert_json_array
+}
+
+@test "List SSH keys (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    run "$TERRAKUBE_CMD" ssh list -o "$TERRAKUBE_TEST_ORG_ID" --output json
+    assert_json_array
+}
+
+@test "List tags (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    run "$TERRAKUBE_CMD" tag list -o "$TERRAKUBE_TEST_ORG_ID" --output json
+    assert_json_array
+}
+
+@test "List teams (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    run "$TERRAKUBE_CMD" team list -o "$TERRAKUBE_TEST_ORG_ID" --output json
+    assert_json_array
+}
+
+@test "List templates (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    run "$TERRAKUBE_CMD" template list -o "$TERRAKUBE_TEST_ORG_ID" --output json
+    assert_json_array
+}
+
+@test "List VCS (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    run "$TERRAKUBE_CMD" vcs list -o "$TERRAKUBE_TEST_ORG_ID" --output json
+    assert_json_array
+}
+
+@test "List webhooks (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    run "$TERRAKUBE_CMD" webhook list -o "$TERRAKUBE_TEST_ORG_ID" --output json
+    assert_json_array
+}
+
+@test "List workspaces (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    run "$TERRAKUBE_CMD" workspace list -o "$TERRAKUBE_TEST_ORG_ID" --output json
+    assert_json_array
+}
+
+@test "List workspaces (Table)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    run "$TERRAKUBE_CMD" workspace list -o "$TERRAKUBE_TEST_ORG_ID" --output table
+    assert_success
+}
+
+# ==============================================================================
+# Level 3: Nested Sub-Resource List Resources
+# ==============================================================================
+
+@test "List addresses (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    [ -n "$TERRAKUBE_TEST_JOB_ID" ] || skip "Job ID not available"
+    run "$TERRAKUBE_CMD" address list -o "$TERRAKUBE_TEST_ORG_ID" -j "$TERRAKUBE_TEST_JOB_ID" --output json
+    assert_json_array
+}
+
+@test "List collection items (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    [ -n "$TERRAKUBE_TEST_COLLECTION_ID" ] || skip "Collection ID not available"
+    run "$TERRAKUBE_CMD" collection-item list -o "$TERRAKUBE_TEST_ORG_ID" --collection "$TERRAKUBE_TEST_COLLECTION_ID" --output json
+    assert_json_array
+}
+
+@test "List collection references (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    [ -n "$TERRAKUBE_TEST_COLLECTION_ID" ] || skip "Collection ID not available"
+    run "$TERRAKUBE_CMD" collection-reference list -o "$TERRAKUBE_TEST_ORG_ID" --collection "$TERRAKUBE_TEST_COLLECTION_ID" --output json
+    assert_json_array
+}
+
+@test "List workspace history (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    [ -n "$TERRAKUBE_TEST_WS_ID" ] || skip "Workspace ID not available"
+    run "$TERRAKUBE_CMD" history list -o "$TERRAKUBE_TEST_ORG_ID" -w "$TERRAKUBE_TEST_WS_ID" --output json
+    assert_json_array
+}
+
+@test "List implementations (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    [ -n "$TERRAKUBE_TEST_WS_ID" ] || skip "Workspace ID not available"
+    run "$TERRAKUBE_CMD" implementation list -o "$TERRAKUBE_TEST_ORG_ID" -w "$TERRAKUBE_TEST_WS_ID" --output json
+    assert_json_array
+}
+
+@test "List jobs (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    [ -n "$TERRAKUBE_TEST_WS_ID" ] || skip "Workspace ID not available"
+    run "$TERRAKUBE_CMD" job list -o "$TERRAKUBE_TEST_ORG_ID" -w "$TERRAKUBE_TEST_WS_ID" --output json
+    assert_json_array
+}
+
+@test "List module versions (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    [ -n "$TERRAKUBE_TEST_MODULE_ID" ] || skip "Module ID not available"
+    run "$TERRAKUBE_CMD" module-version list -o "$TERRAKUBE_TEST_ORG_ID" -m "$TERRAKUBE_TEST_MODULE_ID" --output json
+    assert_json_array
+}
+
+@test "List project accesses (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    [ -n "$TERRAKUBE_TEST_PROJECT_ID" ] || skip "Project ID not available"
+    run "$TERRAKUBE_CMD" project-access list -o "$TERRAKUBE_TEST_ORG_ID" --project "$TERRAKUBE_TEST_PROJECT_ID" --output json
+    assert_json_array
+}
+
+@test "List provider versions (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    [ -n "$TERRAKUBE_TEST_PROVIDER_ID" ] || skip "Provider ID not available"
+    run "$TERRAKUBE_CMD" provider-version list -o "$TERRAKUBE_TEST_ORG_ID" --provider "$TERRAKUBE_TEST_PROVIDER_ID" --output json
+    assert_json_array
+}
+
+@test "List job steps (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    [ -n "$TERRAKUBE_TEST_JOB_ID" ] || skip "Job ID not available"
+    run "$TERRAKUBE_CMD" step list -o "$TERRAKUBE_TEST_ORG_ID" -j "$TERRAKUBE_TEST_JOB_ID" --output json
+    assert_json_array
+}
+
+@test "List workspace variables (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    [ -n "$TERRAKUBE_TEST_WS_ID" ] || skip "Workspace ID not available"
+    run "$TERRAKUBE_CMD" variable list -o "$TERRAKUBE_TEST_ORG_ID" -w "$TERRAKUBE_TEST_WS_ID" --output json
+    assert_json_array
+}
+
+@test "List webhook events (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    [ -n "$TERRAKUBE_TEST_WS_ID" ] || skip "Workspace ID not available"
+    [ -n "$TERRAKUBE_TEST_WEBHOOK_ID" ] || skip "Webhook ID not available"
+    run "$TERRAKUBE_CMD" webhook-event list -o "$TERRAKUBE_TEST_ORG_ID" -w "$TERRAKUBE_TEST_WS_ID" --webhook "$TERRAKUBE_TEST_WEBHOOK_ID" --output json
+    assert_json_array
+}
+
+@test "List workspace access (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    [ -n "$TERRAKUBE_TEST_WS_ID" ] || skip "Workspace ID not available"
+    run "$TERRAKUBE_CMD" workspace-access list -o "$TERRAKUBE_TEST_ORG_ID" -w "$TERRAKUBE_TEST_WS_ID" --output json
+    assert_json_array
+}
+
+@test "List workspace schedules (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    [ -n "$TERRAKUBE_TEST_WS_ID" ] || skip "Workspace ID not available"
+    run "$TERRAKUBE_CMD" workspace-schedule list -o "$TERRAKUBE_TEST_ORG_ID" -w "$TERRAKUBE_TEST_WS_ID" --output json
+    assert_json_array
+}
+
+@test "List workspace tags (JSON)" {
+    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
+    [ -n "$TERRAKUBE_TEST_WS_ID" ] || skip "Workspace ID not available"
+    run "$TERRAKUBE_CMD" workspace-tag list -o "$TERRAKUBE_TEST_ORG_ID" -w "$TERRAKUBE_TEST_WS_ID" --output json
+    assert_json_array
+}
