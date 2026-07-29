@@ -93,5 +93,5 @@ func init() {
 	teamTokenCmd.AddCommand(listTeamTokensCmd)
 	teamTokenCmd.AddCommand(deleteTeamTokenCmd)
 
-	teamCmd.AddCommand(teamTokenCmd)
+	// teamTokenCmd.AddCommand(teamTokenCmd)
 }
