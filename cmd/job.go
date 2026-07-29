@@ -1,36 +1,68 @@
-/*
-Copyright © 2021 NAME HERE <EMAIL ADDRESS>
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package cmd
 
 import (
-	"github.com/spf13/cobra"
+	"context"
+
+	terrakube "github.com/terrakube-io/terrakube-go"
+
+	"terrakube/internal/resource"
 )
 
-var jobLong = `
-This command consists of multiple subcommands to interact with jobs.
-It can be used to create, update, delete and list jobs.
-`
-
-var jobCmd = &cobra.Command{
-	Use:     "job create|list [ARGS]",
-	Short:   "create and list jobs",
-	Long:    jobLong,
-	Aliases: []string{"jobs"},
-}
-
 func init() {
-	rootCmd.AddCommand(jobCmd)
+	resource.Register(rootCmd, resource.Config[terrakube.Job]{
+		Runtime: resource.Runtime{
+			NewClient:  newClient,
+			GetContext: getContext,
+			GetOutput:  func() string { return output },
+		},
+		Name:    "job",
+		Aliases: []string{"jobs"},
+		Parents: []resource.ParentScope{
+			{
+				Name:      "organization",
+				Flag:      "organization",
+				ShortFlag: "o",
+				Aliases:   []string{"org"},
+				IDFlag:    "organization-id",
+				Resolver:  orgResolver,
+			},
+			{
+				Name:      "workspace",
+				Flag:      "workspace",
+				ShortFlag: "w",
+				Aliases:   []string{"ws"},
+				IDFlag:    "workspace-id",
+				Resolver:  workspaceResolver,
+			},
+		},
+		Fields: []resource.FieldDef{
+			{StructField: "Command", Flag: "command", Short: "c", Type: resource.String, Required: true, Description: "Command to execute (plan, apply, destroy)"},
+			{StructField: "Output", Flag: "output", Type: resource.String, Description: "Job output log"},
+			{StructField: "Status", Flag: "status", Type: resource.String, Description: "Job status"},
+			{StructField: "CommitID", Flag: "commit-id", Type: resource.String, Description: "VCS commit ID"},
+			{StructField: "OverrideBranch", Flag: "override-branch", Type: resource.String, Description: "Override branch"},
+			{StructField: "OverrideSource", Flag: "override-source", Type: resource.String, Description: "Override source repository"},
+			{StructField: "PlanChanges", Flag: "plan-changes", Type: resource.Bool, Description: "Whether plan contains changes"},
+			{StructField: "Refresh", Flag: "refresh", Type: resource.Bool, Description: "Whether to refresh state"},
+			{StructField: "RefreshOnly", Flag: "refresh-only", Type: resource.Bool, Description: "Refresh state only"},
+		},
+		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Job, error) {
+			return c.Jobs.List(ctx, pIDs[0], opts)
+		},
+		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.Job, error) {
+			return c.Jobs.Get(ctx, pIDs[0], id)
+		},
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, j *terrakube.Job) (*terrakube.Job, error) {
+			if len(pIDs) > 1 && pIDs[1] != "" {
+				j.Workspace = &terrakube.Workspace{ID: pIDs[1]}
+			}
+			return c.Jobs.Create(ctx, pIDs[0], j)
+		},
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, j *terrakube.Job) (*terrakube.Job, error) {
+			return c.Jobs.Update(ctx, pIDs[0], j)
+		},
+		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
+			return c.Jobs.Delete(ctx, pIDs[0], id)
+		},
+	})
 }

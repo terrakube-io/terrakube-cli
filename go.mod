@@ -29,8 +29,10 @@ require (
 	github.com/spf13/afero v1.14.0 // indirect
 	github.com/spf13/cast v1.9.2 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	github.com/terrakube-io/terrakube-go v0.1.1
+	github.com/terrakube-io/terrakube-go v0.0.0-20260728235900-b3336ae44b2a
 	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 )
+
+replace github.com/terrakube-io/terrakube-go => ../terrakube-go
