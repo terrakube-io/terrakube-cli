@@ -463,10 +463,237 @@ assert_success() {
 }
 
 # ==============================================================================
-# Step 8: Workspace Tag, Variable & Soft-Delete Cleanup
+# Step 8: Organization Global Variables CRUD & Verification
 # ==============================================================================
 
-@test "8. Delete tags, variables, and soft-delete workspace" {
+@test "8. Add, update, validate, and delete organization global variables" {
+    [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
+
+    # 1. Create global variable (key/val: dummy + 4 alphanumeric)
+    RAND_VAR_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    VAR_KEY="dummy${RAND_VAR_SUFFIX}"
+    VAR_VAL="dummy${RAND_VAR_SUFFIX}"
+
+    run "$TERRAKUBE_CMD" organization-variable create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --key "$VAR_KEY" \
+        --value "$VAR_VAL" \
+        --category "ENV" \
+        --description "Initial global variable" \
+        --output json
+    assert_success
+
+    GVAR_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$GVAR_ID" ] && [ "$GVAR_ID" != "null" ]
+
+    # 2. Update key and value to new dummy+4alphanumeric strings
+    RAND_VAR_SUFFIX2=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    NEW_VAR_KEY="dummy${RAND_VAR_SUFFIX2}"
+    NEW_VAR_VAL="dummy${RAND_VAR_SUFFIX2}"
+
+    run "$TERRAKUBE_CMD" organization-variable update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --id "$GVAR_ID" \
+        --key "$NEW_VAR_KEY" \
+        --value "$NEW_VAR_VAL" \
+        --category "ENV" \
+        --description "Updated global variable" \
+        --output json
+    assert_success
+
+    # 3. Read values and validate (JSON format)
+    run "$TERRAKUBE_CMD" organization-variable get -o "$TERRAKUBE_TEST_E2E_ORG_ID" --id "$GVAR_ID" --output json
+    assert_success
+    FETCHED_KEY=$(echo "$output" | jq -r '.attributes.key // .key // empty' 2>/dev/null || true)
+    FETCHED_VAL=$(echo "$output" | jq -r '.attributes.value // .value // empty' 2>/dev/null || true)
+    [ "$FETCHED_KEY" = "$NEW_VAR_KEY" ]
+    [ "$FETCHED_VAL" = "$NEW_VAR_VAL" ]
+
+    # Read values and validate (Table format)
+    run "$TERRAKUBE_CMD" organization-variable list -o "$TERRAKUBE_TEST_E2E_ORG_ID" --output table
+    assert_success
+
+    # 4. Delete global variable
+    run "$TERRAKUBE_CMD" organization-variable delete -o "$TERRAKUBE_TEST_E2E_ORG_ID" --id "$GVAR_ID"
+    assert_success
+}
+
+# ==============================================================================
+# Step 9: Organization Agent CRUD & Verification
+# ==============================================================================
+
+@test "9. Add, update, validate, and delete organization agents" {
+    [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
+
+    # 1. Create agent (name: agent + 4 alphanumeric, URL: https://localhost:8080)
+    RAND_AGT_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    AGT_NAME="agent${RAND_AGT_SUFFIX}"
+
+    run "$TERRAKUBE_CMD" agent create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --name "$AGT_NAME" \
+        --url "https://localhost:8080" \
+        --description "Initial agent" \
+        --output json
+    assert_success
+
+    AGT_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$AGT_ID" ] && [ "$AGT_ID" != "null" ]
+
+    # 2. Update agent URL to https://localhost:8181
+    run "$TERRAKUBE_CMD" agent update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --id "$AGT_ID" \
+        --name "$AGT_NAME" \
+        --url "https://localhost:8181" \
+        --description "Updated agent" \
+        --output json
+    assert_success
+
+    # 3. Read values and validate (JSON format)
+    run "$TERRAKUBE_CMD" agent get -o "$TERRAKUBE_TEST_E2E_ORG_ID" --id "$AGT_ID" --output json
+    assert_success
+    FETCHED_AGT_NAME=$(echo "$output" | jq -r '.attributes.name // .name // empty' 2>/dev/null || true)
+    FETCHED_AGT_URL=$(echo "$output" | jq -r '.attributes.url // .url // empty' 2>/dev/null || true)
+    [ "$FETCHED_AGT_NAME" = "$AGT_NAME" ]
+    [ "$FETCHED_AGT_URL" = "https://localhost:8181" ]
+
+    # Read values and validate (Table format)
+    run "$TERRAKUBE_CMD" agent list -o "$TERRAKUBE_TEST_E2E_ORG_ID" --output table
+    assert_success
+
+    # 4. Delete agent
+    run "$TERRAKUBE_CMD" agent delete -o "$TERRAKUBE_TEST_E2E_ORG_ID" --id "$AGT_ID"
+    assert_success
+}
+
+# ==============================================================================
+# Step 10: Organization SSH Key CRUD & Verification
+# ==============================================================================
+
+@test "10. Add, update, validate, and delete organization SSH keys" {
+    [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
+
+    # 1. Create SSH key (name: ssh + 4 alphanumeric)
+    RAND_SSH_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    SSH_NAME="ssh${RAND_SSH_SUFFIX}"
+    DUMMY_KEY="-----BEGIN RSA PRIVATE KEY-----\ndummykeydata\n-----END RSA PRIVATE KEY-----\n"
+
+    run "$TERRAKUBE_CMD" ssh create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --name "$SSH_NAME" \
+        --ssh-type "rsa" \
+        --private-key "$DUMMY_KEY" \
+        --description "Initial SSH key" \
+        --output json
+    assert_success
+
+    SSH_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$SSH_ID" ] && [ "$SSH_ID" != "null" ]
+
+    # 2. Update description
+    run "$TERRAKUBE_CMD" ssh update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --id "$SSH_ID" \
+        --name "$SSH_NAME" \
+        --ssh-type "rsa" \
+        --private-key "$DUMMY_KEY" \
+        --description "Updated SSH key" \
+        --output json
+    assert_success
+
+    # 3. Read values and validate (JSON format)
+    run "$TERRAKUBE_CMD" ssh get -o "$TERRAKUBE_TEST_E2E_ORG_ID" --id "$SSH_ID" --output json
+    assert_success
+    FETCHED_SSH_NAME=$(echo "$output" | jq -r '.attributes.name // .name // empty' 2>/dev/null || true)
+    FETCHED_SSH_DESC=$(echo "$output" | jq -r '.attributes.description // .description // empty' 2>/dev/null || true)
+    [ "$FETCHED_SSH_NAME" = "$SSH_NAME" ]
+    [ "$FETCHED_SSH_DESC" = "Updated SSH key" ]
+
+    # Read values and validate (Table format)
+    run "$TERRAKUBE_CMD" ssh list -o "$TERRAKUBE_TEST_E2E_ORG_ID" --output table
+    assert_success
+
+    # 4. Delete SSH key
+    run "$TERRAKUBE_CMD" ssh delete -o "$TERRAKUBE_TEST_E2E_ORG_ID" --id "$SSH_ID"
+    assert_success
+}
+
+# ==============================================================================
+# Step 11: Workspace Access CRUD & Verification (Dedicated Workspace)
+# ==============================================================================
+
+@test "11. Create, verify, and delete workspace access with dedicated workspace" {
+    [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
+
+    # 1. Create a new dedicated workspace for workspace-access testing
+    RAND_WSACC_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    DEDICATED_WS_NAME="wsacc${RAND_WSACC_SUFFIX}"
+
+    run "$TERRAKUBE_CMD" workspace create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --name "$DEDICATED_WS_NAME" \
+        --source "https://github.com/terrakube-io/terrakube-docker-compose" \
+        --branch "main" \
+        --folder "/" \
+        --iac-type "tofu" \
+        --iac-version "1.12.5" \
+        --execution-mode "remote" \
+        --output json
+    assert_success
+
+    DEDICATED_WS_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$DEDICATED_WS_ID" ] && [ "$DEDICATED_WS_ID" != "null" ]
+
+    # 2. Add workspace access entry for team "TERRAKUBE_ADMIN"
+    run "$TERRAKUBE_CMD" workspace-access create -o "$TERRAKUBE_TEST_E2E_ORG_ID" -w "$DEDICATED_WS_ID" \
+        --name "TERRAKUBE_ADMIN" \
+        --manage-state \
+        --manage-workspace \
+        --manage-job \
+        --output json
+    assert_success
+
+    ACCESS_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$ACCESS_ID" ] && [ "$ACCESS_ID" != "null" ]
+
+    # 3. Update workspace access permissions
+    run "$TERRAKUBE_CMD" workspace-access update -o "$TERRAKUBE_TEST_E2E_ORG_ID" -w "$DEDICATED_WS_ID" \
+        --id "$ACCESS_ID" \
+        --name "TERRAKUBE_ADMIN" \
+        --manage-state=false \
+        --manage-workspace \
+        --manage-job \
+        --output json
+    assert_success
+
+    # 4. Read values and validate (JSON format)
+    run "$TERRAKUBE_CMD" workspace-access get -o "$TERRAKUBE_TEST_E2E_ORG_ID" -w "$DEDICATED_WS_ID" --id "$ACCESS_ID" --output json
+    assert_success
+    FETCHED_ACC_NAME=$(echo "$output" | jq -r '.attributes.name // .name // empty' 2>/dev/null || true)
+    [ "$FETCHED_ACC_NAME" = "TERRAKUBE_ADMIN" ]
+
+    # Read values and validate (Table format)
+    run "$TERRAKUBE_CMD" workspace-access list -o "$TERRAKUBE_TEST_E2E_ORG_ID" -w "$DEDICATED_WS_ID" --output table
+    assert_success
+
+    # 5. Delete workspace access entry
+    run "$TERRAKUBE_CMD" workspace-access delete -o "$TERRAKUBE_TEST_E2E_ORG_ID" -w "$DEDICATED_WS_ID" --id "$ACCESS_ID"
+    assert_success
+
+    # 6. Soft-delete and cleanup the dedicated workspace
+    NEW_DEDICATED_WS_NAME=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
+    run "$TERRAKUBE_CMD" workspace update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --id "$DEDICATED_WS_ID" \
+        --name "$NEW_DEDICATED_WS_NAME" \
+        --deleted \
+        --source "https://github.com/terrakube-io/terrakube-docker-compose" \
+        --branch "main" \
+        --folder "/" \
+        --iac-type "tofu" \
+        --iac-version "1.12.5" \
+        --execution-mode "remote"
+    assert_success
+}
+
+# ==============================================================================
+# Step 12: Workspace Tag, Variable & Soft-Delete Cleanup
+# ==============================================================================
+
+@test "12. Delete tags, variables, and soft-delete workspace" {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
     [ -n "$TERRAKUBE_TEST_E2E_WS_ID" ] || skip "Workspace ID not available"
 
@@ -521,10 +748,10 @@ assert_success() {
 }
 
 # ==============================================================================
-# Step 9: Final Team Cleanup (Always Executed Last)
+# Step 13: Final Team Cleanup (Always Executed Last)
 # ==============================================================================
 
-@test "9. Delete TERRAKUBE_ADMIN team" {
+@test "13. Delete TERRAKUBE_ADMIN team" {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
     [ -n "$TERRAKUBE_TEST_E2E_TEAM_ID" ] || skip "Team ID not available"
 
