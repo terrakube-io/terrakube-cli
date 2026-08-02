@@ -119,13 +119,6 @@ func getContext() context.Context {
 	return context.Background()
 }
 
-func ptrOrNil(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
 func renderOutput(result interface{}, format string) {
 	if err := outputpkg.Render(os.Stdout, result, format); err != nil {
 		log.Fatal("Failed to render output: ", err)
