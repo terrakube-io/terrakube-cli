@@ -64,30 +64,3 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
-  homebrew:
-    needs: releases-matrix
-    name: Bump Homebrew formula
-    runs-on: ubuntu-latest
-    strategy:
-      # Max-parallel 1 ensures they don't conflict trying to push to your tap repo at the exact same millisecond
-      max-parallel: 1
-      matrix:
-        include:
-          - os: darwin
-            arch: amd64
-          - os: darwin
-            arch: arm64
-          - os: linux
-            arch: amd64
-    steps:
-      - uses: mislav/bump-homebrew-formula-action@v3
-        with:
-          formula-name: terrakube
-          homebrew-tap: terrakube-io/homebrew-cli
-          # Dynamically builds the download URL based on the matrix platform loop
-          download-url: https://github.com/terrakube-io/terrakube-cli/releases/download/${{ github.event.release.tag_name }}/terrakube-${{ github.event.release.tag_name }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
-          commit-message: |
-            Updated {{formulaName}} to {{version}} (${{ matrix.os }}-${{ matrix.arch }})
-        env:
-          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TOKEN }}
