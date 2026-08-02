@@ -690,10 +690,392 @@ assert_success() {
 }
 
 # ==============================================================================
-# Step 12: Workspace Tag, Variable & Soft-Delete Cleanup
+# Step 12: Organization Template CRUD & Verification
 # ==============================================================================
 
-@test "12. Delete tags, variables, and soft-delete workspace" {
+@test "12. Create, verify, and delete organization template" {
+    [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
+
+    # 1. Base64 encode TCL YAML flow
+    TCL_RAW="flow:
+  - type: \"terraformPlan\"
+    step: 100
+  - type: \"terraformApply\"
+    step: 200"
+    TCL_B64=$(echo "$TCL_RAW" | base64 -w 0)
+
+    # 2. Create template (name: tmpl + 4 alphanumeric, description: desc + 4 alphanumeric, version: 1.0.0)
+    RAND_TPL_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    TPL_NAME="tmpl${RAND_TPL_SUFFIX}"
+    TPL_DESC="desc${RAND_TPL_SUFFIX}"
+
+    run "$TERRAKUBE_CMD" template create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --name "$TPL_NAME" \
+        --description "$TPL_DESC" \
+        --version "1.0.0" \
+        --content "$TCL_B64" \
+        --output json
+    assert_success
+
+    TPL_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$TPL_ID" ] && [ "$TPL_ID" != "null" ]
+
+    # 3. Update description with a new 4-character random string
+    RAND_TPL_SUFFIX2=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    NEW_TPL_DESC="desc${RAND_TPL_SUFFIX2}"
+
+    run "$TERRAKUBE_CMD" template update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --id "$TPL_ID" \
+        --name "$TPL_NAME" \
+        --description "$NEW_TPL_DESC" \
+        --version "1.0.0" \
+        --content "$TCL_B64" \
+        --output json
+    assert_success
+
+    # 4. Read values and validate (JSON format)
+    run "$TERRAKUBE_CMD" template get -o "$TERRAKUBE_TEST_E2E_ORG_ID" --id "$TPL_ID" --output json
+    assert_success
+    FETCHED_TPL_NAME=$(echo "$output" | jq -r '.attributes.name // .name // empty' 2>/dev/null || true)
+    FETCHED_TPL_DESC=$(echo "$output" | jq -r '.attributes.description // .description // empty' 2>/dev/null || true)
+    FETCHED_TPL_VER=$(echo "$output" | jq -r '.attributes.version // .version // empty' 2>/dev/null || true)
+    [ "$FETCHED_TPL_NAME" = "$TPL_NAME" ]
+    [ "$FETCHED_TPL_DESC" = "$NEW_TPL_DESC" ]
+    [ "$FETCHED_TPL_VER" = "1.0.0" ]
+
+    # Read values and validate (Table format)
+    run "$TERRAKUBE_CMD" template list -o "$TERRAKUBE_TEST_E2E_ORG_ID" --output table
+    assert_success
+
+    # 5. Delete template
+    run "$TERRAKUBE_CMD" template delete -o "$TERRAKUBE_TEST_E2E_ORG_ID" --id "$TPL_ID"
+    assert_success
+}
+
+# ==============================================================================
+# Step 13: Collection, Collection Item, and Collection Reference CRUD
+# ==============================================================================
+
+@test "13. Create, verify, and delete collection, item, and reference with temporary workspace" {
+    [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
+
+    # 1. Create temporary workspace for collection-reference testing
+    RAND_COLWS_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    COL_WS_NAME="colws${RAND_COLWS_SUFFIX}"
+
+    run "$TERRAKUBE_CMD" workspace create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --name "$COL_WS_NAME" \
+        --source "https://github.com/terrakube-io/terrakube-docker-compose" \
+        --branch "main" \
+        --folder "/" \
+        --iac-type "tofu" \
+        --iac-version "1.12.5" \
+        --execution-mode "remote" \
+        --output json
+    assert_success
+
+    COL_WS_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$COL_WS_ID" ] && [ "$COL_WS_ID" != "null" ]
+
+    # 2. Create collection
+    RAND_COL_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    COL_NAME="col${RAND_COL_SUFFIX}"
+
+    run "$TERRAKUBE_CMD" collection create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --name "$COL_NAME" \
+        --description "Initial collection" \
+        --priority 10 \
+        --output json
+    assert_success
+
+    COL_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$COL_ID" ] && [ "$COL_ID" != "null" ]
+
+    # Update collection description
+    RAND_COL_DESC2="desc$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)"
+    run "$TERRAKUBE_CMD" collection update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --id "$COL_ID" \
+        --name "$COL_NAME" \
+        --description "$RAND_COL_DESC2" \
+        --priority 20 \
+        --output json
+    assert_success
+
+    # Validate collection (JSON & Table)
+    run "$TERRAKUBE_CMD" collection get -o "$TERRAKUBE_TEST_E2E_ORG_ID" --id "$COL_ID" --output json
+    assert_success
+    FETCHED_COL_NAME=$(echo "$output" | jq -r '.attributes.name // .name // empty' 2>/dev/null || true)
+    [ "$FETCHED_COL_NAME" = "$COL_NAME" ]
+
+    run "$TERRAKUBE_CMD" collection list -o "$TERRAKUBE_TEST_E2E_ORG_ID" --output table
+    assert_success
+
+    # 3. Create collection item (category: ENV)
+    RAND_ITEM_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    ITEM_KEY="dummy${RAND_ITEM_SUFFIX}"
+    ITEM_VAL="dummy${RAND_ITEM_SUFFIX}"
+
+    run "$TERRAKUBE_CMD" collection-item create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --collection "$COL_ID" \
+        --key "$ITEM_KEY" \
+        --value "$ITEM_VAL" \
+        --category "ENV" \
+        --description "Collection item description" \
+        --output json
+    assert_success
+
+    ITEM_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$ITEM_ID" ] && [ "$ITEM_ID" != "null" ]
+
+    # Validate collection item (JSON & Table)
+    run "$TERRAKUBE_CMD" collection-item get -o "$TERRAKUBE_TEST_E2E_ORG_ID" --collection "$COL_ID" --id "$ITEM_ID" --output json
+    assert_success
+    FETCHED_ITEM_KEY=$(echo "$output" | jq -r '.attributes.key // .key // empty' 2>/dev/null || true)
+    [ "$FETCHED_ITEM_KEY" = "$ITEM_KEY" ]
+
+    run "$TERRAKUBE_CMD" collection-item list -o "$TERRAKUBE_TEST_E2E_ORG_ID" --collection "$COL_ID" --output table
+    assert_success
+
+    # 4. Create collection reference
+    run "$TERRAKUBE_CMD" collection-reference create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --collection "$COL_ID" \
+        -w "$COL_WS_ID" \
+        --description "Collection reference to workspace" \
+        --output json
+    assert_success
+
+    REF_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$REF_ID" ] && [ "$REF_ID" != "null" ]
+
+    # Validate collection reference (JSON & Table)
+    run "$TERRAKUBE_CMD" collection-reference get -o "$TERRAKUBE_TEST_E2E_ORG_ID" --collection "$COL_ID" -w "$COL_WS_ID" --id "$REF_ID" --output json
+    assert_success
+
+    run "$TERRAKUBE_CMD" collection-reference list -o "$TERRAKUBE_TEST_E2E_ORG_ID" --collection "$COL_ID" -w "$COL_WS_ID" --output table
+    assert_success
+
+    # 5. Cleanup collection reference, collection item, collection, and temporary workspace
+    run "$TERRAKUBE_CMD" collection-reference delete -o "$TERRAKUBE_TEST_E2E_ORG_ID" --collection "$COL_ID" -w "$COL_WS_ID" --id "$REF_ID"
+    assert_success
+
+    run "$TERRAKUBE_CMD" collection-item delete -o "$TERRAKUBE_TEST_E2E_ORG_ID" --collection "$COL_ID" --id "$ITEM_ID"
+    assert_success
+
+    run "$TERRAKUBE_CMD" collection delete -o "$TERRAKUBE_TEST_E2E_ORG_ID" --id "$COL_ID"
+    assert_success
+
+    NEW_COL_WS_NAME=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
+    run "$TERRAKUBE_CMD" workspace update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --id "$COL_WS_ID" \
+        --name "$NEW_COL_WS_NAME" \
+        --deleted \
+        --source "https://github.com/terrakube-io/terrakube-docker-compose" \
+        --branch "main" \
+        --folder "/" \
+        --iac-type "tofu" \
+        --iac-version "1.12.5" \
+        --execution-mode "remote"
+    assert_success
+}
+
+# ==============================================================================
+# Step 14: Project & Project Access CRUD & Verification
+# ==============================================================================
+
+@test "14. Create, verify, and delete project and project access with temporary workspace" {
+    [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
+
+    # 1. Create temporary workspace for project testing
+    RAND_PRJWS_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    PRJ_WS_NAME="prjws${RAND_PRJWS_SUFFIX}"
+
+    run "$TERRAKUBE_CMD" workspace create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --name "$PRJ_WS_NAME" \
+        --source "https://github.com/terrakube-io/terrakube-docker-compose" \
+        --branch "main" \
+        --folder "/" \
+        --iac-type "tofu" \
+        --iac-version "1.12.5" \
+        --execution-mode "remote" \
+        --output json
+    assert_success
+
+    PRJ_WS_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$PRJ_WS_ID" ] && [ "$PRJ_WS_ID" != "null" ]
+
+    # 2. Create project
+    RAND_PRJ_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    PRJ_NAME="proj${RAND_PRJ_SUFFIX}"
+
+    run "$TERRAKUBE_CMD" project create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --name "$PRJ_NAME" \
+        --description "Initial project" \
+        --output json
+    assert_success
+
+    PRJ_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$PRJ_ID" ] && [ "$PRJ_ID" != "null" ]
+
+    # Update project description
+    NEW_PRJ_DESC="desc$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)"
+    run "$TERRAKUBE_CMD" project update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --id "$PRJ_ID" \
+        --name "$PRJ_NAME" \
+        --description "$NEW_PRJ_DESC" \
+        --output json
+    assert_success
+
+    # Validate project (JSON & Table)
+    run "$TERRAKUBE_CMD" project get -o "$TERRAKUBE_TEST_E2E_ORG_ID" --id "$PRJ_ID" --output json
+    assert_success
+    FETCHED_PRJ_NAME=$(echo "$output" | jq -r '.attributes.name // .name // empty' 2>/dev/null || true)
+    [ "$FETCHED_PRJ_NAME" = "$PRJ_NAME" ]
+
+    run "$TERRAKUBE_CMD" project list -o "$TERRAKUBE_TEST_E2E_ORG_ID" --output table
+    assert_success
+
+    # 3. Create project access rule for team TERRAKUBE_ADMIN
+    run "$TERRAKUBE_CMD" project-access create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --project "$PRJ_ID" \
+        --name "TERRAKUBE_ADMIN" \
+        --manage-state \
+        --manage-workspace \
+        --manage-job \
+        --output json
+    assert_success
+
+    PRJ_ACC_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$PRJ_ACC_ID" ] && [ "$PRJ_ACC_ID" != "null" ]
+
+    # Update project access rule
+    run "$TERRAKUBE_CMD" project-access update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --project "$PRJ_ID" \
+        --id "$PRJ_ACC_ID" \
+        --name "TERRAKUBE_ADMIN" \
+        --manage-state=false \
+        --manage-workspace \
+        --manage-job \
+        --output json
+    assert_success
+
+    # Validate project access (JSON & Table)
+    run "$TERRAKUBE_CMD" project-access get -o "$TERRAKUBE_TEST_E2E_ORG_ID" --project "$PRJ_ID" --id "$PRJ_ACC_ID" --output json
+    assert_success
+    FETCHED_PRJ_ACC_NAME=$(echo "$output" | jq -r '.attributes.name // .name // empty' 2>/dev/null || true)
+    [ "$FETCHED_PRJ_ACC_NAME" = "TERRAKUBE_ADMIN" ]
+
+    run "$TERRAKUBE_CMD" project-access list -o "$TERRAKUBE_TEST_E2E_ORG_ID" --project "$PRJ_ID" --output table
+    assert_success
+
+    # 4. Cleanup project access, project, and temporary workspace
+    run "$TERRAKUBE_CMD" project-access delete -o "$TERRAKUBE_TEST_E2E_ORG_ID" --project "$PRJ_ID" --id "$PRJ_ACC_ID"
+    assert_success
+
+    run "$TERRAKUBE_CMD" project delete -o "$TERRAKUBE_TEST_E2E_ORG_ID" --id "$PRJ_ID"
+    assert_success
+
+    NEW_PRJ_WS_NAME=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
+    run "$TERRAKUBE_CMD" workspace update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --id "$PRJ_WS_ID" \
+        --name "$NEW_PRJ_WS_NAME" \
+        --deleted \
+        --source "https://github.com/terrakube-io/terrakube-docker-compose" \
+        --branch "main" \
+        --folder "/" \
+        --iac-type "tofu" \
+        --iac-version "1.12.5" \
+        --execution-mode "remote"
+    assert_success
+}
+
+# ==============================================================================
+# Step 15: Organization Federated Credentials & Claims CRUD & Verification
+# ==============================================================================
+
+@test "15. Create, verify, and delete federated identity and claims" {
+    [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
+
+    # 1. Create federated identity credential (name: fed + 4 alphanumeric)
+    RAND_FED_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    FED_NAME="fed${RAND_FED_SUFFIX}"
+
+    run "$TERRAKUBE_CMD" federated create \
+        --name "$FED_NAME" \
+        --issuer-url "https://token.actions.githubusercontent.com" \
+        --audience "api://Terrakube" \
+        --output json
+    assert_success
+
+    FED_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$FED_ID" ] && [ "$FED_ID" != "null" ]
+
+    # Update audience
+    run "$TERRAKUBE_CMD" federated update \
+        --id "$FED_ID" \
+        --name "$FED_NAME" \
+        --issuer-url "https://token.actions.githubusercontent.com" \
+        --audience "api://TerrakubeV2" \
+        --output json
+    assert_success
+
+    # Validate federated credential (JSON & Table)
+    run "$TERRAKUBE_CMD" federated get --id "$FED_ID" --output json
+    assert_success
+    FETCHED_FED_NAME=$(echo "$output" | jq -r '.attributes.name // .name // empty' 2>/dev/null || true)
+    FETCHED_FED_AUD=$(echo "$output" | jq -r '.attributes.audience // .audience // empty' 2>/dev/null || true)
+    [ "$FETCHED_FED_NAME" = "$FED_NAME" ]
+    [ "$FETCHED_FED_AUD" = "api://TerrakubeV2" ]
+
+    run "$TERRAKUBE_CMD" federated list --output table
+    assert_success
+
+    # 2. Create federated claim (claim-key: repository_owner, claim-value: dummy + 4 alphanumeric)
+    RAND_CLAIM_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    CLAIM_VAL="dummy${RAND_CLAIM_SUFFIX}"
+
+    run "$TERRAKUBE_CMD" federated-claim create \
+        --federated "$FED_ID" \
+        --claim-key "repository_owner" \
+        --claim-value "$CLAIM_VAL" \
+        --output json
+    assert_success
+
+    CLAIM_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$CLAIM_ID" ] && [ "$CLAIM_ID" != "null" ]
+
+    # Update claim value
+    RAND_CLAIM_SUFFIX2=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    NEW_CLAIM_VAL="dummy${RAND_CLAIM_SUFFIX2}"
+    run "$TERRAKUBE_CMD" federated-claim update \
+        --federated "$FED_ID" \
+        --id "$CLAIM_ID" \
+        --claim-key "repository_owner" \
+        --claim-value "$NEW_CLAIM_VAL" \
+        --output json
+    assert_success
+
+    # Validate federated claim (JSON & Table)
+    run "$TERRAKUBE_CMD" federated-claim get --federated "$FED_ID" --id "$CLAIM_ID" --output json
+    assert_success
+    FETCHED_CLAIM_VAL=$(echo "$output" | jq -r '.attributes.claimValue // .claimValue // empty' 2>/dev/null || true)
+    [ "$FETCHED_CLAIM_VAL" = "$NEW_CLAIM_VAL" ]
+
+    run "$TERRAKUBE_CMD" federated-claim list --federated "$FED_ID" --output table
+    assert_success
+
+    # 3. Cleanup federated claim and federated identity credential
+    run "$TERRAKUBE_CMD" federated-claim delete --federated "$FED_ID" --id "$CLAIM_ID"
+    assert_success
+
+    run "$TERRAKUBE_CMD" federated delete --id "$FED_ID"
+    assert_success
+}
+
+# ==============================================================================
+# Step 16: Workspace Tag, Variable & Soft-Delete Cleanup
+# ==============================================================================
+
+@test "16. Delete tags, variables, and soft-delete workspace" {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
     [ -n "$TERRAKUBE_TEST_E2E_WS_ID" ] || skip "Workspace ID not available"
 
@@ -748,10 +1130,10 @@ assert_success() {
 }
 
 # ==============================================================================
-# Step 13: Final Team Cleanup (Always Executed Last)
+# Step 17: Final Team Cleanup (Always Executed Last)
 # ==============================================================================
 
-@test "13. Delete TERRAKUBE_ADMIN team" {
+@test "17. Delete TERRAKUBE_ADMIN team" {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
     [ -n "$TERRAKUBE_TEST_E2E_TEAM_ID" ] || skip "Team ID not available"
 
