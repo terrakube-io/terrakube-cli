@@ -105,9 +105,9 @@ func TestCmdWorkspaceListMissingOrgId(t *testing.T) {
 	ts := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
 	defer ts.Close()
 
-	_, err := executeCommand("workspace", "list")
+	output, err := executeCommand("workspace", "list")
 	if err == nil {
-		t.Fatalf("expected error for workspace list without --organization, got nil (out=%q)", out)
+		t.Fatalf("expected error for workspace list without --organization, got nil (out=%q)", output)
 	}
 	if !strings.Contains(err.Error(), "organization") {
 		t.Fatalf("expected error to mention organization, got: %v", err)
@@ -915,7 +915,7 @@ func TestCmdTeamTokenE2E(t *testing.T) {
 	ts := setupTestServer(handler)
 	defer ts.Close()
 
-	out, err := executeCommand("team", "token", "create", "--group", "dev-team", "--description", "test token")
+	out, err := executeCommand("team-token", "create", "--group", "dev-team", "--description", "test token")
 	if err != nil {
 		t.Fatalf("unexpected error creating team token: %v", err)
 	}

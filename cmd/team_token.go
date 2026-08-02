@@ -8,9 +8,9 @@ import (
 )
 
 var teamTokenCmd = &cobra.Command{
-	Use:     "token",
+	Use:     "team-token",
 	Short:   "manage team tokens",
-	Aliases: []string{"tokens"},
+	Aliases: []string{"team-tokens"},
 }
 
 var createTeamTokenCmd = &cobra.Command{
@@ -93,5 +93,5 @@ func init() {
 	teamTokenCmd.AddCommand(listTeamTokensCmd)
 	teamTokenCmd.AddCommand(deleteTeamTokenCmd)
 
-	// teamTokenCmd.AddCommand(teamTokenCmd)
+	rootCmd.AddCommand(teamTokenCmd)
 }
