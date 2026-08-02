@@ -29,6 +29,7 @@ func init() {
 			{StructField: "Name", Flag: "name", Short: "n", Type: resource.String, Required: true, Description: "Agent name"},
 			{StructField: "Description", Flag: "description", Short: "d", Type: resource.String, Description: "Agent description"},
 			{StructField: "URL", Flag: "url", Short: "u", Type: resource.String, Required: true, Description: "Agent URL"},
+			{StructField: "Type", Flag: "type", Type: resource.String, Description: "Agent type (e.g. KUBERNETES, DOCKER)"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Agent, error) {
 			return c.Agents.List(ctx, pIDs[0], opts)

@@ -34,6 +34,7 @@ func TestCmdCollectionReferenceListE2E(t *testing.T) {
 		"collection-reference", "list",
 		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--collection-id", "d4e5f6a7-b8c9-0123-defa-234567890123",
+		"--workspace-id", "b2c3d4e5-f6a7-8901-bcde-f12345678901",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -69,6 +70,7 @@ func TestCmdCollectionReferenceGetE2E(t *testing.T) {
 		"collection-reference", "get",
 		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--collection-id", "d4e5f6a7-b8c9-0123-defa-234567890123",
+		"--workspace-id", "b2c3d4e5-f6a7-8901-bcde-f12345678901",
 		"--id", "ref-789",
 	)
 	if err != nil {
@@ -105,6 +107,7 @@ func TestCmdCollectionReferenceCreateE2E(t *testing.T) {
 		"collection-reference", "create",
 		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--collection-id", "d4e5f6a7-b8c9-0123-defa-234567890123",
+		"--workspace-id", "b2c3d4e5-f6a7-8901-bcde-f12345678901",
 		"--description", "Production workspace reference",
 	)
 	if err != nil {
@@ -152,6 +155,7 @@ func TestCmdCollectionReferenceDeleteE2E(t *testing.T) {
 		"collection-reference", "delete",
 		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--collection-id", "d4e5f6a7-b8c9-0123-defa-234567890123",
+		"--workspace-id", "b2c3d4e5-f6a7-8901-bcde-f12345678901",
 		"--id", "ref-del",
 	)
 	if err != nil {

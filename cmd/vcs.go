@@ -37,6 +37,8 @@ func init() {
 			{StructField: "Status", Flag: "status", Type: resource.String, Description: "VCS connection status"},
 			{StructField: "Callback", Flag: "callback", Type: resource.String, Description: "OAuth callback URL"},
 			{StructField: "AccessToken", Flag: "access-token", Type: resource.String, Description: "Access token"},
+			{StructField: "RefreshToken", Flag: "refresh-token", Type: resource.String, Description: "Refresh token"},
+			{StructField: "TokenExpiration", Flag: "token-expiration", Type: resource.String, Description: "Token expiration timestamp"},
 			{StructField: "RedirectURL", Flag: "redirect-url", Type: resource.String, Description: "OAuth redirect URL"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.VCS, error) {

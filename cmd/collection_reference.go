@@ -32,6 +32,14 @@ func init() {
 				IDFlag:   "collection-id",
 				Resolver: collectionResolver,
 			},
+			{
+				Name:      "workspace",
+				Flag:      "workspace",
+				ShortFlag: "w",
+				Aliases:   []string{"ws"},
+				IDFlag:    "workspace-id",
+				Resolver:  workspaceResolver,
+			},
 		},
 		Fields: []resource.FieldDef{
 			{StructField: "Description", Flag: "description", Short: "d", Type: resource.String, Description: "Reference description"},
@@ -43,6 +51,7 @@ func init() {
 			return c.CollectionReferences.Get(ctx, id)
 		},
 		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, ref *terrakube.CollectionReference) (*terrakube.CollectionReference, error) {
+			ref.Workspace = &terrakube.Workspace{ID: pIDs[2]}
 			return c.CollectionReferences.Create(ctx, pIDs[0], pIDs[1], ref)
 		},
 		Update: func(ctx context.Context, c *terrakube.Client, _ []string, ref *terrakube.CollectionReference) (*terrakube.CollectionReference, error) {

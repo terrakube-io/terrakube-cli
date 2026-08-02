@@ -56,6 +56,10 @@ func marshalJSONAPI(data any) ([]byte, error) {
 		return json.MarshalIndent(nil, "", "    ")
 	}
 
+	if !isJSONAPIStruct(v) {
+		return json.MarshalIndent(data, "", "    ")
+	}
+
 	// jsonapi.MarshalPayload requires *Struct or []*Struct.
 	// If we got a plain struct value, take its address.
 	if v.Kind() == reflect.Struct {
@@ -66,16 +70,19 @@ func marshalJSONAPI(data any) ([]byte, error) {
 
 	var buf bytes.Buffer
 	if err := jsonapi.MarshalPayload(&buf, data); err != nil {
-		return nil, err
+		return json.MarshalIndent(data, "", "    ")
 	}
 
 	// Unwrap: extract .data from the envelope.
 	var envelope map[string]json.RawMessage
 	if err := json.Unmarshal(buf.Bytes(), &envelope); err != nil {
-		return nil, err
+		return json.MarshalIndent(data, "", "    ")
 	}
 
-	raw := json.RawMessage(envelope["data"])
+	raw, ok := envelope["data"]
+	if !ok || len(raw) == 0 {
+		return json.MarshalIndent(data, "", "    ")
+	}
 
 	if HideNulls {
 		var err2 error
@@ -86,6 +93,31 @@ func marshalJSONAPI(data any) ([]byte, error) {
 	}
 
 	return json.MarshalIndent(raw, "", "    ")
+}
+
+func isJSONAPIStruct(v reflect.Value) bool {
+	if v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return false
+		}
+		v = v.Elem()
+	}
+	if v.Kind() == reflect.Slice {
+		if v.Len() == 0 {
+			return false
+		}
+		return isJSONAPIStruct(v.Index(0))
+	}
+	if v.Kind() != reflect.Struct {
+		return false
+	}
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		if strings.Contains(t.Field(i).Tag.Get("jsonapi"), "primary") {
+			return true
+		}
+	}
+	return false
 }
 
 // stripNulls recursively removes null values from JSON objects.

@@ -66,7 +66,7 @@ type Config[T any] struct {
 }
 
 // Register creates Cobra commands for the resource and adds them to root.
-func Register[T any](root *cobra.Command, cfg Config[T]) {
+func Register[T any](root *cobra.Command, cfg Config[T]) *cobra.Command {
 	parentCmd := &cobra.Command{
 		Use:     cfg.Name + " list|get|create|update|delete [FLAGS]",
 		Short:   fmt.Sprintf("manage %s resources", cfg.Name),
@@ -89,6 +89,7 @@ func Register[T any](root *cobra.Command, cfg Config[T]) {
 	if cfg.Delete != nil {
 		parentCmd.AddCommand(newDeleteCmd(cfg))
 	}
+	return parentCmd
 }
 
 func newListCmd[T any](cfg Config[T]) *cobra.Command {
