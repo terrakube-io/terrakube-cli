@@ -36,6 +36,7 @@ func init() {
 			{StructField: "IaCType", Flag: "iac-type", Short: "t", Type: resource.String, Description: "IaC type (terraform, tofu)"},
 			{StructField: "IaCVersion", Flag: "iac-version", Short: "v", Type: resource.String, Description: "Terraform/Tofu version"},
 			{StructField: "ExecutionMode", Flag: "execution-mode", Short: "e", Type: resource.String, Description: "Execution mode (remote, local)"},
+			{StructField: "Deleted", Flag: "deleted", Type: resource.Bool, Description: "Mark workspace as deleted"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Workspace, error) {
 			return c.Workspaces.List(ctx, pIDs[0], opts)

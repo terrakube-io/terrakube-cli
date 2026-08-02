@@ -12,10 +12,17 @@
 STATE_FILE="${BATS_FILE_TMPDIR:-/tmp}/terrakube_bats_state.env"
 
 setup_file() {
-    TERRAKUBE_CMD="${TERRAKUBE_BIN:-terrakube}"
-    if [ ! -x "$(command -v "$TERRAKUBE_CMD")" ] && [ -x "./terrakube" ]; then
-        TERRAKUBE_CMD="./terrakube"
+    TEST_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")" && pwd)"
+    CLI_DIR="$(cd "$TEST_DIR/.." && pwd)"
+
+    # 0. Build terrakube CLI binary
+    run go build -o "$CLI_DIR/terrakube" "$CLI_DIR/main.go"
+    if [ "$status" -ne 0 ]; then
+        echo "Failed to build terrakube binary in $CLI_DIR: $output" >&2
+        return 1
     fi
+
+    TERRAKUBE_CMD="$CLI_DIR/terrakube"
 
     # 1. Login verification
     if [ -z "$TERRAKUBE_API_URL" ] || [ -z "$TERRAKUBE_PAT" ]; then
@@ -29,7 +36,7 @@ setup_file() {
         return 1
     fi
 
-    # 2. Organization Discovery (starting with --filter name==simple)
+    # 2. Organization Discovery (organization 'simple')
     run "$TERRAKUBE_CMD" organization list --filter "name==simple" --output json
     ORG_ID=""
     if [ "$status" -eq 0 ]; then
@@ -51,13 +58,35 @@ setup_file() {
 
     echo "export TERRAKUBE_TEST_ORG_ID=\"$ORG_ID\"" > "$STATE_FILE"
 
-    # 3. Discover sub-resource parent IDs for Level 3 tests
-    # Workspace
-    run "$TERRAKUBE_CMD" workspace list -o "$ORG_ID" --output json
+    # 3. Discover GCP Organization & IAM Module for module version tests
+    run "$TERRAKUBE_CMD" organization list --filter "name==gcp" --output json
+    GCP_ORG_ID=""
+    if [ "$status" -eq 0 ]; then
+        GCP_ORG_ID=$(echo "$output" | jq -r '.[0].id // empty' 2>/dev/null || true)
+    fi
+    if [ -n "$GCP_ORG_ID" ] && [ "$GCP_ORG_ID" != "null" ]; then
+        echo "export TERRAKUBE_TEST_GCP_ORG_ID=\"$GCP_ORG_ID\"" >> "$STATE_FILE"
+        run "$TERRAKUBE_CMD" module list -o "$GCP_ORG_ID" --filter "name==iam" --output json
+        if [ "$status" -eq 0 ]; then
+            GCP_MOD_ID=$(echo "$output" | jq -r '.[0].id // empty' 2>/dev/null || true)
+            [ -n "$GCP_MOD_ID" ] && [ "$GCP_MOD_ID" != "null" ] && echo "export TERRAKUBE_TEST_GCP_MODULE_ID=\"$GCP_MOD_ID\"" >> "$STATE_FILE"
+        fi
+    fi
+
+    # 4. Discover sub-resource parent IDs for Level 3 tests
+    # Workspace (simple_tag1)
+    run "$TERRAKUBE_CMD" workspace list -o "$ORG_ID" --filter "name==simple_tag1" --output json
+    WS_ID=""
     if [ "$status" -eq 0 ]; then
         WS_ID=$(echo "$output" | jq -r '.[0].id // empty' 2>/dev/null || true)
-        [ -n "$WS_ID" ] && [ "$WS_ID" != "null" ] && echo "export TERRAKUBE_TEST_WS_ID=\"$WS_ID\"" >> "$STATE_FILE"
     fi
+    if [ -z "$WS_ID" ] || [ "$WS_ID" = "null" ]; then
+        run "$TERRAKUBE_CMD" workspace list -o "$ORG_ID" --output json
+        if [ "$status" -eq 0 ]; then
+            WS_ID=$(echo "$output" | jq -r '.[0].id // empty' 2>/dev/null || true)
+        fi
+    fi
+    [ -n "$WS_ID" ] && [ "$WS_ID" != "null" ] && echo "export TERRAKUBE_TEST_WS_ID=\"$WS_ID\"" >> "$STATE_FILE"
 
     # Collection
     run "$TERRAKUBE_CMD" collection list -o "$ORG_ID" --output json
@@ -110,8 +139,11 @@ setup_file() {
 }
 
 setup() {
-    TERRAKUBE_CMD="${TERRAKUBE_BIN:-terrakube}"
-    if [ ! -x "$(command -v "$TERRAKUBE_CMD")" ] && [ -x "./terrakube" ]; then
+    TEST_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")" && pwd)"
+    CLI_DIR="$(cd "$TEST_DIR/.." && pwd)"
+
+    TERRAKUBE_CMD="${TERRAKUBE_BIN:-$CLI_DIR/terrakube}"
+    if [ ! -x "$TERRAKUBE_CMD" ] && [ -x "./terrakube" ]; then
         TERRAKUBE_CMD="./terrakube"
     fi
 
@@ -301,9 +333,11 @@ assert_success() {
 }
 
 @test "List module versions (JSON)" {
-    [ -n "$TERRAKUBE_TEST_ORG_ID" ] || skip "Organization ID not available"
-    [ -n "$TERRAKUBE_TEST_MODULE_ID" ] || skip "Module ID not available"
-    run "$TERRAKUBE_CMD" module-version list -o "$TERRAKUBE_TEST_ORG_ID" -m "$TERRAKUBE_TEST_MODULE_ID" --output json
+    ORG_ID="${TERRAKUBE_TEST_GCP_ORG_ID:-$TERRAKUBE_TEST_ORG_ID}"
+    MOD_ID="${TERRAKUBE_TEST_GCP_MODULE_ID:-$TERRAKUBE_TEST_MODULE_ID}"
+    [ -n "$ORG_ID" ] || skip "Organization ID not available"
+    [ -n "$MOD_ID" ] || skip "Module ID not available"
+    run "$TERRAKUBE_CMD" module-version list -o "$ORG_ID" -m "$MOD_ID" --output json
     assert_json_array
 }
 
