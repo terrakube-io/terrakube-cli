@@ -109,7 +109,8 @@ jobs:
 
       - name: Publish Snap Package to Snap Store
         uses: canonical/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         with:
-          store_login: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
           snap: ${{ steps.build.outputs.snap }}
-          channel: ${{ steps.channel.outputs.channel }}
+          release: ${{ steps.channel.outputs.channel }}
