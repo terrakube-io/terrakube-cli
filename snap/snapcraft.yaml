@@ -1,14 +1,13 @@
 name: terrakube-cli
 title: Terrakube CLI
 base: core24
-version: '0.5.0'
+adopt-info: terrakube-cli
 summary: CLI tool for Terrakube
 description: |
-  terrakube is a CLI tool to handle remote Terraform workspaces and modules
-  in Terrakube organizations, managing the full execution lifecycle (plan, apply, destroy).
+  Tool to handle Terrakube organization configurations.
 license: Apache-2.0
 website: https://terrakube.io
-contact: https://github.com/terrakube-io/terrakube-cli/issues
+contact: mailto:snap@terrakube.io
 issues: https://github.com/terrakube-io/terrakube-cli/issues
 source-code: https://github.com/terrakube-io/terrakube-cli
 
@@ -21,11 +20,6 @@ apps:
     plugs:
       - home
       - network
-  terrakube:
-    command: bin/terrakube
-    plugs:
-      - home
-      - network
 
 parts:
   terrakube-cli:
@@ -34,4 +28,10 @@ parts:
     build-snaps:
       - go/latest/stable
     override-build: |
-      go build -ldflags="-s -w" -o "${CRAFT_PART_INSTALL}/bin/terrakube" .
+      RAW_TAG="${RELEASE_VERSION:-$(git describe --tags --always 2>/dev/null || echo '0.0.0')}"
+      CLEAN_VERSION="${RAW_TAG#v}"
+      COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+      BUILD_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+      craftctl set version="${CLEAN_VERSION}"
+      go build -ldflags="-s -w -X terrakube/cmd.Version=${CLEAN_VERSION} -X terrakube/cmd.Commit=${COMMIT} -X terrakube/cmd.Date=${BUILD_DATE}" -o "${CRAFT_PART_INSTALL}/bin/terrakube" .
+

@@ -45,6 +45,9 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
+	rootCmd.Version = FormatVersion()
+	rootCmd.SetVersionTemplate("{{.Version}}\n")
+
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.terrakube-cli.yaml)")
 	rootCmd.PersistentFlags().StringVar(&output, "output", "json", "Output format: json, yaml, table, tsv, or none")
 	rootCmd.PersistentFlags().BoolVar(&hideNulls, "hide-nulls", true, "Hide null values in JSON output")
