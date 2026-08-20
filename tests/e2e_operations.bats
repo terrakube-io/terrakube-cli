@@ -1102,6 +1102,9 @@ assert_success() {
     run "$TERRAKUBE_CMD" notification-configuration update \
         -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
         --id "$NC_ID" \
+        --name "$NC_NAME" \
+        --channel-type "SLACK" \
+        --destination-url "$NC_URL" \
         --description "$RAND_NC_DESC" \
         --message-style "SIMPLE" \
         --output json
