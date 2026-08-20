@@ -21,13 +21,11 @@ apps:
     plugs:
       - home
       - network
-      - removable-media
   terrakube:
     command: bin/terrakube
     plugs:
       - home
       - network
-      - removable-media
 
 parts:
   terrakube-cli:
