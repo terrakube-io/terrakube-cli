@@ -29,6 +29,7 @@ jobs:
           goarch: ${{ matrix.goarch }}
           goversion: go.mod
           binary_name: "terrakube"
+          ldflags: -s -w -X terrakube/cmd.Version=${{ github.event.release.tag_name }} -X terrakube/cmd.Commit=${{ github.sha }} -X terrakube/cmd.Date=${{ github.event.release.published_at || github.event.release.created_at }}
 
   docker:
     name: Build and Push Docker Image
@@ -64,3 +65,51 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.event.release.tag_name }}
+            COMMIT=${{ github.sha }}
+            DATE=${{ github.event.release.published_at || github.event.release.created_at }}
+
+  snap:
+    name: Build and Publish Snap Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine Snapcraft Channel and Version
+        id: channel
+        run: |
+          TAG="${{ github.event.release.tag_name || github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+          if [[ "$TAG" =~ -rc ]]; then
+            CHANNEL="latest/candidate"
+          elif [[ "$TAG" =~ -beta ]]; then
+            CHANNEL="latest/beta"
+          elif [[ "$TAG" =~ -alpha ]] || [[ "$TAG" =~ - ]]; then
+            CHANNEL="latest/edge"
+          else
+            CHANNEL="latest/stable"
+          fi
+
+          echo "channel=${CHANNEL}" >> "$GITHUB_OUTPUT"
+          echo "Release tag: $TAG -> Version: $VERSION -> Snap Channel: $CHANNEL"
+
+      - name: Build Snap Package
+        id: build
+        uses: canonical/action-build@v1
+        with:
+          path: .
+        env:
+          RELEASE_VERSION: ${{ steps.channel.outputs.version }}
+
+      - name: Publish Snap Package to Snap Store
+        uses: canonical/action-publish@v1
+        with:
+          store_login: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+          snap: ${{ steps.build.outputs.snap }}
+          channel: ${{ steps.channel.outputs.channel }}
