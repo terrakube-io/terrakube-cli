@@ -1211,10 +1211,17 @@ assert_success() {
     assert_success
 
     # Soft-delete temporary workspace
-    run "$TERRAKUBE_CMD" workspace update \
-        -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+    NEW_TEMP_WS_NAME=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
+    run "$TERRAKUBE_CMD" workspace update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
         --id "$TEMP_WS_ID" \
-        --deleted
+        --name "$NEW_TEMP_WS_NAME" \
+        --deleted \
+        --source "https://github.com/terrakube-io/terrakube-docker-compose" \
+        --branch "main" \
+        --folder "/" \
+        --iac-type "tofu" \
+        --iac-version "1.12.5" \
+        --execution-mode "remote"
     assert_success
 
     # 8. Delete organization notification configuration
