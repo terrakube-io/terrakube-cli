@@ -44,8 +44,11 @@ func init() {
 			{StructField: "Branch", Flag: "branch", Type: resource.String, Description: "Branch to watch"},
 			{StructField: "Event", Flag: "event", Type: resource.String, Description: "Event type"},
 			{StructField: "Path", Flag: "path", Type: resource.String, Description: "Webhook event path"},
+			{StructField: "PathType", Flag: "path-type", Type: resource.String, Description: "Path matching type (REGEX, EXACT, GLOB)"},
 			{StructField: "Priority", Flag: "priority", Type: resource.Int, Description: "Priority"},
 			{StructField: "TemplateID", Flag: "template-id", Type: resource.String, Description: "Template ID"},
+			{StructField: "PRWorkflowEnabled", Flag: "pr-workflow-enabled", Type: resource.Bool, Description: "Whether PR workflow is enabled"},
+			{StructField: "PRApplyEnabled", Flag: "pr-apply-enabled", Type: resource.Bool, Description: "Whether PR apply is enabled"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.WebhookEvent, error) {
 			return c.WebhookEvents.List(ctx, pIDs[0], pIDs[1], pIDs[2], opts)

@@ -45,6 +45,8 @@ func init() {
 			{StructField: "PlanChanges", Flag: "plan-changes", Type: resource.Bool, Description: "Whether plan contains changes"},
 			{StructField: "Refresh", Flag: "refresh", Type: resource.Bool, Description: "Whether to refresh state"},
 			{StructField: "RefreshOnly", Flag: "refresh-only", Type: resource.Bool, Description: "Refresh state only"},
+			{StructField: "TargetAddrs", Flag: "target-addrs", Type: resource.StringSlice, Description: "Target resource addresses"},
+			{StructField: "ReplaceAddrs", Flag: "replace-addrs", Type: resource.StringSlice, Description: "Replace resource addresses"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Job, error) {
 			return c.Jobs.List(ctx, pIDs[0], opts)

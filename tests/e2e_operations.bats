@@ -1072,10 +1072,170 @@ assert_success() {
 }
 
 # ==============================================================================
-# Step 16: Workspace Tag, Variable & Soft-Delete Cleanup
+# Step 16: Notification Configuration & Trigger CRUD & Verification
 # ==============================================================================
 
-@test "16. Delete tags, variables, and soft-delete workspace" {
+@test "16. Create, verify, and delete notification configuration and triggers" {
+    [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
+
+    # 1. Create organization notification configuration (Slack)
+    RAND_NOTIF_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    NC_NAME="notif${RAND_NOTIF_SUFFIX}"
+    NC_URL="https://hooks.slack.com/services/T00/B00/${RAND_NOTIF_SUFFIX}"
+
+    run "$TERRAKUBE_CMD" notification-configuration create \
+        -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --name "$NC_NAME" \
+        --description "Initial notification config" \
+        --channel-type "SLACK" \
+        --destination-url "$NC_URL" \
+        --message-style "DETAILED" \
+        --active \
+        --output json
+    assert_success
+
+    NC_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$NC_ID" ] && [ "$NC_ID" != "null" ]
+
+    # 2. Update description and message style
+    RAND_NC_DESC=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
+    run "$TERRAKUBE_CMD" notification-configuration update \
+        -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --id "$NC_ID" \
+        --name "$NC_NAME" \
+        --channel-type "SLACK" \
+        --destination-url "$NC_URL" \
+        --description "$RAND_NC_DESC" \
+        --message-style "SIMPLE" \
+        --output json
+    assert_success
+
+    # 3. Read values and validate (JSON & Table formats)
+    run "$TERRAKUBE_CMD" notification-configuration get \
+        -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --id "$NC_ID" \
+        --output json
+    assert_success
+    FETCHED_NC_NAME=$(echo "$output" | jq -r '.attributes.name // .name // empty' 2>/dev/null || true)
+    FETCHED_NC_DESC=$(echo "$output" | jq -r '.attributes.description // .description // empty' 2>/dev/null || true)
+    FETCHED_NC_STYLE=$(echo "$output" | jq -r '.attributes.messageStyle // .messageStyle // empty' 2>/dev/null || true)
+    [ "$FETCHED_NC_NAME" = "$NC_NAME" ]
+    [ "$FETCHED_NC_DESC" = "$RAND_NC_DESC" ]
+    [ "$FETCHED_NC_STYLE" = "SIMPLE" ]
+
+    run "$TERRAKUBE_CMD" notification-configuration list \
+        -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --output table
+    assert_success
+
+    # 4. Create notification trigger for completed jobs
+    run "$TERRAKUBE_CMD" notification-trigger create \
+        -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --notification-configuration "$NC_ID" \
+        --job-status "completed" \
+        --output json
+    assert_success
+
+    NT_ID=$(echo "$output" | jq -r '.id // .attributes.id // empty' 2>/dev/null || true)
+    [ -n "$NT_ID" ] && [ "$NT_ID" != "null" ]
+
+    # 5. Read notification trigger and validate (JSON & Table formats)
+    run "$TERRAKUBE_CMD" notification-trigger get \
+        -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --notification-configuration "$NC_ID" \
+        --id "$NT_ID" \
+        --output json
+    assert_success
+    FETCHED_JOB_STATUS=$(echo "$output" | jq -r '.attributes.jobStatus // .jobStatus // empty' 2>/dev/null || true)
+    [ "$FETCHED_JOB_STATUS" = "completed" ]
+
+    run "$TERRAKUBE_CMD" notification-trigger list \
+        -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --notification-configuration "$NC_ID" \
+        --output table
+    assert_success
+
+    # 6. Delete notification trigger
+    run "$TERRAKUBE_CMD" notification-trigger delete \
+        -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --notification-configuration "$NC_ID" \
+        --id "$NT_ID"
+    assert_success
+
+    # 7. Workspace-level notification configuration with dedicated temporary workspace
+    RAND_WS_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    TEMP_WS_NAME="wsnotif${RAND_WS_SUFFIX}"
+    run "$TERRAKUBE_CMD" workspace create \
+        -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --name "$TEMP_WS_NAME" \
+        --source "https://github.com/terrakube-io/terrakube-docker-compose" \
+        --branch "main" \
+        --folder "/" \
+        --iac-type "tofu" \
+        --iac-version "1.12.5" \
+        --execution-mode "remote" \
+        --output json
+    assert_success
+    TEMP_WS_ID=$(echo "$output" | jq -r '.id // empty' 2>/dev/null || true)
+    [ -n "$TEMP_WS_ID" ]
+
+    WS_NC_NAME="wsnc${RAND_WS_SUFFIX}"
+    WS_NC_URL="https://outlook.office.com/webhook/${RAND_WS_SUFFIX}"
+    run "$TERRAKUBE_CMD" notification-configuration create \
+        -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        -w "$TEMP_WS_ID" \
+        --name "$WS_NC_NAME" \
+        --channel-type "TEAMS" \
+        --destination-url "$WS_NC_URL" \
+        --active \
+        --output json
+    assert_success
+    WS_NC_ID=$(echo "$output" | jq -r '.id // empty' 2>/dev/null || true)
+    [ -n "$WS_NC_ID" ]
+
+    run "$TERRAKUBE_CMD" notification-configuration list \
+        -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        -w "$TEMP_WS_ID" \
+        --output json
+    assert_success
+
+    run "$TERRAKUBE_CMD" notification-configuration list \
+        -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        -w "$TEMP_WS_ID" \
+        --output table
+    assert_success
+
+    run "$TERRAKUBE_CMD" notification-configuration delete \
+        -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --id "$WS_NC_ID"
+    assert_success
+
+    # Soft-delete temporary workspace
+    NEW_TEMP_WS_NAME=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
+    run "$TERRAKUBE_CMD" workspace update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --id "$TEMP_WS_ID" \
+        --name "$NEW_TEMP_WS_NAME" \
+        --deleted \
+        --source "https://github.com/terrakube-io/terrakube-docker-compose" \
+        --branch "main" \
+        --folder "/" \
+        --iac-type "tofu" \
+        --iac-version "1.12.5" \
+        --execution-mode "remote"
+    assert_success
+
+    # 8. Delete organization notification configuration
+    run "$TERRAKUBE_CMD" notification-configuration delete \
+        -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
+        --id "$NC_ID"
+    assert_success
+}
+
+# ==============================================================================
+# Step 17: Workspace Tag, Variable & Soft-Delete Cleanup
+# ==============================================================================
+
+@test "17. Delete tags, variables, and soft-delete workspace" {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
     [ -n "$TERRAKUBE_TEST_E2E_WS_ID" ] || skip "Workspace ID not available"
 
@@ -1130,10 +1290,10 @@ assert_success() {
 }
 
 # ==============================================================================
-# Step 17: Final Team Cleanup (Always Executed Last)
+# Step 18: Final Team Cleanup (Always Executed Last)
 # ==============================================================================
 
-@test "17. Delete TERRAKUBE_ADMIN team" {
+@test "18. Delete TERRAKUBE_ADMIN team" {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
     [ -n "$TERRAKUBE_TEST_E2E_TEAM_ID" ] || skip "Team ID not available"
 

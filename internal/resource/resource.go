@@ -20,6 +20,7 @@ const (
 	String FieldType = iota
 	Bool
 	Int
+	StringSlice
 )
 
 // ParentScope defines a parent resource for name-to-ID resolution.
@@ -30,6 +31,7 @@ type ParentScope struct {
 	Aliases   []string // flag aliases, e.g. ["org"]
 	IDFlag    string   // hidden backwards-compat alias, e.g. "organization-id"
 	RawID     bool     // parent IDs are not UUIDs (e.g. numeric job IDs); use the flag value as the ID directly, no name resolution
+	Optional  bool     // parent is optional (e.g. workspace on notification-configuration)
 	Resolver  func(ctx context.Context, c *terrakube.Client, resolvedParentIDs []string, name string) (string, error)
 }
 
@@ -296,6 +298,8 @@ func addFieldFlags(cmd *cobra.Command, fields []FieldDef, forCreate bool) {
 			cmd.Flags().BoolP(f.Flag, f.Short, false, desc)
 		case Int:
 			cmd.Flags().IntP(f.Flag, f.Short, 0, desc)
+		case StringSlice:
+			cmd.Flags().StringSliceP(f.Flag, f.Short, nil, desc)
 		}
 
 		if forCreate && f.Required {
@@ -343,6 +347,9 @@ func setFieldFromFlag(cmd *cobra.Command, f FieldDef, obj any) error {
 	case Int:
 		val, _ := cmd.Flags().GetInt(f.Flag)
 		setIntField(field, val)
+	case StringSlice:
+		val, _ := cmd.Flags().GetStringSlice(f.Flag)
+		setStringSliceField(field, val)
 	}
 	return nil
 }
@@ -358,6 +365,13 @@ func setStringField(field reflect.Value, val string) {
 	} else {
 		field.SetString(val)
 	}
+}
+
+func setStringSliceField(field reflect.Value, val []string) {
+	if len(val) == 0 {
+		return
+	}
+	field.Set(reflect.ValueOf(val))
 }
 
 func setBoolField(field reflect.Value, val bool) {
