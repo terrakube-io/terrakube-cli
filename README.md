@@ -20,6 +20,7 @@ For full CLI reference documentation, visit our official guide at [https://docs.
   - [3. Create an Admin Team & Assign Permissions](#3-create-an-admin-team--assign-permissions)
   - [4. Create a Workspace (OpenTofu & Docker Compose)](#4-create-a-workspace-opentofu--docker-compose)
   - [5. Add Workspace Environment Variables & Tags](#5-add-workspace-environment-variables--tags)
+  - [6. Configure Notifications (Slack / Teams / Webhook)](#6-configure-notifications-slack--teams--webhook)
 - [Contributing](#contributing)
 - [Security](#security)
 
@@ -267,6 +268,29 @@ terrakube variable create \
      -o "09e86337-b6bb-49e0-82aa-c114ad0f41ab" \
      -w "<WORKSPACE_ID>" \
      --tag-id "<TAG_ID>" \
+     --output table
+   ```
+
+### 6. Configure Notifications (Slack / Teams / Webhook)
+
+1. Create an organization or workspace notification configuration:
+   ```bash
+   terrakube notification-configuration create \
+     -o "09e86337-b6bb-49e0-82aa-c114ad0f41ab" \
+     --name "slack-alerts" \
+     --channel-type "SLACK" \
+     --destination-url "https://hooks.slack.com/services/T00/B00/X00" \
+     --message-style "DETAILED" \
+     --active \
+     --output json
+   ```
+
+2. Add a trigger on job completion or failure:
+   ```bash
+   terrakube notification-trigger create \
+     -o "09e86337-b6bb-49e0-82aa-c114ad0f41ab" \
+     --notification-configuration "<NOTIFICATION_CONFIGURATION_ID>" \
+     --job-status "completed" \
      --output table
    ```
 

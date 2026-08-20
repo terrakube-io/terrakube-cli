@@ -1,12 +1,13 @@
 package cmd
 
 import (
+	"io"
 	"net/http"
 	"strings"
 	"testing"
 
-	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/google/jsonapi"
+	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
 func TestCmdWebhookEventListE2E(t *testing.T) {
@@ -98,3 +99,44 @@ func TestCmdWebhookEventListMissingOrg(t *testing.T) {
 		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
+
+func TestCmdWebhookEventCreateWithNewFields(t *testing.T) {
+	resetGlobalFlags()
+
+	var reqBody []byte
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		reqBody, _ = io.ReadAll(r.Body)
+
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.WriteHeader(http.StatusCreated)
+		_ = jsonapi.MarshalPayload(w, &terrakube.WebhookEvent{ID: "we-new", Path: "/terraform", PathType: "REGEX", PRWorkflowEnabled: true, PRApplyEnabled: true})
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand(
+		"webhook-event", "create",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--workspace-id", "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+		"--webhook-id", "b8c9d0e1-f2a3-4567-bcde-678901234567",
+		"--path", "/terraform",
+		"--path-type", "REGEX",
+		"--pr-workflow-enabled",
+		"--pr-apply-enabled",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(out, "we-new") {
+		t.Errorf("expected output to contain 'we-new', got: %s", out)
+	}
+	if !strings.Contains(string(reqBody), "REGEX") {
+		t.Errorf("expected request body to contain 'REGEX', got: %s", string(reqBody))
+	}
+}
+

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -178,3 +179,42 @@ func TestCmdJobListMissingOrg(t *testing.T) {
 		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
+
+func TestCmdJobCreateTargetAndReplaceAddrs(t *testing.T) {
+	resetGlobalFlags()
+
+	var reqBody []byte
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		reqBody, _ = io.ReadAll(r.Body)
+
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.WriteHeader(http.StatusCreated)
+		_ = jsonapi.MarshalPayload(w, testutil.FixtureJob())
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	_, err := executeCommand(
+		"job", "create",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--workspace-id", "d4e5f6a7-b8c9-0123-defa-234567890123",
+		"--command", "apply",
+		"--target-addrs", "module.vpc.aws_subnet.public[0]",
+		"--replace-addrs", "aws_instance.web",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !bytes.Contains(reqBody, []byte("module.vpc.aws_subnet.public[0]")) {
+		t.Errorf("expected request body to contain targetAddrs, got: %s", string(reqBody))
+	}
+	if !bytes.Contains(reqBody, []byte("aws_instance.web")) {
+		t.Errorf("expected request body to contain replaceAddrs, got: %s", string(reqBody))
+	}
+}
+

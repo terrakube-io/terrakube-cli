@@ -738,3 +738,52 @@ func FixtureGithubAppTokenList() []*terrakube.GithubAppToken {
 		},
 	}
 }
+
+// --- NotificationConfiguration ---
+
+func FixtureNotificationConfiguration() *terrakube.NotificationConfiguration {
+	return &terrakube.NotificationConfiguration{
+		ID:             "c1a2b3c4-d4e5-6789-abcd-ef1234567890",
+		Name:           "slack-alerts",
+		Description:    strPtr("Production Slack notifications"),
+		ChannelType:    "SLACK",
+		DestinationURL: "https://hooks.slack.com/services/T00/B00/X00",
+		Active:         true,
+		MessageStyle:   "DETAILED",
+	}
+}
+
+func FixtureNotificationConfigurationList() []*terrakube.NotificationConfiguration {
+	return []*terrakube.NotificationConfiguration{
+		FixtureNotificationConfiguration(),
+		{
+			ID:             "c2b3c4d5-e5f6-7890-bcde-f12345678901",
+			Name:           "teams-alerts",
+			Description:    strPtr("Staging Teams notifications"),
+			ChannelType:    "TEAMS",
+			DestinationURL: "https://outlook.office.com/webhook/2",
+			Active:         false,
+			MessageStyle:   "SIMPLE",
+		},
+	}
+}
+
+// --- NotificationTrigger ---
+
+func FixtureNotificationTrigger() *terrakube.NotificationTrigger {
+	return &terrakube.NotificationTrigger{
+		ID:        "d1a2b3c4-d4e5-6789-abcd-ef1234567890",
+		JobStatus: "completed",
+	}
+}
+
+func FixtureNotificationTriggerList() []*terrakube.NotificationTrigger {
+	return []*terrakube.NotificationTrigger{
+		FixtureNotificationTrigger(),
+		{
+			ID:        "d2b3c4d5-e5f6-7890-bcde-f12345678901",
+			JobStatus: "failed",
+		},
+	}
+}
+

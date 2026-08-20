@@ -1,12 +1,13 @@
 package cmd
 
 import (
+	"io"
 	"net/http"
 	"strings"
 	"testing"
 
-	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/google/jsonapi"
+	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
 func TestCmdModuleVersionListE2E(t *testing.T) {
@@ -96,3 +97,45 @@ func TestCmdModuleVersionListMissingOrg(t *testing.T) {
 		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
+
+func TestCmdModuleVersionCreateWithGitTag(t *testing.T) {
+	resetGlobalFlags()
+
+	var reqBody []byte
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		var err error
+		reqBody, err = io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("failed reading request body: %v", err)
+		}
+
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.WriteHeader(http.StatusCreated)
+		_ = jsonapi.MarshalPayload(w, &terrakube.ModuleVersion{ID: "mv-new", Version: "1.2.3"})
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand(
+		"module-version", "create",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--module-id", "f6a7b8c9-d0e1-2345-fabc-456789012345",
+		"--version", "1.2.3",
+		"--git-tag", "v1.2.3",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !strings.Contains(out, "mv-new") {
+		t.Errorf("expected output to contain 'mv-new', got: %s", out)
+	}
+	if !strings.Contains(string(reqBody), "v1.2.3") {
+		t.Errorf("expected request body to contain 'v1.2.3', got: %s", string(reqBody))
+	}
+}
+

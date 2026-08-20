@@ -29,6 +29,9 @@ func resolveParents(ctx context.Context, client *terrakube.Client, cmd *cobra.Co
 func resolveParent(ctx context.Context, client *terrakube.Client, cmd *cobra.Command, p ParentScope, resolvedIDs []string) (string, error) {
 	val, _ := cmd.Flags().GetString(p.Flag)
 	if val == "" {
+		if p.Optional {
+			return "", nil
+		}
 		return "", fmt.Errorf("--%s is required", p.Flag)
 	}
 

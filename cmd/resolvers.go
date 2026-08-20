@@ -48,3 +48,18 @@ func moduleResolver(ctx context.Context, c *terrakube.Client, resolvedParentIDs 
 	}
 	return mods[0].ID, nil
 }
+
+func notificationConfigurationResolver(ctx context.Context, c *terrakube.Client, resolvedParentIDs []string, name string) (string, error) {
+	configs, err := c.NotificationConfigurations.List(ctx, resolvedParentIDs[0], &terrakube.ListOptions{Filter: "name==" + name})
+	if err != nil {
+		return "", err
+	}
+	if len(configs) == 0 {
+		return "", fmt.Errorf("no notification-configuration found with name %q", name)
+	}
+	if len(configs) > 1 {
+		return "", fmt.Errorf("multiple notification-configurations match name %q, use --notification-configuration with the ID", name)
+	}
+	return configs[0].ID, nil
+}
+
