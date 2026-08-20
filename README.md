@@ -7,11 +7,15 @@ For full CLI reference documentation, visit our official guide at [https://docs.
 ## Table of Contents
 
 - [Download & Installation](#download--installation)
-- [Adding Terrakube CLI to PATH](#adding-terrakube-cli-to-path)
+  - [Snap Package (Ubuntu / Linux)](#snap-package-ubuntu--linux)
   - [Linux & macOS](#linux--macos)
   - [Windows](#windows)
+- [Adding Terrakube CLI to PATH](#adding-terrakube-cli-to-path)
+  - [Linux & macOS](#linux--macos-1)
+  - [Windows](#windows-1)
 - [Building & Testing from Source](#building--testing-from-source)
   - [Compiling the Binary](#compiling-the-binary)
+  - [Building Snap Package Locally](#building-snap-package-locally)
   - [Running Unit Tests](#running-unit-tests)
   - [Running End-to-End (BATS) Tests](#running-end-to-end-bats-tests)
 - [Quick Start Guide](#quick-start-guide)
@@ -28,7 +32,22 @@ For full CLI reference documentation, visit our official guide at [https://docs.
 
 ## Download & Installation
 
-You can download pre-compiled binaries directly from our [GitHub Releases](https://github.com/terrakube-io/terrakube-cli/releases/latest) page.
+You can download pre-compiled binaries directly from our [GitHub Releases](https://github.com/terrakube-io/terrakube-cli/releases/latest) page, or install via Snap on Linux/Ubuntu.
+
+### Snap Package (Ubuntu / Linux)
+
+You can install the local `.snap` package:
+
+```bash
+sudo snap install --dangerous terrakube-cli_*.snap
+```
+
+Both `terrakube` and `terrakube-cli` commands will be available:
+
+```bash
+terrakube --version
+terrakube-cli --help
+```
 
 ### Linux & macOS (Bash / Zsh)
 
@@ -140,6 +159,29 @@ Verify compilation:
 ```bash
 ./terrakube --help
 ```
+
+### Building Snap Package Locally
+
+To build the Snap package on Ubuntu/Linux:
+
+1. Install `snapcraft`:
+   ```bash
+   sudo snap install snapcraft --classic
+   ```
+
+2. Build the snap:
+   ```bash
+   # Build directly in container (LXD/Multipass):
+   snapcraft
+
+   # Or build locally in destructive mode:
+   snapcraft --destructive-mode
+   ```
+
+3. Install the locally generated `.snap` package:
+   ```bash
+   sudo snap install --dangerous terrakube-cli_*.snap
+   ```
 
 ### Running Unit Tests
 

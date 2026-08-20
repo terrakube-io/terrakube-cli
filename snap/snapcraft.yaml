@@ -1,0 +1,39 @@
+name: terrakube-cli
+title: Terrakube CLI
+base: core24
+version: '0.5.0'
+summary: CLI tool for Terrakube
+description: |
+  terrakube is a CLI tool to handle remote Terraform workspaces and modules
+  in Terrakube organizations, managing the full execution lifecycle (plan, apply, destroy).
+license: Apache-2.0
+website: https://terrakube.io
+contact: https://github.com/terrakube-io/terrakube-cli/issues
+issues: https://github.com/terrakube-io/terrakube-cli/issues
+source-code: https://github.com/terrakube-io/terrakube-cli
+
+grade: stable
+confinement: strict
+
+apps:
+  terrakube-cli:
+    command: bin/terrakube
+    plugs:
+      - home
+      - network
+      - removable-media
+  terrakube:
+    command: bin/terrakube
+    plugs:
+      - home
+      - network
+      - removable-media
+
+parts:
+  terrakube-cli:
+    plugin: go
+    source: .
+    build-snaps:
+      - go/latest/stable
+    override-build: |
+      go build -ldflags="-s -w" -o "${CRAFT_PART_INSTALL}/bin/terrakube" .

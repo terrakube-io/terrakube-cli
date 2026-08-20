@@ -15,3 +15,10 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 terrakube
+
+# Snapcraft build artifacts
+*.snap
+.craft/
+parts/
+prime/
+stage/
