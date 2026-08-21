@@ -1,0 +1,9 @@
+# Dockerfile used by GoReleaser's dockers_v2 block.
+# GoReleaser pre-builds the binary and provides it in the build context at:
+#   ${TARGETOS}/${TARGETARCH}/terrakube
+# Docker buildx injects TARGETOS and TARGETARCH automatically per platform.
+FROM dhi.io/alpine-base:3.23
+ARG TARGETOS
+ARG TARGETARCH
+COPY ${TARGETOS}/${TARGETARCH}/terrakube /usr/local/bin/terrakube
+ENTRYPOINT ["terrakube"]
