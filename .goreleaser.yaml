@@ -1,0 +1,97 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: terrakube
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: terrakube
+    binary: terrakube
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X terrakube/cmd.Version={{ .Version }}
+      - -X terrakube/cmd.Commit={{ .Commit }}
+      - -X terrakube/cmd.Date={{ .Date }}
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+      - "386"
+    ignore:
+      # Match current exclusions from the release matrix
+      - goos: darwin
+        goarch: "386"
+      - goos: windows
+        goarch: arm64
+      - goos: linux
+        goarch: "386"
+
+archives:
+  - id: default
+    name_template: "terrakube_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+
+checksum:
+  name_template: "terrakube_{{ .Version }}_checksums.txt"
+
+# ---------------------------------------------------------------------------
+# Docker — multi-arch images (amd64 + arm64), pushed to Docker Hub
+# dockers_v2 uses buildx natively to create a single multi-arch manifest,
+# eliminating the need for per-arch entries and a separate docker_manifests block.
+# ---------------------------------------------------------------------------
+dockers_v2:
+  - images:
+      - "docker.io/azbuilder/terrakube-cli"
+    dockerfile: Dockerfile
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    tags:
+      - "{{ .Version }}"
+      - "{{ .Major }}.{{ .Minor }}"
+      - latest
+    build_args:
+      VERSION: "{{ .Version }}"
+      COMMIT: "{{ .Commit }}"
+      DATE: "{{ .Date }}"
+
+# ---------------------------------------------------------------------------
+# Snap — builds via snapcraft CLI and publishes to the Snap Store
+# Channel is injected at runtime via GORELEASER_SNAP_CHANNEL env var
+# (computed in the workflow step before GoReleaser runs)
+# ---------------------------------------------------------------------------
+snapcrafts:
+  - name: terrakube-cli
+    summary: CLI tool for Terrakube
+    description: |
+      Tool to handle Terrakube organization configurations.
+    grade: stable
+    confinement: strict
+    license: Apache-2.0
+    publish: true
+    channel_templates:
+      - "{{ .Env.GORELEASER_SNAP_CHANNEL }}"
+    apps:
+      terrakube-cli:
+        command: terrakube
+        plugs:
+          - home
+          - network
+
+# ---------------------------------------------------------------------------
+# GitHub Release — upload artifacts to the already-created release
+# GoReleaser detects the existing release from GITHUB_REF and uploads to it
+# ---------------------------------------------------------------------------
+release:
+  skip_upload: false
