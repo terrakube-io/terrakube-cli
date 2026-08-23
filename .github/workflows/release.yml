@@ -63,3 +63,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
           GORELEASER_SNAP_CHANNEL: ${{ steps.channel.outputs.channel }}
+
+      - name: Update Snap Store Metadata
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        run: |
+          SNAP_FILE=$(find dist/ -name "*.snap" | head -n 1)
+          if [ -n "$SNAP_FILE" ]; then
+            echo "Uploading metadata from: $SNAP_FILE"
+            snapcraft upload-metadata "$SNAP_FILE" --force
+          else
+            echo "No snap package found in dist/"
+            exit 1
+          fi
