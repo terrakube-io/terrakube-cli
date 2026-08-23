@@ -2,9 +2,21 @@ name: terrakube-cli
 title: Terrakube CLI
 base: core24
 adopt-info: terrakube-cli
-summary: CLI tool for Terrakube
+summary: Manage Terrakube organizations, workspaces, teams, and IaC jobs
 description: |
-  Tool to handle Terrakube organization configurations.
+  Terrakube CLI is the official command-line interface for Terrakube, the
+  open-source self-hosted platform for infrastructure-as-code automation.
+
+  Use it to:
+
+  - Authenticate against your Terrakube server
+  - Manage organizations, teams, and access permissions
+  - Create and configure workspaces for Terraform / OpenTofu execution
+  - Trigger and inspect plan, apply, and destroy jobs
+  - Manage workspace variables, tags, and remote state
+  - Set up notifications for Slack, Microsoft Teams, and webhooks
+
+  Full documentation: https://docs.terrakube.io/user-guide/terrakube-cli
 license: Apache-2.0
 website: https://terrakube.io
 contact: mailto:snap@terrakube.io
