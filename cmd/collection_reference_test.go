@@ -184,3 +184,83 @@ func TestCmdCollectionReferenceListMissingOrg(t *testing.T) {
 		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
+
+func TestCmdCollectionReferenceCreateScopes(t *testing.T) {
+	const (
+		org        = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+		collection = "d4e5f6a7-b8c9-0123-defa-234567890123"
+		workspace  = "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+		project    = "c3d4e5f6-a7b8-9012-cdef-123456789012"
+	)
+	base := []string{"collection-reference", "create", "--organization-id", org, "--collection-id", collection}
+
+	cases := map[string]struct {
+		args        []string
+		wantBody    []string
+		wantNoBody  []string
+		wantFailure string
+	}{
+		"project": {
+			args:       []string{"--project-id", project},
+			wantBody:   []string{`"scope":"PROJECT"`, project},
+			wantNoBody: []string{`"workspace"`},
+		},
+		"organization": {
+			args:       []string{"--scope", "ORGANIZATION"},
+			wantBody:   []string{`"scope":"ORGANIZATION"`},
+			wantNoBody: []string{`"workspace"`, `"project"`},
+		},
+		"workspace sends no scope": {
+			args:       []string{"--workspace-id", workspace},
+			wantBody:   []string{workspace},
+			wantNoBody: []string{"scope", `"project"`},
+		},
+		"no target": {args: nil, wantFailure: "--workspace, --project, or --scope ORGANIZATION"},
+		"both targets": {
+			args:        []string{"--workspace-id", workspace, "--project-id", project},
+			wantFailure: "only one of --workspace and --project",
+		},
+		"organization with a project": {
+			args:        []string{"--scope", "ORGANIZATION", "--project-id", project},
+			wantFailure: "takes neither",
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			resetGlobalFlags()
+			var captured []byte
+			ts := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				captured, _ = io.ReadAll(r.Body)
+				w.Header().Set("Content-Type", "application/vnd.api+json")
+				_ = jsonapi.MarshalPayload(w, testutil.FixtureCollectionReference())
+			}))
+			defer ts.Close()
+
+			_, err := executeCommand(append(append([]string{}, base...), tc.args...)...)
+
+			if tc.wantFailure != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantFailure) {
+					t.Fatalf("expected an error containing %q, got %v", tc.wantFailure, err)
+				}
+				if captured != nil {
+					t.Errorf("the API must not be called for an invalid combination, got %s", captured)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			for _, want := range tc.wantBody {
+				if !strings.Contains(string(captured), want) {
+					t.Errorf("body %s is missing %s", captured, want)
+				}
+			}
+			for _, unwanted := range tc.wantNoBody {
+				if strings.Contains(string(captured), unwanted) {
+					t.Errorf("body %s must not contain %s", captured, unwanted)
+				}
+			}
+		})
+	}
+}

@@ -21,6 +21,20 @@ func collectionResolver(ctx context.Context, c *terrakube.Client, resolvedParent
 	return cols[0].ID, nil
 }
 
+func projectResolver(ctx context.Context, c *terrakube.Client, resolvedParentIDs []string, name string) (string, error) {
+	projects, err := c.Projects.List(ctx, resolvedParentIDs[0], &terrakube.ListOptions{Filter: "name==" + name})
+	if err != nil {
+		return "", err
+	}
+	if len(projects) == 0 {
+		return "", fmt.Errorf("no project found with name %q", name)
+	}
+	if len(projects) > 1 {
+		return "", fmt.Errorf("multiple projects match name %q, use --project with the ID", name)
+	}
+	return projects[0].ID, nil
+}
+
 func providerResolver(ctx context.Context, c *terrakube.Client, resolvedParentIDs []string, name string) (string, error) {
 	provs, err := c.Providers.List(ctx, resolvedParentIDs[0], &terrakube.ListOptions{Filter: "name==" + name})
 	if err != nil {
