@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/fatih/color"
@@ -18,6 +20,7 @@ import (
 	terrakube "github.com/terrakube-io/terrakube-go"
 
 	outputpkg "terrakube/internal/output"
+	"terrakube/internal/resource"
 )
 
 var (
@@ -25,8 +28,12 @@ var (
 	output    string
 	hideNulls bool
 	verbose   bool
-	envPrefix string = "TERRAKUBE"
+	configErr error // config file read/parse error from initConfig
 )
+
+const envPrefix = "TERRAKUBE"
+
+var envReplacer = strings.NewReplacer("-", "_")
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -36,6 +43,18 @@ var rootCmd = &cobra.Command{
 terrakube is a CLI to handle remote terraform workspace and modules in organizations
 and handle all the lifecycle (plan, apply, destroy).`,
 	SilenceErrors: true,
+	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		if err := applyEnv(cmd); err != nil {
+			return err
+		}
+		switch output {
+		case "json", "yaml", "table", "tsv", "none":
+		default:
+			return fmt.Errorf("invalid --output %q: must be one of json, yaml, table, tsv, none", output)
+		}
+		outputpkg.HideNulls = hideNulls
+		return nil
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -54,9 +73,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&output, "output", "json", "Output format: json, yaml, table, tsv, or none")
 	rootCmd.PersistentFlags().BoolVar(&hideNulls, "hide-nulls", true, "Hide null values in JSON output")
 	rootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "Enable verbose output")
-	_ = viper.BindPFlag("output", rootCmd.Flags().Lookup("output"))
-	_ = viper.BindPFlag("hide-nulls", rootCmd.PersistentFlags().Lookup("hide-nulls"))
-	_ = rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
 	cobra.AddTemplateFunc("StyleHeading", color.New(color.FgCyan).SprintFunc())
 	usageTemplate := rootCmd.UsageTemplate()
@@ -74,50 +90,69 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	if cfgFile != "" {
-		viper.SetConfigFile(cfgFile)
-	} else {
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
+	path, err := configPath()
+	cobra.CheckErr(err)
+	viper.SetConfigFile(path)
+	viper.SetConfigType(configType(path))
 
-		configFile := filepath.Join(home, ".terrakube-cli.yaml")
-		viper.SetConfigFile(configFile)
-	}
-
+	// Only api_url and token are read through viper (see newClient).
 	viper.SetEnvPrefix(envPrefix)
-	_ = viper.BindEnv("workspace-id", "TERRAKUBE_WORKSPACE_ID")
-	viper.AutomaticEnv() // read in environment variables that match
+	viper.SetEnvKeyReplacer(envReplacer)
+	viper.AutomaticEnv()
 
-	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err == nil {
-		if verbose {
-			fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	// A missing config file is fine; a broken one is reported by newClient.
+	configErr = nil
+	if err := viper.ReadInConfig(); err != nil {
+		if !errors.Is(err, fs.ErrNotExist) {
+			configErr = fmt.Errorf("reading config file %s: %w", path, err)
 		}
+	} else if verbose {
+		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
-
-	outputpkg.HideNulls = viper.GetBool("hide-nulls")
-
-	postInitCommands(rootCmd.Commands())
 }
 
-func newClient() *terrakube.Client {
+// configPath returns the --config value or the default $HOME/.terrakube-cli.yaml.
+func configPath() (string, error) {
+	if cfgFile != "" {
+		return cfgFile, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".terrakube-cli.yaml"), nil
+}
+
+// configType returns the viper config type for path. Extensionless paths and
+// extensions viper does not support are treated as YAML.
+func configType(path string) string {
+	ext := strings.TrimPrefix(filepath.Ext(path), ".")
+	if !slices.Contains(viper.SupportedExts, ext) {
+		return "yaml"
+	}
+	return ext
+}
+
+func newClient() (*terrakube.Client, error) {
+	if configErr != nil {
+		return nil, configErr
+	}
 	endpoint := viper.GetString("api_url")
-	if endpoint == "" {
-		endpoint = "http://localhost:8080"
-	}
-	token := viper.GetString("token")
+	// Env beats the config file: TERRAKUBE_TOKEN, then TERRAKUBE_PAT, then config.
+	token := os.Getenv("TERRAKUBE_TOKEN")
 	if token == "" {
-		token = "test-token"
+		token = os.Getenv("TERRAKUBE_PAT")
 	}
-	c, err := terrakube.NewClient(
+	if token == "" {
+		token = viper.GetString("token")
+	}
+	if endpoint == "" || token == "" {
+		return nil, errors.New(`not logged in: run "terrakube login" or set TERRAKUBE_API_URL and TERRAKUBE_TOKEN (or TERRAKUBE_PAT)`)
+	}
+	return terrakube.NewClient(
 		terrakube.WithEndpoint(endpoint),
 		terrakube.WithToken(token),
 	)
-	if err != nil {
-		fmt.Printf("Error creating client: %v\n", err)
-		os.Exit(1)
-	}
-	return c
 }
 
 func getContext() context.Context {
@@ -130,89 +165,28 @@ func renderOutput(result interface{}, format string) {
 	}
 }
 
-func splitInterface(input interface{}) ([][]string, []string) {
-	reflectData := reflect.ValueOf(input)
-	headers := []string{"ID"}
-	result := make([][]string, 0)
-
-	if reflectData.Kind() == reflect.Slice {
-		for i := 0; i < reflectData.Len(); i++ {
-			data := reflectData.Index(i).Interface()
-			d := reflect.Indirect(reflect.ValueOf(data))
-			row := []string{d.FieldByName("ID").String()}
-			row, headers = appendFields(d, row, headers, i == 0)
-			result = append(result, row)
-		}
-	} else {
-		d := reflect.Indirect(reflectData)
-		row := []string{d.FieldByName("ID").String()}
-		row, headers = appendFields(d, row, headers, true)
-		result = append(result, row)
-	}
-	return result, headers
-}
-
-// appendFields extracts columns from a flat struct, skipping the ID field
-// (already handled) and any jsonapi relation fields.
-func appendFields(d reflect.Value, row []string, headers []string, buildHeaders bool) ([]string, []string) {
-	for j := 0; j < d.NumField(); j++ {
-		field := d.Type().Field(j)
-		if field.Name == "ID" || !field.IsExported() {
-			continue
-		}
-		tag := field.Tag.Get("jsonapi")
-		if strings.HasPrefix(tag, "relation,") {
-			continue
-		}
-		if buildHeaders {
-			headers = append(headers, field.Name)
-		}
-		row = append(row, formatFieldValue(d.Field(j)))
-	}
-	return row, headers
-}
-
-func formatFieldValue(fieldValue reflect.Value) string {
-	switch fieldValue.Kind() {
-	case reflect.Bool:
-		return fmt.Sprintf("%t", fieldValue.Bool())
-	case reflect.Pointer:
-		if fieldValue.IsNil() {
-			return ""
-		}
-		derefValue := fieldValue.Elem()
-		switch derefValue.Kind() {
-		case reflect.String:
-			return derefValue.String()
-		case reflect.Bool:
-			return fmt.Sprintf("%t", derefValue.Bool())
-		default:
-			return fmt.Sprintf("%v", derefValue.Interface())
-		}
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return fmt.Sprintf("%d", fieldValue.Int())
-	default:
-		return fieldValue.String()
-	}
-}
-
-func postInitCommands(commands []*cobra.Command) {
-	for _, cmd := range commands {
-		presetRequiredFlags(cmd)
-		if cmd.HasSubCommands() {
-			postInitCommands(cmd.Commands())
-		}
-	}
-}
-
-func presetRequiredFlags(cmd *cobra.Command) {
-	_ = viper.BindPFlags(cmd.Flags())
+// applyEnv fills flags of the executing command from TERRAKUBE_* environment
+// variables when they were not set explicitly. Only global flags and parent
+// scope flags (annotated by the resource framework) are eligible.
+func applyEnv(cmd *cobra.Command) error {
+	var err error
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		if f.Name == "api-url" || f.Name == "pat" {
+		if f.Changed || err != nil {
 			return
 		}
-		if viper.IsSet(f.Name) && viper.GetString(f.Name) != "" {
-			_ = cmd.Flags().Set(f.Name, viper.GetString(f.Name))
+		names := f.Annotations[resource.EnvAnnotation]
+		if f.Name == "output" || f.Name == "hide-nulls" {
+			names = []string{f.Name}
+		}
+		for _, name := range names {
+			key := envPrefix + "_" + strings.ToUpper(envReplacer.Replace(name))
+			if val := os.Getenv(key); val != "" {
+				if setErr := cmd.Flags().Set(f.Name, val); setErr != nil {
+					err = fmt.Errorf("invalid %s: %w", key, setErr)
+				}
+				return
+			}
 		}
 	})
+	return err
 }

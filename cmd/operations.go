@@ -14,7 +14,10 @@ var operationsCmd = &cobra.Command{
 	Short:   "submit JSON:API atomic operations batch requests",
 	Aliases: []string{"ops"},
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		client := newClient()
+		client, err := newClient()
+		if err != nil {
+			return err
+		}
 		ctx := getContext()
 
 		file, _ := cmd.Flags().GetString("file")
