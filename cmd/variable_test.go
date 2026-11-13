@@ -142,13 +142,12 @@ func TestCmdVariableUpdateE2E(t *testing.T) {
 
 	var capturedBody []byte
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPatch {
-			t.Errorf("expected PATCH, got %s", r.Method)
-		}
 		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/workspace/38b6635a-d38e-46f2-a95e-d00a416de4fd/variable/b8c9d0e1-f2a3-4567-bcde-678901234567") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
-
+		if r.Method != http.MethodPatch {
+			t.Errorf("expected PATCH, got %s", r.Method)
+		}
 		capturedBody, _ = io.ReadAll(r.Body)
 
 		w.Header().Set("Content-Type", "application/vnd.api+json")
@@ -187,6 +186,150 @@ func TestCmdVariableUpdateE2E(t *testing.T) {
 	}
 	if attrs["value"] != "us-west-2" {
 		t.Errorf("expected value 'us-west-2', got %v", attrs["value"])
+	}
+}
+
+func TestCmdVariableUpdateDescriptionOnlyOmitsValue(t *testing.T) {
+	resetGlobalFlags()
+
+	var capturedBody []byte
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			t.Errorf("expected only PATCH, got %s", r.Method)
+		}
+		capturedBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, testutil.FixtureVariable())
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	_, err := executeCommand(
+		"variable", "update",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd",
+		"--id", "b8c9d0e1-f2a3-4567-bcde-678901234567",
+		"--description", "d",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var body struct {
+		Data struct {
+			Attributes map[string]interface{} `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(capturedBody, &body); err != nil {
+		t.Fatalf("failed to parse PATCH body: %v", err)
+	}
+	if _, ok := body.Data.Attributes["value"]; ok {
+		t.Errorf("PATCH must not send value when only --description changed, got: %s", capturedBody)
+	}
+	if len(body.Data.Attributes) != 1 || body.Data.Attributes["description"] != "d" {
+		t.Errorf("expected attributes {description: d}, got: %s", capturedBody)
+	}
+}
+
+func TestCmdVariableUpdateEmptyDescription(t *testing.T) {
+	resetGlobalFlags()
+
+	var capturedBody []byte
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, testutil.FixtureVariable())
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	_, err := executeCommand(
+		"variable", "update",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd",
+		"--id", "b8c9d0e1-f2a3-4567-bcde-678901234567",
+		"--description", "",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var body struct {
+		Data struct {
+			Attributes map[string]interface{} `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(capturedBody, &body); err != nil {
+		t.Fatalf("failed to parse PATCH body: %v", err)
+	}
+	if v, ok := body.Data.Attributes["description"]; !ok || v != "" || len(body.Data.Attributes) != 1 {
+		t.Errorf("expected attributes {description: \"\"}, got: %s", capturedBody)
+	}
+}
+
+func TestCmdVariableUpdateNoContentRendersGet(t *testing.T) {
+	resetGlobalFlags()
+
+	var methods []string
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		methods = append(methods, r.Method)
+		if r.Method == http.MethodPatch {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, testutil.FixtureVariable())
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand(
+		"variable", "update",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd",
+		"--id", "b8c9d0e1-f2a3-4567-bcde-678901234567",
+		"--value", "us-west-2",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.Join(methods, ",") != "PATCH,GET" {
+		t.Errorf("expected PATCH then GET, got %v", methods)
+	}
+	if !strings.Contains(out, "b8c9d0e1-f2a3-4567-bcde-678901234567") {
+		t.Errorf("expected output to contain the fetched variable id, got: %s", out)
+	}
+}
+
+func TestCmdVariableUpdateNoContentGetFailsRendersLocal(t *testing.T) {
+	resetGlobalFlags()
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPatch {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	out, err := executeCommand(
+		"variable", "update",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd",
+		"--id", "b8c9d0e1-f2a3-4567-bcde-678901234567",
+		"--value", "us-west-2",
+	)
+	if err != nil {
+		t.Fatalf("expected success after PATCH 204 even if GET fails, got: %v", err)
+	}
+	if !strings.Contains(out, "b8c9d0e1-f2a3-4567-bcde-678901234567") || !strings.Contains(out, "us-west-2") {
+		t.Errorf("expected output to contain the id and sent value, got: %s", out)
 	}
 }
 

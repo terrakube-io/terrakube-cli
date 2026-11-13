@@ -1,10 +1,15 @@
 package resource
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"reflect"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -228,9 +233,38 @@ func newUpdateCmd[T any](cfg Config[T]) *cobra.Command {
 				return err
 			}
 
+			// terrakube-go marshals every attribute (no omitempty), which would
+			// wipe unset fields and write-only secrets. Send only changed attributes.
+			attrs := map[string]any{}
+			rv := reflect.ValueOf(resource).Elem()
+			for _, f := range cfg.Fields {
+				flag := cmd.Flags().Lookup(f.Flag)
+				sf, ok := rv.Type().FieldByName(f.StructField)
+				if flag == nil || !flag.Changed || !ok {
+					continue
+				}
+				if tag := strings.Split(sf.Tag.Get("jsonapi"), ","); len(tag) > 1 && tag[0] == "attr" {
+					attrs[tag[1]] = rv.FieldByIndex(sf.Index).Interface()
+				}
+			}
+			// ponytail: terrakube-go exposes no sparse update or raw request API, so
+			// the PATCH body is rewritten in the transport. This replaces the client's
+			// HTTP client; carry over any custom TLS/transport here if newClient adds one.
+			_ = terrakube.WithHTTPClient(&http.Client{Transport: sparsePatch{attrs: attrs}})(client)
+
 			result, err := cfg.Update(ctx, client, parentIDs, resource)
 			if err != nil {
 				return err
+			}
+			// Elide may answer PATCH with 204, leaving result empty: show the stored
+			// state, or the sent fields if it can't be read back (e.g. soft-deleted).
+			if result == nil || reflect.ValueOf(result).Elem().FieldByName("ID").String() == "" {
+				result = resource
+				if cfg.Get != nil {
+					if fetched, getErr := cfg.Get(ctx, client, parentIDs, id); getErr == nil {
+						result = fetched
+					}
+				}
 			}
 
 			return output.Render(os.Stdout, result, cfg.GetOutput())
@@ -422,4 +456,40 @@ func setStructField(obj any, name string, val string) {
 	if field.IsValid() && field.CanSet() {
 		field.SetString(val)
 	}
+}
+
+// sparsePatch rewrites JSON:API PATCH bodies to {data:{type,id,attributes}}
+// with attributes replaced by attrs (built from changed flags, so omitempty
+// tags can't drop explicit false/""); relationships and included are dropped.
+type sparsePatch struct{ attrs map[string]any }
+
+func (s sparsePatch) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Method != http.MethodPatch || req.Body == nil {
+		return http.DefaultTransport.RoundTrip(req)
+	}
+	raw, err := io.ReadAll(req.Body)
+	_ = req.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	var doc struct {
+		Data struct {
+			Type       string         `json:"type"`
+			ID         string         `json:"id"`
+			Attributes map[string]any `json:"attributes,omitempty"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return nil, fmt.Errorf("rewriting update body: %w", err)
+	}
+	doc.Data.Attributes = s.attrs
+	body, err := json.Marshal(doc)
+	if err != nil {
+		return nil, err
+	}
+	req = req.Clone(req.Context())
+	req.Body = io.NopCloser(bytes.NewReader(body))
+	req.ContentLength = int64(len(body))
+	req.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(body)), nil }
+	return http.DefaultTransport.RoundTrip(req)
 }

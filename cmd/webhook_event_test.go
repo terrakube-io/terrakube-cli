@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -137,5 +138,46 @@ func TestCmdWebhookEventCreateWithNewFields(t *testing.T) {
 	}
 	if !strings.Contains(string(reqBody), "REGEX") {
 		t.Errorf("expected request body to contain 'REGEX', got: %s", string(reqBody))
+	}
+}
+
+func TestCmdWebhookEventUpdateSendsExplicitFalse(t *testing.T) {
+	resetGlobalFlags()
+
+	var reqBody []byte
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			t.Errorf("expected PATCH, got %s", r.Method)
+		}
+		reqBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, &terrakube.WebhookEvent{ID: "we-1"})
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	_, err := executeCommand(
+		"webhook-event", "update",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--workspace-id", "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+		"--webhook-id", "b8c9d0e1-f2a3-4567-bcde-678901234567",
+		"--id", "c9d0e1f2-a3b4-5678-cdef-789012345678",
+		"--pr-workflow-enabled=false",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var body struct {
+		Data struct {
+			Attributes map[string]interface{} `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(reqBody, &body); err != nil {
+		t.Fatalf("failed to parse PATCH body: %v", err)
+	}
+	if v, ok := body.Data.Attributes["prWorkflowEnabled"]; !ok || v != false || len(body.Data.Attributes) != 1 {
+		t.Errorf("expected attributes {prWorkflowEnabled: false}, got: %s", reqBody)
 	}
 }
