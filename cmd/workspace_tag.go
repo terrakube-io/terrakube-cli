@@ -2,26 +2,11 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 
 	terrakube "github.com/terrakube-io/terrakube-go"
 
 	"terrakube/internal/resource"
 )
-
-func workspaceResolver(ctx context.Context, c *terrakube.Client, resolvedParentIDs []string, name string) (string, error) {
-	wss, err := c.Workspaces.List(ctx, resolvedParentIDs[0], &terrakube.ListOptions{Filter: "name==" + name})
-	if err != nil {
-		return "", err
-	}
-	if len(wss) == 0 {
-		return "", fmt.Errorf("no workspace found with name %q", name)
-	}
-	if len(wss) > 1 {
-		return "", fmt.Errorf("multiple workspaces match name %q, use --workspace with the ID", name)
-	}
-	return wss[0].ID, nil
-}
 
 func init() {
 	resource.Register(rootCmd, resource.Config[terrakube.WorkspaceTag]{

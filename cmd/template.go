@@ -2,26 +2,11 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 
 	terrakube "github.com/terrakube-io/terrakube-go"
 
 	"terrakube/internal/resource"
 )
-
-func orgResolver(ctx context.Context, c *terrakube.Client, _ []string, name string) (string, error) {
-	orgs, err := c.Organizations.List(ctx, &terrakube.ListOptions{Filter: "name==" + name})
-	if err != nil {
-		return "", err
-	}
-	if len(orgs) == 0 {
-		return "", fmt.Errorf("no organization found with name %q", name)
-	}
-	if len(orgs) > 1 {
-		return "", fmt.Errorf("multiple organizations match name %q, use --organization with the ID", name)
-	}
-	return orgs[0].ID, nil
-}
 
 func init() {
 	resource.Register(rootCmd, resource.Config[terrakube.Template]{

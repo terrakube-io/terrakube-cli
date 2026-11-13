@@ -272,3 +272,18 @@ func TestExtractRows_EmptySlice(t *testing.T) {
 		t.Errorf("expected only ID header, got %v", headers)
 	}
 }
+
+func TestRenderJSON_EmptySlice(t *testing.T) {
+	for name, data := range map[string]any{
+		"nil":   []*sampleResource(nil),
+		"empty": []*sampleResource{},
+	} {
+		var buf bytes.Buffer
+		if err := Render(&buf, data, "json"); err != nil {
+			t.Fatalf("%s: unexpected error: %v", name, err)
+		}
+		if got := strings.TrimSpace(buf.String()); got != "[]" {
+			t.Errorf("%s: expected [], got %q", name, got)
+		}
+	}
+}

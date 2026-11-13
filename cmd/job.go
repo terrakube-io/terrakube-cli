@@ -37,7 +37,7 @@ func init() {
 		},
 		Fields: []resource.FieldDef{
 			{StructField: "Command", Flag: "command", Short: "c", Type: resource.String, Required: true, Description: "Command to execute (plan, apply, destroy)"},
-			{StructField: "Output", Flag: "output", Type: resource.String, Description: "Job output log"},
+			{StructField: "Output", Flag: "job-output", Type: resource.String, Description: "Job output log"},
 			{StructField: "Status", Flag: "status", Type: resource.String, Description: "Job status"},
 			{StructField: "CommitID", Flag: "commit-id", Type: resource.String, Description: "VCS commit ID"},
 			{StructField: "OverrideBranch", Flag: "override-branch", Type: resource.String, Description: "Override branch"},
