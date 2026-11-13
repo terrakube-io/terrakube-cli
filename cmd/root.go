@@ -204,6 +204,10 @@ func postInitCommands(commands []*cobra.Command) {
 }
 
 func presetRequiredFlags(cmd *cobra.Command) {
+	// Login flags must come from the command line, never from a saved config file.
+	if cmd == loginCmd {
+		return
+	}
 	_ = viper.BindPFlags(cmd.Flags())
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
 		if f.Name == "api-url" || f.Name == "pat" {

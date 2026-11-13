@@ -224,6 +224,37 @@ Authenticate against your Terrakube server using your API URL and Personal Acces
 terrakube login -a "https://terrakube-api.platform.local" -t "XXXXXXXXXXXXX"
 ```
 
+#### Workload identity in CI/CD
+
+Inside GitHub Actions, GitLab CI, Bitbucket Pipelines or Azure Pipelines, `--oidc` detects the platform,
+obtains its OIDC token and logs in with it. Terrakube accepts the token when a `federated` credential matches
+its issuer, audience and claims. `--terraform-credentials` also writes the token to
+`~/.terraform.d/credentials.tfrc.json` for `terraform init` / `tofu init`.
+
+```yaml
+# GitHub Actions
+permissions:
+  id-token: write
+steps:
+  - run: terrakube login -a https://terrakube-api.example.com --oidc --oidc-audience terrakube --terraform-credentials
+
+# GitLab CI
+plan:
+  id_tokens:
+    TERRAKUBE_OIDC_TOKEN:
+      aud: terrakube
+  script:
+    - terrakube login -a https://terrakube-api.example.com --oidc --terraform-credentials
+```
+
+Bitbucket needs `oidc: true` on the step. Azure Pipelines needs a workload identity service connection, with
+`SYSTEM_ACCESSTOKEN: $(System.AccessToken)` and `AZURESUBSCRIPTION_SERVICE_CONNECTION_ID` mapped into the step `env`.
+Elsewhere, pass `--oidc-token-file` or set `TERRAKUBE_OIDC_TOKEN`. OIDC tokens are short-lived, so log in right before use.
+
+`--oidc` requires an https API URL, and GitHub Actions requires `--oidc-audience` because the default audience is
+trusted by other services too. Azure Pipelines tokens always carry the Azure AD audience, so give the service connection
+no Azure role assignments. The token is stored in HOME, so clean it up on persistent self-hosted runners.
+
 ### 2. Create an Organization
 
 Create a new organization configured for remote execution:
