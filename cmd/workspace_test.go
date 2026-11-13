@@ -175,3 +175,49 @@ func TestCmdWorkspaceListMissingOrg(t *testing.T) {
 		t.Errorf("expected error to mention organization, got: %v", err)
 	}
 }
+
+func TestCmdWorkspaceUpdateSendsOnlyChangedAttributes(t *testing.T) {
+	resetGlobalFlags()
+
+	var capturedBody []byte
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			t.Errorf("expected only PATCH, got %s", r.Method)
+		}
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/workspace/d4e5f6a7-b8c9-0123-defa-234567890123") {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		capturedBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, testutil.FixtureWorkspace())
+	})
+
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	_, err := executeCommand(
+		"workspace", "update",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--id", "d4e5f6a7-b8c9-0123-defa-234567890123",
+		"--description", "d",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var bodyMap map[string]interface{}
+	if err := json.Unmarshal(capturedBody, &bodyMap); err != nil {
+		t.Fatalf("failed to parse PATCH body: %v", err)
+	}
+	data, _ := bodyMap["data"].(map[string]interface{})
+	if data["type"] != "workspace" || data["id"] != "d4e5f6a7-b8c9-0123-defa-234567890123" {
+		t.Errorf("expected workspace type and id, got: %s", capturedBody)
+	}
+	attrs, _ := data["attributes"].(map[string]interface{})
+	if len(attrs) != 1 || attrs["description"] != "d" {
+		t.Errorf("expected attributes {description: d}, got: %s", capturedBody)
+	}
+	if _, ok := data["relationships"]; ok {
+		t.Errorf("PATCH body must not contain relationships, got: %s", capturedBody)
+	}
+}
