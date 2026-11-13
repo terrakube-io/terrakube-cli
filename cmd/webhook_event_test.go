@@ -139,4 +139,3 @@ func TestCmdWebhookEventCreateWithNewFields(t *testing.T) {
 		t.Errorf("expected request body to contain 'REGEX', got: %s", string(reqBody))
 	}
 }
-

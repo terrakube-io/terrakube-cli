@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
 const loginLong = `
@@ -39,8 +39,10 @@ var loginCmd = &cobra.Command{
 	Example: fmt.Sprintf(loginExamples, rootCmd.Use),
 }
 
-var apiURL string
-var patToken string
+var (
+	apiURL   string
+	patToken string
+)
 
 func init() {
 	rootCmd.AddCommand(loginCmd)

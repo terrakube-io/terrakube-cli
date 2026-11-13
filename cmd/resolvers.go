@@ -62,4 +62,3 @@ func notificationConfigurationResolver(ctx context.Context, c *terrakube.Client,
 	}
 	return configs[0].ID, nil
 }
-

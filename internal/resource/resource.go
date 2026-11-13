@@ -6,9 +6,9 @@ import (
 	"os"
 	"reflect"
 
-	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	terrakube "github.com/terrakube-io/terrakube-go"
 
 	"terrakube/internal/output"
 )

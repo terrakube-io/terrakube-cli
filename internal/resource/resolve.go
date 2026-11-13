@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
+	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
 // resolveParents resolves parent resource IDs from flags.

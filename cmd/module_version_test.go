@@ -138,4 +138,3 @@ func TestCmdModuleVersionCreateWithGitTag(t *testing.T) {
 		t.Errorf("expected request body to contain 'v1.2.3', got: %s", string(reqBody))
 	}
 }
-

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/google/jsonapi"
+	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
 func TestCmdProviderVersionListE2E(t *testing.T) {
