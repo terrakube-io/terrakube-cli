@@ -217,3 +217,42 @@ func TestCmdJobCreateTargetAndReplaceAddrs(t *testing.T) {
 		t.Errorf("expected request body to contain replaceAddrs, got: %s", string(reqBody))
 	}
 }
+
+func TestCmdJobCreateOutputFlags(t *testing.T) {
+	resetGlobalFlags()
+
+	var capturedBody []byte
+	ts := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedBody, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, testutil.FixtureJob())
+	}))
+	defer ts.Close()
+
+	out, err := executeCommand(
+		"job", "create",
+		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--workspace-id", "d4e5f6a7-b8c9-0123-defa-234567890123",
+		"--command", "plan",
+		"--job-output", "log-text",
+		"--output", "table",
+	)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if strings.HasPrefix(strings.TrimSpace(out), "{") || !strings.Contains(out, "plan") {
+		t.Errorf("expected table output, got: %s", out)
+	}
+
+	var body struct {
+		Data struct {
+			Attributes map[string]any `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(capturedBody, &body); err != nil {
+		t.Fatalf("failed to parse request body: %v", err)
+	}
+	if body.Data.Attributes["output"] != "log-text" {
+		t.Errorf("expected output attribute 'log-text', got %v", body.Data.Attributes["output"])
+	}
+}

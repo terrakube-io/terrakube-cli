@@ -51,9 +51,9 @@ func renderJSON(w io.Writer, data any) error {
 func marshalJSONAPI(data any) ([]byte, error) {
 	v := reflect.ValueOf(data)
 
-	// Handle nil/empty slices — return "null" to match old behavior.
+	// Empty or nil slices render as an empty JSON array.
 	if v.Kind() == reflect.Slice && v.Len() == 0 {
-		return json.MarshalIndent(nil, "", "    ")
+		return []byte("[]"), nil
 	}
 
 	if !isJSONAPIStruct(v) {
