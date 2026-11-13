@@ -4,67 +4,60 @@
 
 Terrakube CLI (`terrakube`) is a command-line tool for managing Terrakube Server resources: organizations, workspaces, modules, variables, teams, and jobs. It handles the full Terraform lifecycle (plan, apply, destroy) through the Terrakube API.
 
-- **Language**: Go 1.25
+- **Language**: Go 1.26
 - **Module path**: `terrakube`
 - **CLI framework**: [cobra](https://github.com/spf13/cobra) + [viper](https://github.com/spf13/viper)
 - **API client**: [github.com/terrakube-io/terrakube-go](https://github.com/terrakube-io/terrakube-go) (JSON:API via [google/jsonapi](https://github.com/google/jsonapi))
 - **Config**: `~/.terrakube-cli.yaml` or `--config` flag
-- **Auth**: Bearer token via config or `TERRAKUBE_TOKEN` env var
+- **Auth**: `terrakube login` stores `api_url` and `token`; commands read them from the config or `TERRAKUBE_API_URL` / `TERRAKUBE_TOKEN`
 - **Output formats**: json (default), yaml, table, tsv, none
 
 ## Architecture
 
 ```
 main.go              # Entry point, calls cmd.Execute()
-cmd/                 # Cobra command definitions
-  root.go            # Root command, config init, output rendering
-  <resource>.go      # Parent command for each resource (organization, workspace, etc.)
-  <resource>_<verb>.go  # Hand-written subcommands: create, list, update, delete
-  template.go        # Framework-registered resource (via resource.Register)
-  vcs.go             # Framework-registered resource
-  workspace_tag.go   # Framework-registered resource
+cmd/
+  root.go            # Root command, config init, env handling, --output validation, newClient()
+  login.go logout.go # Write/remove credentials in the config file
+  resolvers.go       # Name-to-ID resolvers for parent flags (resolveByName + quoted RSQL nameFilter)
+  <resource>.go      # One file per resource, each calls resource.Register
+  team_token.go      # Hand-written commands (no generic CRUD shape)
+  operations.go      # Hand-written: JSON:API atomic operations from --file
 internal/
-  output/            # Output rendering (json, yaml, table, tsv, none)
-    renderer.go      # Render(w, data, format) function
-  resource/          # Generic resource framework
-    resource.go      # Config[T], Register[T](), field population
-    resolve.go       # Parent scope name resolution
-testutil/            # Test infrastructure
-  server.go          # HTTP test server for API mocking
-  assertions.go      # Common test assertion helpers
-  fixtures.go        # Shared test data
+  output/renderer.go # Render(w, data, format): json, yaml, table, tsv, none
+  resource/
+    resource.go      # Config[T], Register[T](), flag/field population
+    resolve.go       # Parent scope resolution (UUID passthrough or Resolver)
+testutil/            # HTTP test server, assertions, fixtures
+tests/e2e_operations.bats  # End-to-end suite against a live server
 ```
 
-### Two patterns for resources
+### Resource framework
 
-**Hand-written (legacy)** -- used by organization, workspace, module, variable, team, job. Each verb is a separate file (`cmd/<resource>_<verb>.go`) with its own Cobra command, flag setup, and API call.
+Every resource is registered through `resource.Register[T](rootCmd, resource.Config[T]{...})` in `cmd/<resource>.go`. See `cmd/template.go` for a complete example.
 
-**Framework (preferred for new resources)** -- used by template, vcs, workspace-tag. A single `cmd/<resource>.go` file calls `resource.Register[T]()` with a `resource.Config[T]` struct. The framework generates list, get, create, update, and delete subcommands automatically.
+- `Config[T]` holds Name, Aliases, Parents, Fields, and API closures (List/Get/Create/Update/Delete). Only non-nil closures get a subcommand.
+- `ParentScope` adds one flag per parent (e.g. `--organization`/`-o`, alias `--org`, hidden `--organization-id`). The value is used as-is if it is a UUID (or `RawID` is set), otherwise it goes through `Resolver`. Resolvers live in `cmd/resolvers.go`; new ones should use `resolveByName` with `nameFilter`.
+- `FieldDef` maps a flag to a struct field (String, Bool, Int, StringSlice). On create, `Required` fields are enforced. On update, only explicitly set flags are applied.
+- List adds `--filter` (RSQL). Get, update, and delete take `--id`.
+- Field flags must not be named `output` (it is the global format flag); the job log field is `--job-output`.
 
-### Framework details
+Hand-written commands (`login`, `logout`, `team-token`, `operations`) call `newClient()` themselves.
 
-- `resource.Config[T]` holds Name, Aliases, Parents, Fields, and API closures (List/Get/Create/Update/Delete).
-- `resource.ParentScope` defines parent resources (e.g., organization) with `--<parent>-id` and `--<parent>-name` flags. Name flags use a `Resolver` function for automatic name-to-ID resolution.
-- `resource.FieldDef` maps CLI flags to struct fields with type safety (String, Bool, Int).
-- `resource.Register[T]()` creates a parent command and up to 5 subcommands. Only non-nil API closures get subcommands.
-- On create, all `Required` fields are enforced. On update, only flags that were explicitly set are applied.
-- Output is handled by `internal/output.Render(w, data, format)`.
+### Config, env, and flags
 
-### Adding a new resource (framework pattern)
-
-Create `cmd/<resource>.go` with an `init()` that calls `resource.Register[T]()`. Typical registration is ~30 lines. See `cmd/template.go` for a complete example.
-
-### Adding a new subcommand (hand-written pattern)
-
-Follow existing `cmd/<resource>_<verb>.go` pattern. Register as subcommand of the resource parent. Use `viper` for flag binding with env var support (`TERRAKUBE_` prefix).
-
-### Flag handling
-
-Flags are bound to viper. Environment variables use the `TERRAKUBE_` prefix. Config file values are lowest priority, then env vars, then flags.
+- Config file: `~/.terrakube-cli.yaml` or `--config`. `login` writes only `api_url` and `token` (mode 0600, other keys kept); `logout` removes `token`.
+- `login` takes `--api-url`/`-a` and `--pat`/`-t`, falling back to `TERRAKUBE_API_URL` / `TERRAKUBE_PAT`.
+- Other commands read `api_url` from `TERRAKUBE_API_URL` or the config. The token comes from `TERRAKUBE_TOKEN`, then `TERRAKUBE_PAT`, then the config `token`. If either value is missing the command fails with "not logged in".
+- `applyEnv` (`cmd/root.go`) fills a flag from `TERRAKUBE_<FLAG>` (uppercase, `-` to `_`) only when the flag was not set explicitly, and only for:
+  - parent-scope flags, via `resource.EnvAnnotation` (e.g. `TERRAKUBE_ORGANIZATION` or `TERRAKUBE_ORGANIZATION_ID`, `TERRAKUBE_WORKSPACE` or `TERRAKUBE_WORKSPACE_ID`). This includes `Optional` parents: an exported `TERRAKUBE_WORKSPACE` scopes `notification-configuration` to that workspace;
+  - `--output` (`TERRAKUBE_OUTPUT`) and `--hide-nulls` (`TERRAKUBE_HIDE_NULLS`).
+- Field flags (`--name`, `--id`, `--description`, ...) are never read from env or the config file.
+- `--output` is validated before any API call.
 
 ### Output rendering
 
-Call `output.Render(w, data, format)` from `internal/output/renderer.go`. Supports json, yaml, table, tsv, none formats. Table rendering uses reflection to extract struct fields; fields tagged with `jsonapi "relation,..."` are skipped.
+Call `output.Render(w, data, format)` from `internal/output/renderer.go`. Supports json, yaml, table, tsv, none formats. Table rendering uses reflection to extract struct fields; fields tagged with `jsonapi "relation,..."` are skipped. Empty lists render as `[]` in JSON.
 
 ## Building and Testing
 
@@ -76,18 +69,19 @@ mise run vulncheck      # govulncheck ./...
 mise run check          # all of the above
 ```
 
-Dev environment: `mise install` sets up Go 1.25.7, golangci-lint, govulncheck, gofumpt.
+Dev environment: `mise install` sets up Go 1.26.11, golangci-lint 2.15.0, govulncheck, gofumpt. Lint config is `.golangci.yml` (gofumpt formatter).
 
 ## CI/CD
 
+All GitHub Actions are pinned by commit SHA. Dependabot (`.github/dependabot.yml`) updates Go modules and actions weekly.
+
 - **PR builds**: `.github/workflows/go.yml` - build, test (with `-race`), golangci-lint, govulncheck, `go mod tidy` check, coverage delta PR comment
 - **CodeQL**: `.github/workflows/codeql.yml` - SAST analysis on PRs and weekly
-- **Releases**: `.github/workflows/release.yml` - cross-compiles (linux/windows/darwin, 386/amd64), publishes to GitHub Releases, bumps Homebrew formula
+- **Releases**: `.github/workflows/release.yml` runs GoReleaser (`.goreleaser.yaml`) when a GitHub release is created: archives for linux and darwin (amd64, arm64) and windows (amd64, 386), the multi-arch `azbuilder/terrakube-cli` image on Docker Hub, and the `terrakube-cli` snap on the Snap Store (channel from the tag: `-rc` candidate, `-beta` beta, other pre-release edge, else stable)
 - **Pre-commit**: `.pre-commit-config.yaml` - golangci-lint, build, test, go mod tidy, govulncheck
 
 ## Conventions
 
-- Test infrastructure in `testutil/` (`server.go`, `assertions.go`, `fixtures.go`). Tests in `cmd/cmd_test.go`, `cmd/render_test.go`.
-- Error handling: use `cobra.CheckErr()` for fatal errors in commands, return errors from client methods.
-- Environment variable naming: `TERRAKUBE_<FLAG_NAME>` (uppercase, underscores).
+- Test infrastructure in `testutil/` (`server.go`, `assertions.go`, `fixtures.go`). Unit tests live next to the code (`cmd/<resource>_test.go`, `internal/*/*_test.go`).
+- Error handling: commands use `RunE` and return errors; do not exit from inside a command.
 - Commit messages: conventional commits format `type(scope): description`.
