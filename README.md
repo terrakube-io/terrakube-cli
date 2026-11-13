@@ -10,6 +10,7 @@ For full CLI reference documentation, visit our official guide at [https://docs.
   - [Snap Package (Ubuntu / Linux)](#snap-package-ubuntu--linux)
   - [Linux & macOS](#linux--macos)
   - [Windows](#windows)
+  - [Docker](#docker)
 - [Adding Terrakube CLI to PATH](#adding-terrakube-cli-to-path)
   - [Linux & macOS](#linux--macos-1)
   - [Windows](#windows-1)
@@ -25,6 +26,7 @@ For full CLI reference documentation, visit our official guide at [https://docs.
   - [4. Create a Workspace (OpenTofu & Docker Compose)](#4-create-a-workspace-opentofu--docker-compose)
   - [5. Add Workspace Environment Variables & Tags](#5-add-workspace-environment-variables--tags)
   - [6. Configure Notifications (Slack / Teams / Webhook)](#6-configure-notifications-slack--teams--webhook)
+- [Breaking Changes](#breaking-changes)
 - [Contributing](#contributing)
 - [Security](#security)
 
@@ -32,40 +34,56 @@ For full CLI reference documentation, visit our official guide at [https://docs.
 
 ## Download & Installation
 
-You can download pre-compiled binaries directly from our [GitHub Releases](https://github.com/terrakube-io/terrakube-cli/releases/latest) page, or install via Snap on Linux/Ubuntu.
+Pre-compiled archives are published on [GitHub Releases](https://github.com/terrakube-io/terrakube-cli/releases/latest) for Linux and macOS (amd64, arm64) and Windows (amd64, 386). The CLI is also available from the Snap Store and as a Docker image.
 
 ### Snap Package (Ubuntu / Linux)
 
-You can install the local `.snap` package:
+Install from the Snap Store:
 
 ```bash
-sudo snap install --dangerous terrakube-cli_*.snap
+sudo snap install terrakube-cli
 ```
 
-Both `terrakube` and `terrakube-cli` commands will be available:
+The snap exposes the command as `terrakube-cli`. To call it as `terrakube`, add an alias:
 
 ```bash
+sudo snap alias terrakube-cli terrakube
 terrakube --version
-terrakube-cli --help
 ```
+
+To install a locally built snap instead, see [Building Snap Package Locally](#building-snap-package-locally).
 
 ### Linux & macOS (Bash / Zsh)
 
-Download the binary using `curl` or `wget`:
+Release archives are named `terrakube_<version>_<os>_<arch>.tar.gz` (version without the leading `v`). Download and extract one with `curl`:
 
 ```bash
-# Example: Download latest Linux amd64 binary
-curl -sSL -o terrakube https://github.com/terrakube-io/terrakube-cli/releases/latest/download/terrakube-linux-amd64
-chmod +x terrakube
+# Example: Linux amd64; replace VERSION with a release from the Releases page
+VERSION="x.y.z"
+curl -sSLO "https://github.com/terrakube-io/terrakube-cli/releases/download/v${VERSION}/terrakube_${VERSION}_linux_amd64.tar.gz"
+tar -xzf "terrakube_${VERSION}_linux_amd64.tar.gz" terrakube
 ```
 
 ### Windows (PowerShell)
 
-Download the binary using PowerShell:
+Windows releases are `.zip` archives:
 
 ```powershell
-# Download latest Windows amd64 binary
-Invoke-WebRequest -Uri "https://github.com/terrakube-io/terrakube-cli/releases/latest/download/terrakube-windows-amd64.exe" -OutFile "terrakube.exe"
+# Example: Windows amd64; replace $Version with a release from the Releases page
+$Version = "x.y.z"
+Invoke-WebRequest -Uri "https://github.com/terrakube-io/terrakube-cli/releases/download/v$Version/terrakube_${Version}_windows_amd64.zip" -OutFile "terrakube.zip"
+Expand-Archive terrakube.zip -DestinationPath .
+```
+
+### Docker
+
+A multi-arch image (linux/amd64, linux/arm64) is published to Docker Hub as [`azbuilder/terrakube-cli`](https://hub.docker.com/r/azbuilder/terrakube-cli). The entrypoint is `terrakube`, so pass credentials as environment variables:
+
+```bash
+docker run --rm \
+  -e TERRAKUBE_API_URL="https://terrakube-api.platform.local" \
+  -e TERRAKUBE_TOKEN="XXXXXXXXXXXXX" \
+  azbuilder/terrakube-cli organization list
 ```
 
 ---
@@ -142,7 +160,7 @@ terrakube --version
 
 ### Prerequisites
 
-- [Go](https://go.dev/) 1.22 or higher
+- [Go](https://go.dev/) 1.26 or higher
 
 ### Compiling the Binary
 
@@ -203,6 +221,8 @@ Terrakube CLI includes comprehensive end-to-end integration tests written using 
 > export TERRAKUBE_API_URL="https://terrakube-api.platform.local"
 > export TERRAKUBE_PAT="XXXXXXXXXXXXX"  # Replace with a valid Terrakube Admin Personal Access Token
 > ```
+>
+> The suite builds `./terrakube` and runs `terrakube login` with these values. It sets `HOME` to a temporary directory first, so your own `~/.terrakube-cli.yaml` is not modified.
 
 Execute the E2E operations test suite:
 
@@ -223,6 +243,21 @@ Authenticate against your Terrakube server using your API URL and Personal Acces
 ```bash
 terrakube login -a "https://terrakube-api.platform.local" -t "XXXXXXXXXXXXX"
 ```
+
+`login` checks the credentials against the server and saves `api_url` and `token` to `~/.terrakube-cli.yaml` (or the file given with `--config`) with `0600` permissions. It also reads `TERRAKUBE_API_URL` and `TERRAKUBE_PAT` when the flags are omitted:
+
+```bash
+export TERRAKUBE_API_URL="https://terrakube-api.platform.local"
+export TERRAKUBE_PAT="XXXXXXXXXXXXX"
+terrakube login
+```
+
+To run commands without a config file (for example in CI), set `TERRAKUBE_API_URL` and a token. The token is taken from the first of these that is set: `TERRAKUBE_TOKEN`, `TERRAKUBE_PAT`, the `token` saved in the config file. `terrakube logout` removes the stored token (a token in the environment still applies).
+
+Parent-scope flags can also come from the environment when not passed on the command line, for example `TERRAKUBE_ORGANIZATION` (or `TERRAKUBE_ORGANIZATION_ID`) for `-o` and `TERRAKUBE_WORKSPACE` (or `TERRAKUBE_WORKSPACE_ID`) for `-w`, as do `TERRAKUBE_OUTPUT` and `TERRAKUBE_HIDE_NULLS`. Other flags such as `--name` or `--id` must be passed explicitly.
+
+> [!NOTE]
+> An exported `TERRAKUBE_WORKSPACE` / `TERRAKUBE_WORKSPACE_ID` also applies where the workspace is optional. For example, `notification-configuration list` and `create` then work on that workspace instead of the organization. Unset it to work at organization level.
 
 ### 2. Create an Organization
 
@@ -335,6 +370,18 @@ terrakube variable create \
      --job-status "completed" \
      --output table
    ```
+
+---
+
+## Breaking Changes
+
+Changes in behaviour that can affect existing scripts:
+
+- `job create` / `job update`: the job log field flag is now `--job-output`. `--output` is always the global output format and is validated before any API call.
+- Empty lists print `[]` in JSON instead of `null`.
+- The config file only provides `api_url` and `token`. Other keys in it no longer fill flags.
+- Environment variables no longer fill field flags (`--name`, `--id`, `--description`, ...). Only parent-scope flags, `--output`, and `--hide-nulls` are read from `TERRAKUBE_*` variables.
+- Name lookups (for example `-o my-org`) require an exact name match.
 
 ---
 
