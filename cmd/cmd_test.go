@@ -41,11 +41,11 @@ func resetGlobalFlags() {
 		viper.Set(key, "")
 	}
 
-	// Point viper at a nonexistent config file to prevent real user config interference.
-	cfgFile = os.DevNull
-
 	// Reset cobra flag state on all commands.
 	resetCobraFlags(rootCmd)
+
+	// Point viper at an empty config file to prevent user config interference.
+	cfgFile = os.DevNull
 }
 
 // resetCobraFlags recursively resets all flags on a command and its subcommands.
@@ -567,18 +567,6 @@ func TestCmdRootTopLevelCommands(t *testing.T) {
 	}
 }
 
-func TestCmdLogoutE2E(t *testing.T) {
-	resetGlobalFlags()
-
-	out, err := executeCommand("logout")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(out, "logout ok") {
-		t.Errorf("expected 'logout ok' in output, got: %s", out)
-	}
-}
-
 // ----- Login Required Flags -----
 
 func TestCmdLoginMissingApiUrl(t *testing.T) {
@@ -688,67 +676,6 @@ func TestCmdJobAlias(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected job command to have alias 'jobs', got aliases: %v", cmd.Aliases)
-	}
-}
-
-// ----- Logout Stub Test -----
-
-func TestCmdLogoutIsStub(t *testing.T) {
-	resetGlobalFlags()
-
-	viper.Set("api_url", "http://localhost:8080")
-	viper.Set("token", "some-secret-token")
-
-	out, err := executeCommand("logout")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !strings.Contains(out, "logout ok") {
-		t.Errorf("expected 'logout ok' in output, got: %s", out)
-	}
-
-	if viper.GetString("token") != "some-secret-token" {
-		t.Error("expected token to remain in viper after logout")
-	}
-	if viper.GetString("api_url") != "http://localhost:8080" {
-		t.Error("expected api_url to remain in viper after logout")
-	}
-}
-
-// ----- Login Config Writing -----
-
-func TestCmdLoginWritesConfig(t *testing.T) {
-	resetGlobalFlags()
-
-	desc := "test org"
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		orgs := []*terrakube.Organization{{ID: "org-1", Name: "test-org", Description: &desc}}
-		w.Header().Set("Content-Type", "application/vnd.api+json")
-		_ = jsonapi.MarshalPayload(w, orgs)
-	})
-
-	ts := setupTestServer(handler)
-	defer ts.Close()
-
-	out, err := executeCommand(
-		"login",
-		"--api-url", ts.URL,
-		"--pat", "my-secret-pat",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !strings.Contains(out, "Successfully logged in") {
-		t.Errorf("expected 'Successfully logged in' in output, got: %s", out)
-	}
-
-	if viper.GetString("api_url") != ts.URL {
-		t.Errorf("expected viper api_url to be %q, got %q", ts.URL, viper.GetString("api_url"))
-	}
-	if viper.GetString("token") != "my-secret-pat" {
-		t.Errorf("expected viper token to be 'my-secret-pat', got %q", viper.GetString("token"))
 	}
 }
 

@@ -45,9 +45,13 @@ type FieldDef struct {
 	Description string
 }
 
+// EnvAnnotation is the flag annotation listing the flag names whose
+// TERRAKUBE_* environment variables may fill a parent flag when it is not set.
+const EnvAnnotation = "terrakube_env"
+
 // Runtime provides access to CLI infrastructure.
 type Runtime struct {
-	NewClient  func() *terrakube.Client
+	NewClient  func() (*terrakube.Client, error)
 	GetContext func() context.Context
 	GetOutput  func() string
 }
@@ -100,7 +104,10 @@ func newListCmd[T any](cfg Config[T]) *cobra.Command {
 		Short:        fmt.Sprintf("list %s resources", cfg.Name),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			client := cfg.NewClient()
+			client, err := cfg.NewClient()
+			if err != nil {
+				return err
+			}
 			ctx := cfg.GetContext()
 
 			parentIDs, err := resolveParents(ctx, client, cmd, cfg.Parents)
@@ -134,7 +141,10 @@ func newGetCmd[T any](cfg Config[T]) *cobra.Command {
 		Short:        fmt.Sprintf("get a %s resource", cfg.Name),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			client := cfg.NewClient()
+			client, err := cfg.NewClient()
+			if err != nil {
+				return err
+			}
 			ctx := cfg.GetContext()
 
 			parentIDs, err := resolveParents(ctx, client, cmd, cfg.Parents)
@@ -164,7 +174,10 @@ func newCreateCmd[T any](cfg Config[T]) *cobra.Command {
 		Short:        fmt.Sprintf("create a %s resource", cfg.Name),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			client := cfg.NewClient()
+			client, err := cfg.NewClient()
+			if err != nil {
+				return err
+			}
 			ctx := cfg.GetContext()
 
 			parentIDs, err := resolveParents(ctx, client, cmd, cfg.Parents)
@@ -197,7 +210,10 @@ func newUpdateCmd[T any](cfg Config[T]) *cobra.Command {
 		Short:        fmt.Sprintf("update a %s resource", cfg.Name),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			client := cfg.NewClient()
+			client, err := cfg.NewClient()
+			if err != nil {
+				return err
+			}
 			ctx := cfg.GetContext()
 
 			parentIDs, err := resolveParents(ctx, client, cmd, cfg.Parents)
@@ -234,7 +250,10 @@ func newDeleteCmd[T any](cfg Config[T]) *cobra.Command {
 		Short:        fmt.Sprintf("delete a %s resource", cfg.Name),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			client := cfg.NewClient()
+			client, err := cfg.NewClient()
+			if err != nil {
+				return err
+			}
 			ctx := cfg.GetContext()
 
 			parentIDs, err := resolveParents(ctx, client, cmd, cfg.Parents)
@@ -266,9 +285,12 @@ func addParentFlags(cmd *cobra.Command, parents []ParentScope) {
 			usage = fmt.Sprintf("%s ID", p.Name)
 		}
 		cmd.Flags().StringP(p.Flag, p.ShortFlag, "", usage)
+		envNames := []string{p.Flag}
 		if p.IDFlag != "" && p.IDFlag != p.Flag {
 			aliases[p.IDFlag] = p.Flag
+			envNames = append(envNames, p.IDFlag)
 		}
+		_ = cmd.Flags().SetAnnotation(p.Flag, EnvAnnotation, envNames)
 		for _, a := range p.Aliases {
 			aliases[a] = p.Flag
 		}

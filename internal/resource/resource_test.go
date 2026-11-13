@@ -17,7 +17,7 @@ type testResource struct {
 
 func testRuntime() Runtime {
 	return Runtime{
-		NewClient:  func() *terrakube.Client { return nil },
+		NewClient:  func() (*terrakube.Client, error) { return nil, nil },
 		GetContext: func() context.Context { return context.Background() },
 		GetOutput:  func() string { return "json" },
 	}

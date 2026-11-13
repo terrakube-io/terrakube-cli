@@ -241,3 +241,34 @@ func TestRenderTSV_BoolFormatting(t *testing.T) {
 		t.Errorf("expected true in tsv output, got:\n%s", out)
 	}
 }
+
+func TestExtractRows(t *testing.T) {
+	rows, headers := extractRows(resourceSlice())
+
+	wantHeaders := []string{"ID", "Name", "Description", "Active", "Count"}
+	if strings.Join(headers, ",") != strings.Join(wantHeaders, ",") {
+		t.Errorf("headers = %v, want %v (relations skipped, no duplicates)", headers, wantHeaders)
+	}
+	wantRows := [][]string{
+		{"abc-123", "test-item", "a description", "true", "42"},
+		{"def-456", "other-item", "", "false", "0"},
+	}
+	if len(rows) != len(wantRows) {
+		t.Fatalf("got %d rows, want %d", len(rows), len(wantRows))
+	}
+	for i := range wantRows {
+		if strings.Join(rows[i], ",") != strings.Join(wantRows[i], ",") {
+			t.Errorf("row %d = %v, want %v", i, rows[i], wantRows[i])
+		}
+	}
+}
+
+func TestExtractRows_EmptySlice(t *testing.T) {
+	rows, headers := extractRows([]*sampleResource{})
+	if len(rows) != 0 {
+		t.Errorf("expected 0 rows, got %d", len(rows))
+	}
+	if len(headers) != 1 || headers[0] != "ID" {
+		t.Errorf("expected only ID header, got %v", headers)
+	}
+}
