@@ -51,7 +51,12 @@ func resetGlobalFlags() {
 // resetCobraFlags recursively resets all flags on a command and its subcommands.
 func resetCobraFlags(cmd *cobra.Command) {
 	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		_ = f.Value.Set(f.DefValue)
+		// Set("[]") on a slice flag would yield ["[]"], so clear slices explicitly.
+		if sv, ok := f.Value.(pflag.SliceValue); ok {
+			_ = sv.Replace(nil)
+		} else {
+			_ = f.Value.Set(f.DefValue)
+		}
 		f.Changed = false
 	})
 	cmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
@@ -720,6 +725,9 @@ func TestCmdLogoutIsStub(t *testing.T) {
 
 func TestCmdLoginWritesConfig(t *testing.T) {
 	resetGlobalFlags()
+	home := t.TempDir() // login writes <home>/.terrakube-cli.yaml
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
 
 	desc := "test org"
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
