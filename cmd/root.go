@@ -20,11 +20,13 @@ import (
 	outputpkg "terrakube/internal/output"
 )
 
-var cfgFile string
-var output string
-var hideNulls bool
-var verbose bool
-var envPrefix string = "TERRAKUBE"
+var (
+	cfgFile   string
+	output    string
+	hideNulls bool
+	verbose   bool
+	envPrefix string = "TERRAKUBE"
+)
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{

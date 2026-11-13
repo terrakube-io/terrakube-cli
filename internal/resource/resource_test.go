@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
+	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
 type testResource struct {
@@ -18,7 +18,7 @@ type testResource struct {
 func testRuntime() Runtime {
 	return Runtime{
 		NewClient:  func() *terrakube.Client { return nil },
-		GetContext:  func() context.Context { return context.Background() },
+		GetContext: func() context.Context { return context.Background() },
 		GetOutput:  func() string { return "json" },
 	}
 }
@@ -38,10 +38,18 @@ func testConfig() Config[testResource] {
 			{StructField: "Desc", Flag: "description", Short: "d", Type: String, Description: "widget description"},
 			{StructField: "Flag", Flag: "flag", Short: "f", Type: Bool, Description: "widget flag"},
 		},
-		List:   func(_ context.Context, _ *terrakube.Client, _ []string, _ *terrakube.ListOptions) ([]*testResource, error) { return nil, nil },
-		Get:    func(_ context.Context, _ *terrakube.Client, _ []string, _ string) (*testResource, error) { return nil, nil },
-		Create: func(_ context.Context, _ *terrakube.Client, _ []string, _ *testResource) (*testResource, error) { return nil, nil },
-		Update: func(_ context.Context, _ *terrakube.Client, _ []string, _ *testResource) (*testResource, error) { return nil, nil },
+		List: func(_ context.Context, _ *terrakube.Client, _ []string, _ *terrakube.ListOptions) ([]*testResource, error) {
+			return nil, nil
+		},
+		Get: func(_ context.Context, _ *terrakube.Client, _ []string, _ string) (*testResource, error) {
+			return nil, nil
+		},
+		Create: func(_ context.Context, _ *terrakube.Client, _ []string, _ *testResource) (*testResource, error) {
+			return nil, nil
+		},
+		Update: func(_ context.Context, _ *terrakube.Client, _ []string, _ *testResource) (*testResource, error) {
+			return nil, nil
+		},
 		Delete: func(_ context.Context, _ *terrakube.Client, _ []string, _ string) error { return nil },
 	}
 }
@@ -88,8 +96,10 @@ func TestRegister_OnlyListAndDelete(t *testing.T) {
 		Runtime: testRuntime(),
 		Name:    "partial",
 		Fields:  []FieldDef{},
-		List:    func(_ context.Context, _ *terrakube.Client, _ []string, _ *terrakube.ListOptions) ([]*testResource, error) { return nil, nil },
-		Delete:  func(_ context.Context, _ *terrakube.Client, _ []string, _ string) error { return nil },
+		List: func(_ context.Context, _ *terrakube.Client, _ []string, _ *terrakube.ListOptions) ([]*testResource, error) {
+			return nil, nil
+		},
+		Delete: func(_ context.Context, _ *terrakube.Client, _ []string, _ string) error { return nil },
 	}
 	Register(root, cfg)
 

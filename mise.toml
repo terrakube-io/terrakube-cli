@@ -1,8 +1,8 @@
 [tools]
-go = "1.25.7"
-golangci-lint = "2.8.0"
-"go:golang.org/x/vuln/cmd/govulncheck" = "latest"
-"go:mvdan.cc/gofumpt" = "latest"
+go = "1.26.11"
+golangci-lint = "2.15.0"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.9.0"
+"go:mvdan.cc/gofumpt" = "0.12.0"
 
 [tasks.build]
 run = "go build ./..."

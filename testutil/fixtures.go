@@ -786,4 +786,3 @@ func FixtureNotificationTriggerList() []*terrakube.NotificationTrigger {
 		},
 	}
 }
-

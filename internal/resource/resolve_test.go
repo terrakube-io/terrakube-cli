@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
+	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
 func TestIsUUID(t *testing.T) {

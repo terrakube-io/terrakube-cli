@@ -217,4 +217,3 @@ func TestCmdJobCreateTargetAndReplaceAddrs(t *testing.T) {
 		t.Errorf("expected request body to contain replaceAddrs, got: %s", string(reqBody))
 	}
 }
-

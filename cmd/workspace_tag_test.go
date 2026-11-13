@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/google/jsonapi"
 	"github.com/spf13/cobra"
+	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
 func TestCmdWorkspaceTagListE2E(t *testing.T) {
@@ -274,4 +274,3 @@ func TestCmdWorkspaceTagSubcommands(t *testing.T) {
 		}
 	}
 }
-
