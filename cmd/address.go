@@ -36,7 +36,6 @@ func init() {
 		},
 		Fields: []resource.FieldDef{
 			{StructField: "Name", Flag: "name", Short: "n", Type: resource.String, Required: true, Description: "Address name"},
-			{StructField: "Type", Flag: "type", Type: resource.String, Required: true, Description: "Address type"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Address, error) {
 			return c.Addresses.List(ctx, pIDs[0], pIDs[1], opts)

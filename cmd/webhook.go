@@ -36,11 +36,7 @@ func init() {
 			},
 		},
 		Fields: []resource.FieldDef{
-			{StructField: "Path", Flag: "path", Type: resource.String, Description: "Webhook path"},
-			{StructField: "Branch", Flag: "branch", Type: resource.String, Description: "Branch to watch"},
-			{StructField: "TemplateID", Flag: "template-id", Type: resource.String, Description: "Template ID"},
 			{StructField: "RemoteHookID", Flag: "remote-hook-id", Type: resource.String, Description: "Remote hook ID"},
-			{StructField: "Event", Flag: "event", Type: resource.String, Description: "Event type"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Webhook, error) {
 			return c.Webhooks.List(ctx, pIDs[0], pIDs[1], opts)

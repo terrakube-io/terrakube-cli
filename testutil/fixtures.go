@@ -131,10 +131,9 @@ func FixtureVariableList() []*terrakube.Variable {
 
 func FixtureJob() *terrakube.Job {
 	return &terrakube.Job{
-		ID:      "d0e1f2a3-b4c5-6789-defa-890123456789",
-		Command: "plan",
-		Output:  "Terraform will perform the following actions...",
-		Status:  "completed",
+		ID:     "d0e1f2a3-b4c5-6789-defa-890123456789",
+		Output: "Terraform will perform the following actions...",
+		Status: "completed",
 		Workspace: &terrakube.Workspace{
 			ID: "d4e5f6a7-b8c9-0123-defa-234567890123",
 		},
@@ -145,10 +144,9 @@ func FixtureJobList() []*terrakube.Job {
 	return []*terrakube.Job{
 		FixtureJob(),
 		{
-			ID:      "e1f2a3b4-c5d6-7890-efab-901234567890",
-			Command: "apply",
-			Output:  "Apply complete! Resources: 3 added, 0 changed, 0 destroyed.",
-			Status:  "completed",
+			ID:     "e1f2a3b4-c5d6-7890-efab-901234567890",
+			Output: "Apply complete! Resources: 3 added, 0 changed, 0 destroyed.",
+			Status: "completed",
 		},
 	}
 }
@@ -480,11 +478,7 @@ func FixtureWorkspaceScheduleList() []*terrakube.WorkspaceSchedule {
 func FixtureWebhook() *terrakube.Webhook {
 	return &terrakube.Webhook{
 		ID:           "wh1a2b3c-d4e5-6789-abcd-ef1234567890",
-		Path:         "/",
-		Branch:       "main",
-		TemplateID:   "tpl-abc-123",
 		RemoteHookID: "gh-hook-456",
-		Event:        "PUSH",
 	}
 }
 
@@ -493,11 +487,7 @@ func FixtureWebhookList() []*terrakube.Webhook {
 		FixtureWebhook(),
 		{
 			ID:           "wh2b3c4d-e5f6-7890-bcde-f12345678901",
-			Path:         "/modules",
-			Branch:       "develop",
-			TemplateID:   "tpl-def-456",
 			RemoteHookID: "gh-hook-789",
-			Event:        "TAG",
 		},
 	}
 }
@@ -701,7 +691,6 @@ func FixtureAddress() *terrakube.Address {
 	return &terrakube.Address{
 		ID:   "ad1a2b3c-d4e5-6789-abcd-ef1234567890",
 		Name: "aws_vpc.main",
-		Type: "aws_vpc",
 	}
 }
 
@@ -711,7 +700,6 @@ func FixtureAddressList() []*terrakube.Address {
 		{
 			ID:   "ad2b3c4d-e5f6-7890-bcde-f12345678901",
 			Name: "aws_subnet.public",
-			Type: "aws_subnet",
 		},
 	}
 }

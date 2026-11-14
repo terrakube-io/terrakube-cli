@@ -27,7 +27,7 @@ Before opening a new issue, please search existing issues to see if it has alrea
    ```bash
    git checkout -b feature/my-new-feature
    ```
-3. **Make Code Changes**: Requires Go 1.26. `mise install` sets up the pinned Go, golangci-lint, govulncheck, and gofumpt versions from `mise.toml`.
+3. **Make Code Changes**: Requires Go 1.27. `mise install` sets up the pinned Go, golangci-lint, govulncheck, and gofumpt versions from `mise.toml`.
 4. **Run Formatters & Linters**: Code is formatted with gofumpt (configured in `.golangci.yml`).
    ```bash
    golangci-lint fmt ./...

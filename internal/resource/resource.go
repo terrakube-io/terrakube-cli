@@ -10,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -78,6 +79,7 @@ type Config[T any] struct {
 
 // Register creates Cobra commands for the resource and adds them to root.
 func Register[T any](root *cobra.Command, cfg Config[T]) *cobra.Command {
+	checkFields[T](cfg.Fields)
 	parentCmd := &cobra.Command{
 		Use:     cfg.Name + " list|get|create|update|delete [FLAGS]",
 		Short:   fmt.Sprintf("manage %s resources", cfg.Name),
@@ -311,6 +313,38 @@ func newDeleteCmd[T any](cfg Config[T]) *cobra.Command {
 	return cmd
 }
 
+var timeType = reflect.TypeFor[time.Time]()
+
+// checkFields panics at startup if a FieldDef names a struct field that does
+// not exist or cannot hold its flag type, e.g. after a terrakube-go upgrade.
+func checkFields[T any](fields []FieldDef) {
+	t := reflect.TypeFor[T]()
+	for _, f := range fields {
+		sf, ok := t.FieldByName(f.StructField)
+		if !ok {
+			panic(fmt.Sprintf("%s has no field %q (flag --%s)", t.Name(), f.StructField, f.Flag))
+		}
+		ft := sf.Type
+		if ft.Kind() == reflect.Pointer {
+			ft = ft.Elem()
+		}
+		var fits bool
+		switch f.Type {
+		case String:
+			fits = ft.Kind() == reflect.String || ft == timeType
+		case Bool:
+			fits = ft.Kind() == reflect.Bool
+		case Int:
+			fits = ft.Kind() >= reflect.Int && ft.Kind() <= reflect.Int64
+		case StringSlice:
+			fits = ft == reflect.TypeFor[[]string]()
+		}
+		if !fits {
+			panic(fmt.Sprintf("%s.%s is %s, cannot hold flag --%s", t.Name(), f.StructField, sf.Type, f.Flag))
+		}
+	}
+}
+
 func addParentFlags(cmd *cobra.Command, parents []ParentScope) {
 	aliases := make(map[string]string)
 	for _, p := range parents {
@@ -396,7 +430,9 @@ func setFieldFromFlag(cmd *cobra.Command, f FieldDef, obj any) error {
 	switch f.Type {
 	case String:
 		val, _ := cmd.Flags().GetString(f.Flag)
-		setStringField(field, val)
+		if err := setStringField(field, val); err != nil {
+			return fmt.Errorf("--%s: %w", f.Flag, err)
+		}
 	case Bool:
 		val, _ := cmd.Flags().GetBool(f.Flag)
 		setBoolField(field, val)
@@ -410,17 +446,32 @@ func setFieldFromFlag(cmd *cobra.Command, f FieldDef, obj any) error {
 	return nil
 }
 
-func setStringField(field reflect.Value, val string) {
+func setStringField(field reflect.Value, val string) error {
 	if field.Kind() == reflect.Pointer {
 		if val == "" {
-			return
+			return nil
 		}
 		ptr := reflect.New(field.Type().Elem())
-		ptr.Elem().SetString(val)
+		if err := setStringField(ptr.Elem(), val); err != nil {
+			return err
+		}
 		field.Set(ptr)
-	} else {
-		field.SetString(val)
+		return nil
 	}
+	if field.Type() == timeType {
+		if val == "" {
+			return nil
+		}
+		t, err := time.Parse(time.RFC3339, val)
+		if err != nil {
+			return fmt.Errorf("want an RFC 3339 timestamp like 2026-01-02T15:04:05Z: %w", err)
+		}
+		// Same form jsonapi's rfc3339 tag sends on create, so update matches it.
+		field.Set(reflect.ValueOf(t.UTC().Truncate(time.Second)))
+		return nil
+	}
+	field.SetString(val)
+	return nil
 }
 
 func setStringSliceField(field reflect.Value, val []string) {
