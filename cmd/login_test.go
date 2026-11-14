@@ -16,23 +16,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// TestMain isolates the package from the developer's HOME and TERRAKUBE_* env.
-func TestMain(m *testing.M) {
-	home, err := os.MkdirTemp("", "terrakube-cli-test-home")
-	if err != nil {
-		panic(err)
-	}
-	_ = os.Setenv("HOME", home)
-	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, envPrefix+"_") {
-			_ = os.Unsetenv(kv[:strings.Index(kv, "=")])
-		}
-	}
-	code := m.Run()
-	_ = os.RemoveAll(home)
-	os.Exit(code)
-}
-
 func orgListServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -356,4 +339,137 @@ func TestCmdTokenEnvBeatsConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCmdLoginMissingCredentials(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{"no url", []string{"--pat", "p"}, "--api-url or TERRAKUBE_API_URL is required"},
+		{"no pat", []string{"--api-url", "http://x"}, "--pat or TERRAKUBE_PAT is required"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetGlobalFlags()
+			cfg := filepath.Join(t.TempDir(), "cfg.yaml")
+
+			_, err := executeCommand(append([]string{"login", "--config", cfg}, tt.args...)...)
+			if err == nil || err.Error() != tt.wantErr {
+				t.Fatalf("error = %v, want %q", err, tt.wantErr)
+			}
+			if _, statErr := os.Stat(cfg); !os.IsNotExist(statErr) {
+				t.Errorf("config must not be written, stat err: %v", statErr)
+			}
+		})
+	}
+}
+
+func TestCmdLoginInvalidURL(t *testing.T) {
+	resetGlobalFlags()
+	cfg := filepath.Join(t.TempDir(), "cfg.yaml")
+
+	_, err := executeCommand("login", "--config", cfg, "--api-url", "http://[::1", "--pat", "p")
+	if err == nil || !strings.Contains(err.Error(), "creating client") {
+		t.Fatalf("expected creating client error, got %v", err)
+	}
+}
+
+func TestCmdLoginServerRejectsToken(t *testing.T) {
+	resetGlobalFlags()
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer ts.Close()
+	cfg := filepath.Join(t.TempDir(), "cfg.yaml")
+
+	_, err := executeCommand("login", "--config", cfg, "--api-url", ts.URL, "--pat", "bad")
+	if err == nil || !strings.Contains(err.Error(), "connecting to Terrakube server") || !strings.Contains(err.Error(), "401") {
+		t.Fatalf("expected connection error with 401, got %v", err)
+	}
+	if _, statErr := os.Stat(cfg); !os.IsNotExist(statErr) {
+		t.Errorf("config must not be written, stat err: %v", statErr)
+	}
+}
+
+func TestCmdLoginSaveFailures(t *testing.T) {
+	tests := []struct {
+		name    string
+		cfg     func(t *testing.T) string
+		wantErr string
+	}{
+		{
+			name:    "non-yaml config",
+			cfg:     func(t *testing.T) string { return filepath.Join(t.TempDir(), "cfg.json") },
+			wantErr: "must be YAML, not json",
+		},
+		{
+			name:    "malformed yaml",
+			cfg:     func(t *testing.T) string { return writeTempFile(t, "cfg.yaml", "a: [unclosed\n") },
+			wantErr: "parsing",
+		},
+		{
+			name:    "config is a directory",
+			cfg:     func(t *testing.T) string { return t.TempDir() },
+			wantErr: "is a directory",
+		},
+		{
+			name:    "directory does not exist",
+			cfg:     func(t *testing.T) string { return filepath.Join(t.TempDir(), "missing", "cfg.yaml") },
+			wantErr: "no such file or directory",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetGlobalFlags()
+			ts := orgListServer(t)
+			cfg := tt.cfg(t)
+
+			_, err := executeCommand("login", "--config", cfg, "--api-url", ts.URL, "--pat", "p")
+			if err == nil || !strings.Contains(err.Error(), "saving configuration") || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("expected saving configuration error containing %q, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestUpdateConfigNullYAMLTreatedAsEmpty(t *testing.T) {
+	resetGlobalFlags()
+	t.Cleanup(resetGlobalFlags)
+	cfg := writeTempFile(t, "cfg.yaml", "~\n")
+	cfgFile = cfg
+
+	err := updateConfig(func(s map[string]any) { s["k"] = "v" })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := readConfig(t, cfg); got["k"] != "v" {
+		t.Errorf("config = %v, want k=v", got)
+	}
+}
+
+func TestUpdateConfigNoHome(t *testing.T) {
+	resetGlobalFlags()
+	t.Cleanup(resetGlobalFlags)
+	cfgFile = ""
+	t.Setenv("HOME", "")
+
+	if err := updateConfig(func(map[string]any) {}); err == nil {
+		t.Fatal("expected error when home directory is unknown")
+	}
+}
+
+func TestUpdateConfigCreatesFileWith0600(t *testing.T) {
+	resetGlobalFlags()
+	t.Cleanup(resetGlobalFlags)
+	cfgFile = filepath.Join(t.TempDir(), "cfg.yaml")
+
+	if err := updateConfig(func(s map[string]any) { s["k"] = "v" }); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := readConfig(t, cfgFile); got["k"] != "v" {
+		t.Errorf("config = %v, want k=v", got)
+	}
+	assertMode0600(t, cfgFile)
 }
