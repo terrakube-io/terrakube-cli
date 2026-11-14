@@ -160,7 +160,7 @@ terrakube --version
 
 ### Prerequisites
 
-- [Go](https://go.dev/) 1.26 or higher
+- [Go](https://go.dev/) 1.27 or higher
 
 ### Compiling the Binary
 
@@ -378,6 +378,10 @@ terrakube variable create \
 Changes in behaviour that can affect existing scripts:
 
 - `job create` / `job update`: the job log field flag is now `--job-output`. `--output` is always the global output format and is validated before any API call.
+- `job create`: `--command`/`-c` is replaced by `--template-reference`/`-t` (the template ID to run). The server never accepted `command`.
+- Flags for attributes the API does not expose are removed: `webhook --path/--branch/--template-id/--event` (use `webhook-event`), `vcs --refresh-token/--token-expiration`, `address --type`, `agent --type`.
+- `github-app-token --expires-at` takes an RFC 3339 timestamp (`2026-01-02T15:04:05Z`). Dates print as UTC RFC 3339 timestamps.
+- A path in `api_url` is now kept as a prefix: `https://host/terrakube` sends requests to `https://host/terrakube/api/v1/...`. Before, the path was dropped, so an `api_url` ending in `/api/v1` must lose that suffix.
 - Empty lists print `[]` in JSON instead of `null`.
 - The config file only provides `api_url` and `token`. Other keys in it no longer fill flags.
 - Environment variables no longer fill field flags (`--name`, `--id`, `--description`, ...). Only parent-scope flags, `--output`, and `--hide-nulls` are read from `TERRAKUBE_*` variables.

@@ -36,7 +36,7 @@ func init() {
 			},
 		},
 		Fields: []resource.FieldDef{
-			{StructField: "Command", Flag: "command", Short: "c", Type: resource.String, Required: true, Description: "Command to execute (plan, apply, destroy)"},
+			{StructField: "TemplateReference", Flag: "template-reference", Short: "t", Type: resource.String, Required: true, Description: "Template ID to run, not its name (see: terrakube template list)"},
 			{StructField: "Output", Flag: "job-output", Type: resource.String, Description: "Job output log"},
 			{StructField: "Status", Flag: "status", Type: resource.String, Description: "Job status"},
 			{StructField: "CommitID", Flag: "commit-id", Type: resource.String, Description: "VCS commit ID"},

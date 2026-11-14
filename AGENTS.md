@@ -4,7 +4,7 @@
 
 Terrakube CLI (`terrakube`) is a command-line tool for managing Terrakube Server resources: organizations, workspaces, modules, variables, teams, and jobs. It handles the full Terraform lifecycle (plan, apply, destroy) through the Terrakube API.
 
-- **Language**: Go 1.26
+- **Language**: Go 1.27
 - **Module path**: `terrakube`
 - **CLI framework**: [cobra](https://github.com/spf13/cobra) + [viper](https://github.com/spf13/viper)
 - **API client**: [github.com/terrakube-io/terrakube-go](https://github.com/terrakube-io/terrakube-go) (JSON:API via [google/jsonapi](https://github.com/google/jsonapi))
@@ -69,7 +69,7 @@ mise run vulncheck      # govulncheck ./...
 mise run check          # all of the above
 ```
 
-Dev environment: `mise install` sets up Go 1.26.11, golangci-lint 2.15.0, govulncheck, gofumpt. Lint config is `.golangci.yml` (gofumpt formatter).
+Dev environment: `mise install` sets up Go 1.27.4, golangci-lint 2.15.0, govulncheck, gofumpt. Lint config is `.golangci.yml` (gofumpt formatter).
 
 ## CI/CD
 

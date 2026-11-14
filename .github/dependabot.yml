@@ -8,3 +8,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      # All codeql-action steps must share one version or CodeQL fails.
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"

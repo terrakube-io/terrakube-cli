@@ -7,6 +7,7 @@ import (
 	"io"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/google/jsonapi"
 	"github.com/kataras/tablewriter"
@@ -237,6 +238,9 @@ func formatFieldValue(v reflect.Value) string {
 			return ""
 		}
 		elem := v.Elem()
+		if t, ok := elem.Interface().(time.Time); ok {
+			return t.Format(time.RFC3339)
+		}
 		switch elem.Kind() {
 		case reflect.String:
 			return elem.String()

@@ -39,8 +39,8 @@ func TestCmdJobListE2E(t *testing.T) {
 	if !strings.Contains(out, "plan") {
 		t.Errorf("expected output to contain 'plan', got: %s", out)
 	}
-	if !strings.Contains(out, "apply") {
-		t.Errorf("expected output to contain 'apply', got: %s", out)
+	if !strings.Contains(out, "Apply complete") {
+		t.Errorf("expected output to contain 'Apply complete', got: %s", out)
 	}
 }
 
@@ -94,7 +94,7 @@ func TestCmdJobCreateE2E(t *testing.T) {
 		"job", "create",
 		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--workspace-id", "d4e5f6a7-b8c9-0123-defa-234567890123",
-		"--command", "plan",
+		"--template-reference", "tpl-plan",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -116,8 +116,8 @@ func TestCmdJobCreateE2E(t *testing.T) {
 	if !ok {
 		t.Fatal("expected request body data to contain attributes")
 	}
-	if attrs["command"] != "plan" {
-		t.Errorf("expected command 'plan', got %v", attrs["command"])
+	if attrs["templateReference"] != "tpl-plan" {
+		t.Errorf("expected templateReference 'tpl-plan', got %v", attrs["templateReference"])
 	}
 	relationships, ok := data["relationships"].(map[string]interface{})
 	if !ok {
@@ -202,7 +202,7 @@ func TestCmdJobCreateTargetAndReplaceAddrs(t *testing.T) {
 		"job", "create",
 		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--workspace-id", "d4e5f6a7-b8c9-0123-defa-234567890123",
-		"--command", "apply",
+		"--template-reference", "tpl-apply",
 		"--target-addrs", "module.vpc.aws_subnet.public[0]",
 		"--replace-addrs", "aws_instance.web",
 	)
@@ -233,14 +233,14 @@ func TestCmdJobCreateOutputFlags(t *testing.T) {
 		"job", "create",
 		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--workspace-id", "d4e5f6a7-b8c9-0123-defa-234567890123",
-		"--command", "plan",
+		"--template-reference", "tpl-plan",
 		"--job-output", "log-text",
 		"--output", "table",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if strings.HasPrefix(strings.TrimSpace(out), "{") || !strings.Contains(out, "plan") {
+	if strings.HasPrefix(strings.TrimSpace(out), "{") || !strings.Contains(out, "completed") {
 		t.Errorf("expected table output, got: %s", out)
 	}
 

@@ -254,17 +254,17 @@ func TestCmdTeamCreateMissingOrgId(t *testing.T) {
 	}
 }
 
-func TestCmdJobCreateMissingCommand(t *testing.T) {
+func TestCmdJobCreateMissingTemplateReference(t *testing.T) {
 	resetGlobalFlags()
 	ts := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
 	defer ts.Close()
 
 	_, err := executeCommand("job", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
-		t.Fatal("expected error for job create without --command, got nil")
+		t.Fatal("expected error for job create without --template-reference, got nil")
 	}
-	if !strings.Contains(err.Error(), "command") {
-		t.Errorf("expected error to mention command, got: %v", err)
+	if !strings.Contains(err.Error(), "template-reference") {
+		t.Errorf("expected error to mention template-reference, got: %v", err)
 	}
 }
 
@@ -273,7 +273,7 @@ func TestCmdJobCreateMissingOrgId(t *testing.T) {
 	ts := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
 	defer ts.Close()
 
-	_, err := executeCommand("job", "create", "--command", "plan", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
+	_, err := executeCommand("job", "create", "--template-reference", "tpl-plan", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
 		t.Fatal("expected error for job create without --organization, got nil")
 	}

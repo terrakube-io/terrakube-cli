@@ -58,7 +58,7 @@ func TestCmdWebhookEventDeleteE2E(t *testing.T) {
 		if r.Method != http.MethodDelete {
 			t.Errorf("expected DELETE, got %s", r.Method)
 		}
-		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/workspace/b2c3d4e5-f6a7-8901-bcde-f12345678901/webhook/b8c9d0e1-f2a3-4567-bcde-678901234567/event/we-789") {
+		if !strings.Contains(r.URL.Path, "organization/a1b2c3d4-e5f6-7890-abcd-ef1234567890/workspace/b2c3d4e5-f6a7-8901-bcde-f12345678901/webhook/b8c9d0e1-f2a3-4567-bcde-678901234567/events/we-789") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusNoContent)
