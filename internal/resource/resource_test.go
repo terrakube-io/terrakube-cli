@@ -171,11 +171,16 @@ func TestRegister_CreateRequiredFlags(t *testing.T) {
 	if nameFlag == nil {
 		t.Fatal("expected --name flag on create")
 	}
+	if _, ok := nameFlag.Annotations[cobra.BashCompOneRequiredFlag]; !ok {
+		t.Error("expected --name to be marked required on create")
+	}
 
-	// Check that description is NOT required on create
 	descFlag := createCmd.Flags().Lookup("description")
 	if descFlag == nil {
 		t.Fatal("expected --description flag on create")
+	}
+	if _, ok := descFlag.Annotations[cobra.BashCompOneRequiredFlag]; ok {
+		t.Error("expected --description not to be required on create")
 	}
 }
 

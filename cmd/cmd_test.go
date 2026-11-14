@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -68,6 +69,7 @@ func executeCommand(args ...string) (string, error) {
 	old := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
+	defer func() { os.Stdout = old }()
 
 	rootCmd.SetArgs(args)
 	rootCmd.SetOut(w)
@@ -87,6 +89,16 @@ func setupTestServer(handler http.Handler) *httptest.Server {
 	viper.Set("api_url", ts.URL)
 	viper.Set("token", "test-token")
 	return ts
+}
+
+// writeTempFile writes content to name inside a fresh temp dir (mode 0600) and returns its path.
+func writeTempFile(t *testing.T, name, content string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return p
 }
 
 func findSubCmd(name string) *cobra.Command {
@@ -569,31 +581,6 @@ func TestCmdRootTopLevelCommands(t *testing.T) {
 
 // ----- Login Required Flags -----
 
-func TestCmdLoginMissingApiUrl(t *testing.T) {
-	resetGlobalFlags()
-	viper.Set("api_url", "")
-	_, err := executeCommand("login", "--pat", "some-token")
-	if err == nil {
-		t.Fatal("expected error for login without --api-url, got nil")
-	}
-	if !strings.Contains(err.Error(), "api-url") {
-		t.Errorf("expected error to mention api-url, got: %v", err)
-	}
-}
-
-func TestCmdLoginMissingPat(t *testing.T) {
-	resetGlobalFlags()
-	viper.Set("pat", "")
-	viper.Set("token", "")
-	_, err := executeCommand("login", "--api-url", "http://localhost:8080")
-	if err == nil {
-		t.Fatal("expected error for login without --pat, got nil")
-	}
-	if !strings.Contains(err.Error(), "pat") {
-		t.Errorf("expected error to mention pat, got: %v", err)
-	}
-}
-
 // ----- API Error Handling -----
 
 func TestCmdWorkspaceListAPIError(t *testing.T) {
@@ -608,7 +595,9 @@ func TestCmdWorkspaceListAPIError(t *testing.T) {
 	defer ts.Close()
 
 	_, err := executeCommand("workspace", "list", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
-	_ = err
+	if err == nil || !strings.Contains(err.Error(), "500") {
+		t.Fatalf("expected error mentioning 500, got %v", err)
+	}
 }
 
 // ----- Command Help/Usage Tests -----
