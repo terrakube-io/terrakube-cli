@@ -143,6 +143,7 @@ var routeCases = []routeCase{
 // routeNotChecked lists resource-shaped commands this table deliberately skips.
 var routeNotChecked = map[string]string{
 	"team-token": "hand-written command on /access-token/v1/teams, covered by team_token_test.go",
+	"pat":        "hand-written command on /pat/v1, covered by pat_test.go",
 }
 
 func (c routeCase) verbList() []string {
