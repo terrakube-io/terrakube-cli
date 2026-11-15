@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -24,7 +26,7 @@ func init() {
 		Use:   "state pull|outputs|rollback|diff",
 		Short: "read, compare and roll back a workspace's Terraform state",
 	}
-	stateCmd.AddCommand(newStatePullCmd(), newStateOutputsCmd(), newStateRollbackCmd())
+	stateCmd.AddCommand(newStatePullCmd(), newStateOutputsCmd(), newStateRollbackCmd(), newStateDiffCmd())
 	rootCmd.AddCommand(stateCmd)
 }
 
@@ -288,4 +290,178 @@ func (s *stateScope) confirm(cmd *cobra.Command, h *terrakube.History) error {
 		return fmt.Errorf("confirmation did not match %q: nothing changed", name)
 	}
 	return nil
+}
+
+// stateDiff is what changed from one state version to another: resource
+// instances by address, and outputs by name. It holds no values, so nothing
+// sensitive is printed.
+type stateDiff struct {
+	Resources diffSet `json:"resources" yaml:"resources"`
+	Outputs   diffSet `json:"outputs" yaml:"outputs"`
+}
+
+type diffSet struct {
+	Added   []string `json:"added" yaml:"added"`
+	Removed []string `json:"removed" yaml:"removed"`
+	Changed []string `json:"changed" yaml:"changed"`
+}
+
+func newStateDiffCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "diff <workspace> <history-id-a> <history-id-b>",
+		Short: "list the resources and outputs added, removed or changed between two state versions",
+		Long: `Compare two state versions (see: history list) of a workspace: resource instances
+by address (a change is any change of their attributes) and outputs by name.
+Values are never printed.
+
+The default is text, one "+ added", "- removed" or "~ changed" line per address.
+An explicit --output json or yaml prints {resources, outputs} with added, removed
+and changed lists; table and tsv print one change, kind, address row each.`,
+		Args:         cobra.ExactArgs(3),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := newStateScope(cmd, args[0])
+			if err != nil {
+				return err
+			}
+			resA, outA, err := s.readState(args[1])
+			if err != nil {
+				return err
+			}
+			resB, outB, err := s.readState(args[2])
+			if err != nil {
+				return err
+			}
+			d := stateDiff{Resources: diffMaps(resA, resB), Outputs: diffMaps(outA, outB)}
+			switch {
+			case !cmd.Flags().Changed("output"):
+				return writeDiffText(os.Stdout, d)
+			case output == "table" || output == "tsv":
+				return outputpkg.RenderRows(os.Stdout, []string{"change", "kind", "address"}, d.rows(), output)
+			default:
+				return outputpkg.Render(os.Stdout, d, output)
+			}
+		},
+	}
+	resource.AddScopeFlags(cmd, orgScope)
+	return cmd
+}
+
+// readState returns the resource instances (address to attributes) and the
+// outputs (name to output) of a state version's raw state.
+func (s *stateScope) readState(version string) (resources, outputs map[string]any, err error) {
+	body, err := s.open(version, terrakube.StateRaw)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer body.Close() //nolint:errcheck // read-only body
+	var st struct {
+		Outputs   map[string]any `json:"outputs"`
+		Resources []struct {
+			Module    string `json:"module"`
+			Mode      string `json:"mode"`
+			Type      string `json:"type"`
+			Name      string `json:"name"`
+			Instances []struct {
+				IndexKey   any `json:"index_key"`
+				Attributes any `json:"attributes"`
+			} `json:"instances"`
+		} `json:"resources"`
+	}
+	dec := json.NewDecoder(body)
+	dec.UseNumber()
+	if err := dec.Decode(&st); err != nil {
+		return nil, nil, fmt.Errorf("state version %s: %w", version, err)
+	}
+	resources = map[string]any{}
+	for _, r := range st.Resources {
+		base := r.Type + "." + r.Name
+		if r.Mode == "data" {
+			base = "data." + base
+		}
+		if r.Module != "" {
+			base = r.Module + "." + base
+		}
+		for _, inst := range r.Instances {
+			resources[base+indexSuffix(inst.IndexKey)] = inst.Attributes
+		}
+	}
+	return resources, st.Outputs, nil
+}
+
+// indexSuffix is the address suffix of an instance key: [0] for count,
+// ["key"] for for_each, nothing for a single instance.
+func indexSuffix(key any) string {
+	switch k := key.(type) {
+	case nil:
+		return ""
+	case string:
+		return "[" + strconv.Quote(k) + "]"
+	default:
+		return fmt.Sprintf("[%v]", k)
+	}
+}
+
+// diffMaps returns the keys only in b (added), only in a (removed) and in both
+// with different values (changed), each sorted.
+func diffMaps(a, b map[string]any) diffSet {
+	d := diffSet{Added: []string{}, Removed: []string{}, Changed: []string{}}
+	for k, va := range a {
+		vb, ok := b[k]
+		switch {
+		case !ok:
+			d.Removed = append(d.Removed, k)
+		case !reflect.DeepEqual(va, vb):
+			d.Changed = append(d.Changed, k)
+		}
+	}
+	for k := range b {
+		if _, ok := a[k]; !ok {
+			d.Added = append(d.Added, k)
+		}
+	}
+	slices.Sort(d.Added)
+	slices.Sort(d.Removed)
+	slices.Sort(d.Changed)
+	return d
+}
+
+// rows returns one change, kind, address row per difference.
+func (d stateDiff) rows() [][]string {
+	var rows [][]string
+	for _, sec := range []struct {
+		kind string
+		set  diffSet
+	}{{"resource", d.Resources}, {"output", d.Outputs}} {
+		for _, ch := range []struct {
+			name  string
+			addrs []string
+		}{{"added", sec.set.Added}, {"removed", sec.set.Removed}, {"changed", sec.set.Changed}} {
+			for _, a := range ch.addrs {
+				rows = append(rows, []string{ch.name, sec.kind, a})
+			}
+		}
+	}
+	return rows
+}
+
+func writeDiffText(w io.Writer, d stateDiff) error {
+	var b strings.Builder
+	for _, sec := range []struct {
+		title string
+		set   diffSet
+	}{{"Resources", d.Resources}, {"Outputs", d.Outputs}} {
+		fmt.Fprintf(&b, "%s: %d added, %d removed, %d changed\n", sec.title, len(sec.set.Added), len(sec.set.Removed), len(sec.set.Changed))
+		for _, a := range sec.set.Added {
+			fmt.Fprintf(&b, "  + %s\n", a)
+		}
+		for _, a := range sec.set.Removed {
+			fmt.Fprintf(&b, "  - %s\n", a)
+		}
+		for _, a := range sec.set.Changed {
+			fmt.Fprintf(&b, "  ~ %s\n", a)
+		}
+	}
+	_, err := io.WriteString(w, b.String())
+	return err
 }

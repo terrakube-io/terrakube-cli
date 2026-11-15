@@ -447,6 +447,19 @@ terrakube state pull prod -o my-org --version <HISTORY_ID> -f old.tfstate
 
 `state rollback prod <HISTORY_ID> -o my-org` makes that version the current state, as the UI's rollback does. It asks you to type the workspace name; in scripts pass `--yes`. Without a terminal and without `--yes` it fails before any request.
 
+`state diff prod <HISTORY_ID_A> <HISTORY_ID_B> -o my-org` lists what changed from version A to version B: resource instances by address and outputs by name, never their values.
+
+```text
+Resources: 1 added, 1 removed, 1 changed
+  + aws_s3_bucket.logs[0]
+  - aws_instance.old
+  ~ module.net.aws_subnet.private["b"]
+Outputs: 0 added, 0 removed, 1 changed
+  ~ vpc_id
+```
+
+With an explicit `--output json` (or `yaml`) it prints `{"resources": {"added": [...], "removed": [...], "changed": [...]}, "outputs": {...}}`; `tsv` prints one `change kind address` line per difference.
+
 `state outputs prod -o my-org` prints the outputs of the newest state. With `--output json` (the default) it prints the same map as `terraform output -json`, so CI can read it with `jq -r .vpc_id.value`; `table` and `tsv` print one line per output. Sensitive values print as `(sensitive)` unless `--show-sensitive` is set.
 
 ## Breaking Changes

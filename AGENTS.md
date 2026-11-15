@@ -62,7 +62,7 @@ Hand-written commands (`login`, `logout`, `team-token`, `operations`, `job wait|
 
 ### Output rendering
 
-Call `output.Render(w, data, format)` from `internal/output/renderer.go`. Supports json, yaml, table, tsv, none formats. Table rendering uses reflection to extract struct fields; a to-one relation (except `organization`) becomes a column with the related ID, to-many relations are skipped. Empty lists render as `[]` in JSON.
+Call `output.Render(w, data, format)` from `internal/output/renderer.go`. For data that is not a resource struct (`state outputs`, `state diff`), build string rows and call `output.RenderRows` for table/tsv. `state diff` is the one command whose default is text: it prints json/yaml/table/tsv only when `--output` (or `TERRAKUBE_OUTPUT`) is set explicitly. Supports json, yaml, table, tsv, none formats. Table rendering uses reflection to extract struct fields; a to-one relation (except `organization`) becomes a column with the related ID, to-many relations are skipped. Empty lists render as `[]` in JSON.
 
 ## Building and Testing
 

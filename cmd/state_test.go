@@ -359,3 +359,148 @@ func TestCmdStateRollbackRefused(t *testing.T) {
 		})
 	}
 }
+
+// Two state versions: one resource removed, one added, two changed, the rest
+// equal; one output each added, removed and changed (a sensitive one).
+const (
+	diffStateA = `{"version":4,"serial":1,
+	"outputs":{"vpc_id":{"value":"vpc-1","type":"string"},"old":{"value":1,"type":"number"},"secret":{"value":"s3cr3t-a","type":"string","sensitive":true}},
+	"resources":[
+		{"mode":"managed","type":"aws_instance","name":"old","instances":[{"attributes":{"id":"i-1"}}]},
+		{"mode":"managed","type":"aws_vpc","name":"main","instances":[{"attributes":{"id":"vpc-1","cidr":"10.0.0.0/16"}}]},
+		{"module":"module.net","mode":"managed","type":"aws_subnet","name":"private","instances":[
+			{"index_key":"a","attributes":{"id":"s-a"}},{"index_key":"b","attributes":{"id":"s-b"}}]},
+		{"mode":"data","type":"aws_ami","name":"ubuntu","instances":[{"attributes":{"id":"ami-1"}}]}]}`
+	diffStateB = `{"version":4,"serial":2,
+	"outputs":{"vpc_id":{"value":"vpc-1","type":"string"},"bucket":{"value":"logs","type":"string"},"secret":{"value":"s3cr3t-b","type":"string","sensitive":true}},
+	"resources":[
+		{"mode":"managed","type":"aws_vpc","name":"main","instances":[{"attributes":{"id":"vpc-1","cidr":"10.1.0.0/16"}}]},
+		{"module":"module.net","mode":"managed","type":"aws_subnet","name":"private","instances":[
+			{"index_key":"a","attributes":{"id":"s-a"}},{"index_key":"b","attributes":{"id":"s-b2"}},{"index_key":"c","attributes":{"id":"s-c"}}]},
+		{"mode":"data","type":"aws_ami","name":"ubuntu","instances":[{"attributes":{"id":"ami-1"}}]},
+		{"mode":"managed","type":"aws_s3_bucket","name":"logs","instances":[{"index_key":0,"attributes":{"id":"b-1"}}]}]}`
+)
+
+func diffAPI(t *testing.T) *stateAPI {
+	t.Helper()
+	s := newStateAPI(t)
+	s.addVersion("h1", "v1", time.Now().Add(-time.Hour), diffStateA, "")
+	s.addVersion("h2", "v2", time.Now(), diffStateB, "")
+	return s
+}
+
+// AC-40: the default text output lists resource addresses and outputs as
+// added (+), removed (-) and changed (~), never values.
+func TestCmdStateDiffText(t *testing.T) {
+	resetGlobalFlags()
+	diffAPI(t)
+	out, err := executeCommand("state", "diff", "prod", "h1", "h2", "-o", polOrg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `Resources: 2 added, 1 removed, 2 changed
+  + aws_s3_bucket.logs[0]
+  + module.net.aws_subnet.private["c"]
+  - aws_instance.old
+  ~ aws_vpc.main
+  ~ module.net.aws_subnet.private["b"]
+Outputs: 1 added, 1 removed, 1 changed
+  + bucket
+  - old
+  ~ secret
+`
+	if out != want {
+		t.Errorf("got:\n%s\nwant:\n%s", out, want)
+	}
+}
+
+// AC-40: --output json, yaml and tsv give the same diff in structured form.
+func TestCmdStateDiffFormats(t *testing.T) {
+	cases := map[string]string{
+		"json": `{
+    "resources": {
+        "added": [],
+        "removed": [],
+        "changed": []
+    },
+    "outputs": {
+        "added": [
+            "bucket"
+        ],
+        "removed": [],
+        "changed": [
+            "secret"
+        ]
+    }
+}
+`,
+		"tsv": "added\toutput\tbucket\nchanged\toutput\tsecret\n",
+	}
+	for format, want := range cases {
+		t.Run(format, func(t *testing.T) {
+			resetGlobalFlags()
+			s := newStateAPI(t)
+			s.addVersion("h1", "v1", time.Now(), `{"outputs":{"secret":{"value":1,"sensitive":true}},"resources":[]}`, "")
+			s.addVersion("h2", "v2", time.Now(), `{"outputs":{"secret":{"value":2,"sensitive":true},"bucket":{"value":"x"}}}`, "")
+			out, err := executeCommand("state", "diff", "prod", "h1", "h2", "-o", polOrg, "--output", format)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if out != want {
+				t.Errorf("got:\n%s\nwant:\n%s", out, want)
+			}
+		})
+	}
+
+	resetGlobalFlags()
+	diffAPI(t)
+	out, err := executeCommand("state", "diff", polWs, "h1", "h2", "-o", polOrg, "--output", "yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range []string{"resources:\n", "    - aws_s3_bucket.logs[0]\n", "    - module.net.aws_subnet.private[\"b\"]\n", "outputs:\n", "    - secret\n"} {
+		if !strings.Contains(out, w) {
+			t.Errorf("yaml lacks %q:\n%s", w, out)
+		}
+	}
+	if strings.Contains(out, "s3cr3t") {
+		t.Errorf("a value leaked:\n%s", out)
+	}
+}
+
+func TestCmdStateDiffErrors(t *testing.T) {
+	cases := map[string]struct {
+		args []string
+		want string
+	}{
+		"unknown first":  {[]string{"prod", "nope", "h2"}, "not found"},
+		"unknown second": {[]string{"prod", "h1", "nope"}, "not found"},
+		"not json":       {[]string{"prod", "h1", "bad"}, "state version bad: "},
+		"unknown ws":     {[]string{"other", "h1", "h2"}, `workspace "other" not found`},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			resetGlobalFlags()
+			s := diffAPI(t)
+			s.addVersion("bad", "bad", time.Now(), "not json", "")
+			_, err := executeCommand(append([]string{"state", "diff", "-o", polOrg}, c.args...)...)
+			if err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("expected %q, got %v", c.want, err)
+			}
+		})
+	}
+}
+
+// TERRAKUBE_OUTPUT counts as an explicit --output.
+func TestCmdStateDiffOutputFromEnv(t *testing.T) {
+	resetGlobalFlags()
+	diffAPI(t)
+	t.Setenv("TERRAKUBE_OUTPUT", "tsv")
+	out, err := executeCommand("state", "diff", "prod", "h1", "h2", "-o", polOrg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(out, "added\tresource\taws_s3_bucket.logs[0]\n") || !strings.HasSuffix(out, "changed\toutput\tsecret\n") {
+		t.Errorf("got:\n%s", out)
+	}
+}
