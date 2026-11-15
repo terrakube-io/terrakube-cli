@@ -9,7 +9,7 @@ import (
 )
 
 func init() {
-	resource.Register(rootCmd, resource.Config[terrakube.Workspace]{
+	wsCmd := resource.Register(rootCmd, resource.Config[terrakube.Workspace]{
 		Runtime: resource.Runtime{
 			NewClient:  newClient,
 			GetContext: getContext,
@@ -61,4 +61,5 @@ func init() {
 		// The server stops a workspace's schedules and jobs only when deleted=true is set.
 		SoftDelete: &resource.SoftDelete{Attribute: "deleted", Done: "marked as deleted", Hard: true},
 	})
+	wsCmd.AddCommand(newWorkspaceLockCmd(true), newWorkspaceLockCmd(false))
 }

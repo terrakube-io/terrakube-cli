@@ -26,6 +26,7 @@ For full CLI reference documentation, visit our official guide at [https://docs.
   - [4. Create a Workspace (OpenTofu & Docker Compose)](#4-create-a-workspace-opentofu--docker-compose)
   - [5. Add Workspace Environment Variables & Tags](#5-add-workspace-environment-variables--tags)
   - [6. Configure Notifications (Slack / Teams / Webhook)](#6-configure-notifications-slack--teams--webhook)
+  - [7. Run a Plan or Apply and Wait for It](#7-run-a-plan-or-apply-and-wait-for-it)
 - [Breaking Changes](#breaking-changes)
 - [Contributing](#contributing)
 - [Security](#security)
@@ -372,6 +373,19 @@ terrakube variable create \
    ```
 
 ---
+
+### 7. Run a Plan or Apply and Wait for It
+
+`run plan|apply|destroy` starts a job on a workspace. The template decides what the job does: pass `-t` with a template name or ID, or set `TERRAKUBE_TEMPLATE_PLAN`, `TERRAKUBE_TEMPLATE_APPLY` or `TERRAKUBE_TEMPLATE_DESTROY`. Without either, `run apply` uses the workspace's default template.
+
+```bash
+terrakube run plan -o "my-org" -w "prod" -t "Plan" --target module.network --wait --timeout 30m
+echo $?   # 0 completed or no changes, 1 error, 2 failed, rejected or cancelled, 3 timed out
+```
+
+`job create --wait` and `job wait <job-id>` wait the same way, so a CI step can branch on the exit code. `job logs <job-id>` prints every step's log in order (`--step 200` for one step); `--follow` streams the running step until the job ends and exits with the same codes.
+
+A job waiting for approval is listed with `job list -o my-org -w prod --status waitingApproval` and handled with `job approve <job-id>`, `job reject <job-id>` or `job cancel <job-id>`. Each checks the job's current status first and changes nothing if it does not allow the action. `workspace lock prod -o my-org --reason "release freeze"` stops new runs on a workspace until `workspace unlock prod -o my-org`.
 
 ## Breaking Changes
 

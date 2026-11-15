@@ -513,3 +513,53 @@ func TestCheckFields_RelationshipNeedsRelationFieldAndType(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateCmd_AfterCreateReplacesRendering(t *testing.T) {
+	cfg := testConfig()
+	cfg.Create = func(context.Context, *terrakube.Client, []string, terrakube.Patch) (*testResource, error) {
+		return &testResource{ID: "c1", Name: "made"}, nil
+	}
+	cfg.CreateFlags = func(cmd *cobra.Command) { cmd.Flags().Bool("follow", false, "") }
+	var gotFollow bool
+	var gotID string
+	cfg.AfterCreate = func(cmd *cobra.Command, _ context.Context, _ *terrakube.Client, _ []string, created *testResource) error {
+		gotFollow, _ = cmd.Flags().GetBool("follow")
+		gotID = created.ID
+		return nil
+	}
+	out, err := runCmd(t, cfg, "create", "--organization", testOrgID, "--name", "n", "--follow")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !gotFollow || gotID != "c1" || out != "" {
+		t.Errorf("follow=%v id=%q out=%q", gotFollow, gotID, out)
+	}
+}
+
+func TestListCmd_ListFiltersAreANDedWithFilter(t *testing.T) {
+	cfg := testConfig()
+	cfg.ListFilters = []ListFilter{{Flag: "state", Attribute: "status", Description: "status"}}
+	var got string
+	cfg.List = func(_ context.Context, _ *terrakube.Client, _ []string, opts *terrakube.ListOptions) ([]*testResource, error) {
+		got = ""
+		if opts != nil {
+			got = opts.Filter
+		}
+		return nil, nil
+	}
+	for _, tt := range []struct {
+		args []string
+		want string
+	}{
+		{nil, ""},
+		{[]string{"--state", `a "b"`}, `status=="a \"b\""`},
+		{[]string{"--filter", "x==1", "--state", "on"}, `x==1;status=="on"`},
+	} {
+		if _, err := runCmd(t, cfg, append([]string{"list", "--organization", testOrgID}, tt.args...)...); err != nil {
+			t.Fatal(err)
+		}
+		if got != tt.want {
+			t.Errorf("%v: filter %q, want %q", tt.args, got, tt.want)
+		}
+	}
+}

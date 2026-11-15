@@ -24,6 +24,8 @@ cmd/
   team_token.go      # Hand-written commands (no generic CRUD shape)
   operations.go      # Hand-written: JSON:API atomic operations from --file
 internal/
+  exit/exit.go       # exit codes: 0 ok, 1 error, 2 job failed/rejected/cancelled, 3 timeout
+  jobwait/jobwait.go # Wait: poll a job until a final status (job wait, run --wait)
   output/renderer.go # Render(w, data, format): json, yaml, table, tsv, none
   resource/
     resource.go      # Config[T], Register[T](), flag/field population
@@ -39,12 +41,12 @@ Every resource is registered through `resource.Register[T](rootCmd, resource.Con
 - `Config[T]` holds Name, Aliases, Parents, Fields, and API closures (List/Get/Create/Update/Delete). Only non-nil closures get a subcommand.
 - `ParentScope` adds one flag per parent (e.g. `--organization`/`-o`, alias `--org`, hidden `--organization-id`). The value is used as-is if it is a UUID (or `RawID` is set), otherwise it goes through `Resolver`. Resolvers live in `cmd/resolvers.go`; new ones should use `resolveByName` with `nameFilter`.
 - `FieldDef` maps a flag to a struct field (String, Bool, Int, StringSlice), or to a to-one relationship (`Relationship`: `RelType` + optional `Resolver`; a UUID is used as is, a name goes through the resolver, `""` clears the link). On create, `Required` fields are enforced. Create and update send only explicitly set flags: the `Create`/`Update` closures get a `terrakube.Patch` and call the SDK's `CreateFields`/`UpdateFields`, so server defaults apply to unset fields and an explicit `false`/`0`/`""` is kept. An update with no field flag fails before any request.
-- List adds `--filter` (RSQL). Get, update, and delete take `--id`.
+- List adds `--filter` (RSQL); `Config.ListFilters` add flags such as `job list --status` that AND `attr=="value"` (quoted with `resource.QuoteRSQL`) onto it. Get, update, and delete take `--id`.
 - `SoftDelete` turns delete into an update of one attribute (`workspace`: `deleted`, with `--hard` for `DELETE`; `organization`: `disabled`, confirmed by typing the name or `--yes`). `resource.IsTerminal` and `resource.Stdin` are variables so tests can fake the prompt.
 - Field flags must not be named `output` (it is the global format flag); the job log field is `--job-output`.
 - Executor-only parts are hidden from `--help` but still work: `FieldDef.Hidden` for flags, `Config.HiddenVerbs` for subcommands (job/step/history/github-app-token writes the server allows only to executor or super-service tokens).
 
-Hand-written commands (`login`, `logout`, `team-token`, `operations`) call `newClient()` themselves.
+Hand-written commands (`login`, `logout`, `team-token`, `operations`, `job wait|logs|approve|reject|cancel`, `run plan|apply|destroy`, `workspace lock|unlock`) call `newClient()` themselves. Subcommands of a generated resource are added to the command `Register` returns (`jobCmd.AddCommand(newJobWaitCmd())`); `resource.AddScopeFlags`/`ResolveScope` give them the same parent flags. `Config.CreateFlags`/`AfterCreate` add flags to a generated create and take over its rendering (`job create --wait`). To end with an exit code other than 1, return an `*exit.Error`; `Execute` maps it through `run()`.
 
 ### Config, env, and flags
 

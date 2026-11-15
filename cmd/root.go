@@ -19,6 +19,7 @@ import (
 
 	terrakube "github.com/terrakube-io/terrakube-go"
 
+	"terrakube/internal/exit"
 	outputpkg "terrakube/internal/output"
 	"terrakube/internal/resource"
 )
@@ -60,7 +61,19 @@ and handle all the lifecycle (plan, apply, destroy).`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	cobra.CheckErr(rootCmd.Execute())
+	if code := run(); code != exit.OK {
+		os.Exit(code)
+	}
+}
+
+// run executes the root command, prints an error, and returns the exit code
+// (see internal/exit: 2 for a failed job, 3 for a timed-out wait).
+func run() int {
+	err := rootCmd.Execute()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+	}
+	return exit.Code(err)
 }
 
 func init() {
