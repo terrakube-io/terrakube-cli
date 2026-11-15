@@ -37,6 +37,10 @@ func init() {
 			{StructField: "IaCVersion", Flag: "iac-version", Short: "v", Type: resource.String, Description: "Terraform/Tofu version"},
 			{StructField: "ExecutionMode", Flag: "execution-mode", Short: "e", Type: resource.String, Description: "Execution mode (remote, local)"},
 			{StructField: "Deleted", Flag: "deleted", Type: resource.Bool, Description: "Mark workspace as deleted"},
+			{StructField: "Vcs", Flag: "vcs", Type: resource.Relationship, RelType: "vcs", Description: "VCS connection ID (\"\" clears it)"},
+			{StructField: "SSH", Flag: "ssh", Type: resource.Relationship, RelType: "ssh", Description: "SSH key ID (\"\" clears it)"},
+			{StructField: "Agent", Flag: "agent", Type: resource.Relationship, RelType: "agent", Description: "Agent pool ID (\"\" clears it)"},
+			{StructField: "Project", Flag: "project", Type: resource.Relationship, RelType: "project", Description: "Project ID (\"\" clears it)"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Workspace, error) {
 			return c.Workspaces.List(ctx, pIDs[0], opts)

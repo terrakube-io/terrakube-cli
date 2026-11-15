@@ -221,3 +221,76 @@ func TestCmdWorkspaceUpdateSendsOnlyChangedAttributes(t *testing.T) {
 		t.Errorf("PATCH body must not contain relationships, got: %s", capturedBody)
 	}
 }
+
+// captureWorkspaceWrite runs a workspace create/update and returns the request's data object.
+func captureWorkspaceWrite(t *testing.T, args ...string) map[string]interface{} {
+	t.Helper()
+	resetGlobalFlags()
+
+	var body []byte
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		if r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusCreated)
+		}
+		_ = jsonapi.MarshalPayload(w, testutil.FixtureWorkspace())
+	})
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	if _, err := executeCommand(append([]string{"workspace"}, args...)...); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var payload struct {
+		Data map[string]interface{} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		t.Fatalf("failed to parse body %q: %v", body, err)
+	}
+	return payload.Data
+}
+
+const (
+	testVcsID   = "e5f6a7b8-c9d0-1234-efab-345678901234"
+	testAgentID = "f6a7b8c9-d0e1-2345-fabc-456789012345"
+)
+
+// AC-4: relationship flags go out as JSON:API relationships in the same request.
+func TestCmdWorkspaceCreateSendsRelationships(t *testing.T) {
+	data := captureWorkspaceWrite(t, "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--name", "n", "--vcs", testVcsID, "--agent", testAgentID)
+
+	rels, _ := data["relationships"].(map[string]interface{})
+	if len(rels) != 2 {
+		t.Fatalf("expected relationships vcs and agent only, got %v", data["relationships"])
+	}
+	for name, want := range map[string]map[string]interface{}{
+		"vcs":   {"type": "vcs", "id": testVcsID},
+		"agent": {"type": "agent", "id": testAgentID},
+	} {
+		rel, _ := rels[name].(map[string]interface{})
+		got, _ := rel["data"].(map[string]interface{})
+		if got["type"] != want["type"] || got["id"] != want["id"] {
+			t.Errorf("relationship %s: got %v, want %v", name, rel, want)
+		}
+	}
+}
+
+// AC-5: an empty value clears the link ({"data": null}).
+func TestCmdWorkspaceUpdateClearsRelationship(t *testing.T) {
+	data := captureWorkspaceWrite(t, "update", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--id", "d4e5f6a7-b8c9-0123-defa-234567890123", "--agent", "")
+
+	rels, _ := data["relationships"].(map[string]interface{})
+	rel, ok := rels["agent"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected an agent relationship, got %v", data)
+	}
+	if d, present := rel["data"]; !present || d != nil {
+		t.Errorf("expected agent data null, got %v", rel)
+	}
+	if attrs, _ := data["attributes"].(map[string]interface{}); len(attrs) != 0 {
+		t.Errorf("expected no attributes, got %v", attrs)
+	}
+}

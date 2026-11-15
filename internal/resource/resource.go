@@ -24,6 +24,8 @@ const (
 	Bool
 	Int
 	StringSlice
+	// Relationship is a to-one JSON:API relationship set by ID or name; "" clears it.
+	Relationship
 )
 
 // ParentScope defines a parent resource for name-to-ID resolution.
@@ -46,6 +48,12 @@ type FieldDef struct {
 	Type        FieldType
 	Required    bool
 	Description string
+
+	// For Relationship fields: StructField names the relation field (its jsonapi
+	// tag gives the relationship name), RelType is the JSON:API type of the target,
+	// and Resolver turns a name into an ID (nil accepts UUIDs only).
+	RelType  string
+	Resolver func(ctx context.Context, c *terrakube.Client, parentIDs []string, name string) (string, error)
 }
 
 // EnvAnnotation is the flag annotation listing the flag names whose
@@ -196,7 +204,11 @@ func newCreateCmd[T any](cfg Config[T]) *cobra.Command {
 				return err
 			}
 
-			result, err := cfg.Create(ctx, client, parentIDs, changedPatch(cmd, cfg.Fields, resource))
+			patch := changedPatch(cmd, cfg.Fields, resource)
+			if err := addRelationships[T](ctx, client, cmd, cfg.Fields, parentIDs, &patch); err != nil {
+				return err
+			}
+			result, err := cfg.Create(ctx, client, parentIDs, patch)
 			if err != nil {
 				return err
 			}
@@ -235,6 +247,9 @@ func newUpdateCmd[T any](cfg Config[T]) *cobra.Command {
 			}
 
 			patch := changedPatch(cmd, cfg.Fields, resource)
+			if err := addRelationships[T](ctx, client, cmd, cfg.Fields, parentIDs, &patch); err != nil {
+				return err
+			}
 			if len(patch.Attributes) == 0 && len(patch.Relationships) == 0 {
 				return errors.New("nothing to update: set at least one field flag, see --help")
 			}
@@ -322,6 +337,9 @@ func checkFields[T any](fields []FieldDef) {
 			fits = ft.Kind() >= reflect.Int && ft.Kind() <= reflect.Int64
 		case StringSlice:
 			fits = ft == reflect.TypeFor[[]string]()
+		case Relationship:
+			tag := strings.Split(sf.Tag.Get("jsonapi"), ",")
+			fits = ft.Kind() == reflect.Struct && len(tag) > 1 && tag[0] == "relation" && f.RelType != ""
 		}
 		if !fits {
 			panic(fmt.Sprintf("%s.%s is %s, cannot hold flag --%s", t.Name(), f.StructField, sf.Type, f.Flag))
@@ -366,7 +384,7 @@ func addFieldFlags(cmd *cobra.Command, fields []FieldDef, forCreate bool) {
 		}
 
 		switch f.Type {
-		case String:
+		case String, Relationship:
 			cmd.Flags().StringP(f.Flag, f.Short, "", desc)
 		case Bool:
 			cmd.Flags().BoolP(f.Flag, f.Short, false, desc)
@@ -403,6 +421,8 @@ func setFieldFromFlag(cmd *cobra.Command, f FieldDef, obj any) error {
 	}
 
 	switch f.Type {
+	case Relationship:
+		// Sent as a relationship by addRelationships, not stored in the struct.
 	case String:
 		val, _ := cmd.Flags().GetString(f.Flag)
 		if err := setStringField(field, val); err != nil {
@@ -500,4 +520,36 @@ func changedPatch(cmd *cobra.Command, fields []FieldDef, obj any) terrakube.Patc
 		}
 	}
 	return p
+}
+
+// addRelationships adds the Relationship flags set on cmd to p: an ID as is, a
+// name through the field's Resolver, and "" as a cleared link.
+func addRelationships[T any](ctx context.Context, client *terrakube.Client, cmd *cobra.Command, fields []FieldDef, parentIDs []string, p *terrakube.Patch) error {
+	for _, f := range fields {
+		flag := cmd.Flags().Lookup(f.Flag)
+		if f.Type != Relationship || flag == nil || !flag.Changed {
+			continue
+		}
+		sf, _ := reflect.TypeFor[T]().FieldByName(f.StructField) // checked by checkFields
+		name := strings.Split(sf.Tag.Get("jsonapi"), ",")[1]
+		if p.Relationships == nil {
+			p.Relationships = map[string]terrakube.Relationship{}
+		}
+		val := flag.Value.String()
+		switch {
+		case val == "":
+			p.Relationships[name] = terrakube.Relationship{}
+		case IsUUID(val):
+			p.Relationships[name] = terrakube.Relationship{Type: f.RelType, ID: &val}
+		case f.Resolver == nil:
+			return fmt.Errorf("--%s: %q is not a UUID", f.Flag, val)
+		default:
+			id, err := f.Resolver(ctx, client, parentIDs, val)
+			if err != nil {
+				return err
+			}
+			p.Relationships[name] = terrakube.Relationship{Type: f.RelType, ID: &id}
+		}
+	}
+	return nil
 }

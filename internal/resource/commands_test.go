@@ -425,3 +425,91 @@ func TestUpdateCmd_NoFieldFlagsIsAnError(t *testing.T) {
 	_, err := runCmd(t, cfg, "update", "--organization", testOrgID, "--id", "x")
 	wantErr(t, err, "nothing to update: set at least one field flag, see --help")
 }
+
+type linkTarget struct {
+	ID string `jsonapi:"primary,target"`
+}
+
+type linkedResource struct {
+	ID     string      `jsonapi:"primary,linked"`
+	Name   string      `jsonapi:"attr,name"`
+	Target *linkTarget `jsonapi:"relation,target,omitempty"`
+}
+
+func linkedConfig(resolver func(context.Context, *terrakube.Client, []string, string) (string, error)) Config[linkedResource] {
+	return Config[linkedResource]{
+		Runtime: testRuntime(),
+		Name:    "linked",
+		Parents: []ParentScope{{Name: "organization", Flag: "organization", IDFlag: "organization-id"}},
+		Fields: []FieldDef{
+			{StructField: "Name", Flag: "name", Type: String},
+			{StructField: "Target", Flag: "target", Type: Relationship, RelType: "target", Resolver: resolver},
+		},
+	}
+}
+
+func TestRelationship_NameWithoutResolverIsAnError(t *testing.T) {
+	cfg := linkedConfig(nil)
+	cfg.Create = func(context.Context, *terrakube.Client, []string, terrakube.Patch) (*linkedResource, error) {
+		t.Error("Create must not be called")
+		return nil, nil
+	}
+	_, err := runCmd(t, cfg, "create", "--organization", testOrgID, "--target", "prod")
+	wantErr(t, err, `--target: "prod" is not a UUID`)
+}
+
+func TestRelationship_NameGoesThroughResolver(t *testing.T) {
+	const resolved = "11111111-2222-4333-8444-555555555555"
+	var gotParents []string
+	cfg := linkedConfig(func(_ context.Context, _ *terrakube.Client, parents []string, name string) (string, error) {
+		gotParents = parents
+		if name != "prod" {
+			t.Errorf("resolver got %q", name)
+		}
+		return resolved, nil
+	})
+	var got terrakube.Patch
+	cfg.Create = func(_ context.Context, _ *terrakube.Client, _ []string, p terrakube.Patch) (*linkedResource, error) {
+		got = p
+		return &linkedResource{ID: "l1"}, nil
+	}
+	if _, err := runCmd(t, cfg, "create", "--organization", testOrgID, "--target", "prod"); err != nil {
+		t.Fatal(err)
+	}
+	rel := got.Relationships["target"]
+	if rel.Type != "target" || rel.ID == nil || *rel.ID != resolved {
+		t.Errorf("relationship: %+v", rel)
+	}
+	if len(gotParents) != 1 || gotParents[0] != testOrgID {
+		t.Errorf("resolver parents: %v", gotParents)
+	}
+}
+
+func TestRelationship_ResolverErrorStopsTheWrite(t *testing.T) {
+	cfg := linkedConfig(func(context.Context, *terrakube.Client, []string, string) (string, error) {
+		return "", errors.New(`target "prod" not found`)
+	})
+	cfg.NewClient = func() (*terrakube.Client, error) { return realClient(t), nil }
+	cfg.Update = func(context.Context, *terrakube.Client, []string, string, terrakube.Patch) (*linkedResource, error) {
+		t.Error("Update must not be called")
+		return nil, nil
+	}
+	_, err := runCmd(t, cfg, "update", "--organization", testOrgID, "--id", "x", "--target", "prod")
+	wantErr(t, err, `target "prod" not found`)
+}
+
+func TestCheckFields_RelationshipNeedsRelationFieldAndType(t *testing.T) {
+	for name, f := range map[string]FieldDef{
+		"attr field":  {StructField: "Name", Flag: "name", Type: Relationship, RelType: "x"},
+		"no rel type": {StructField: "Target", Flag: "target", Type: Relationship},
+	} {
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Error("expected checkFields to panic")
+				}
+			}()
+			checkFields[linkedResource]([]FieldDef{f})
+		})
+	}
+}
