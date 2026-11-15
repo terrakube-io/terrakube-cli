@@ -22,7 +22,7 @@ func TestCmdWorkspaceTagListE2E(t *testing.T) {
 		}
 
 		tags := []*terrakube.WorkspaceTag{
-			{ID: "wt-1", TagID: "tag-prod-001"},
+			{ID: "wt-1", TagID: "e1f2a3b4-c5d6-4789-8abc-def012345678"},
 			{ID: "wt-2", TagID: "tag-staging-002"},
 		}
 		w.Header().Set("Content-Type", "application/vnd.api+json")
@@ -44,8 +44,8 @@ func TestCmdWorkspaceTagListE2E(t *testing.T) {
 	if !strings.Contains(out, "wt-1") {
 		t.Errorf("expected output to contain 'wt-1', got: %s", out)
 	}
-	if !strings.Contains(out, "tag-prod-001") {
-		t.Errorf("expected output to contain 'tag-prod-001', got: %s", out)
+	if !strings.Contains(out, "e1f2a3b4-c5d6-4789-8abc-def012345678") {
+		t.Errorf("expected output to contain 'e1f2a3b4-c5d6-4789-8abc-def012345678', got: %s", out)
 	}
 }
 
@@ -60,7 +60,7 @@ func TestCmdWorkspaceTagCreateE2E(t *testing.T) {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
-		tag := &terrakube.WorkspaceTag{ID: "wt-new", TagID: "tag-prod-001"}
+		tag := &terrakube.WorkspaceTag{ID: "wt-new", TagID: "e1f2a3b4-c5d6-4789-8abc-def012345678"}
 		w.Header().Set("Content-Type", "application/vnd.api+json")
 		_ = jsonapi.MarshalPayload(w, tag)
 	})
@@ -72,7 +72,7 @@ func TestCmdWorkspaceTagCreateE2E(t *testing.T) {
 		"workspace-tag", "create",
 		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--workspace-id", "b2c3d4e5-f6a7-8901-bcde-f12345678901",
-		"--tag-id", "tag-prod-001",
+		"--tag-id", "e1f2a3b4-c5d6-4789-8abc-def012345678",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

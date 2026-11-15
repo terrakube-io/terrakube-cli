@@ -26,15 +26,15 @@ func TestResolveByName(t *testing.T) {
 		wantErr string
 	}{
 		{name: "single match", items: one, lookup: "acme", want: "a"},
-		{name: "not found", lookup: "acme", wantErr: `no organization found with name "acme"`},
-		{name: "multiple", items: two, lookup: "acme", wantErr: `multiple organizations match name "acme", use --organization with the ID`},
+		{name: "not found", lookup: "acme", wantErr: `organization "acme" not found`},
+		{name: "multiple", items: two, lookup: "acme", wantErr: `multiple organizations match "acme": a, b; pass the ID instead`},
 		{name: "exact match among wildcard hits", items: []*terrakube.Organization{{ID: "x", Name: "acme-prod"}, {ID: "a", Name: "acme"}}, lookup: "acme", want: "a"},
-		{name: "wildcard is not a match", items: []*terrakube.Organization{{ID: "p", Name: "production"}}, lookup: "prod*", wantErr: `no organization found with name "prod*"`},
+		{name: "wildcard is not a match", items: []*terrakube.Organization{{ID: "p", Name: "production"}}, lookup: "prod*", wantErr: `organization "prod*" not found`},
 		{name: "list error", err: errors.New("boom"), lookup: "acme", wantErr: "boom"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := resolveByName(tt.items, tt.err, "organization", tt.lookup, fields)
+			got, err := resolveByName(tt.items, tt.err, "organization", tt.lookup, "", fields)
 			if tt.wantErr != "" {
 				if err == nil || err.Error() != tt.wantErr {
 					t.Fatalf("expected error %q, got %v", tt.wantErr, err)
@@ -175,7 +175,7 @@ func TestNamedParentResolverNotFound(t *testing.T) {
 
 	_, err := executeCommand("provider-version", "list", "--provider", "ghost",
 		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
-	if err == nil || !strings.Contains(err.Error(), `no provider found with name "ghost"`) {
+	if err == nil || !strings.Contains(err.Error(), `provider "ghost" not found in organization a1b2c3d4-e5f6-7890-abcd-ef1234567890`) {
 		t.Fatalf("expected not-found error, got %v", err)
 	}
 	if requests != 1 {

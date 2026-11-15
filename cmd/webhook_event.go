@@ -46,7 +46,7 @@ func init() {
 			{StructField: "Path", Flag: "path", Type: resource.String, Description: "Webhook event path"},
 			{StructField: "PathType", Flag: "path-type", Type: resource.String, Description: "Path matching type (REGEX, EXACT, GLOB)"},
 			{StructField: "Priority", Flag: "priority", Type: resource.Int, Description: "Priority"},
-			{StructField: "TemplateID", Flag: "template-id", Type: resource.String, Description: "Template ID"},
+			{StructField: "TemplateID", Flag: "template-id", Type: resource.String, Resolver: templateResolver, Description: "Template, by name or ID"},
 			{StructField: "PRWorkflowEnabled", Flag: "pr-workflow-enabled", Type: resource.Bool, Description: "Whether PR workflow is enabled"},
 			{StructField: "PRApplyEnabled", Flag: "pr-apply-enabled", Type: resource.Bool, Description: "Whether PR apply is enabled"},
 		},

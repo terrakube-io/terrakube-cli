@@ -51,7 +51,8 @@ type FieldDef struct {
 
 	// For Relationship fields: StructField names the relation field (its jsonapi
 	// tag gives the relationship name), RelType is the JSON:API type of the target,
-	// and Resolver turns a name into an ID (nil accepts UUIDs only).
+	// and Resolver turns a name into an ID (nil accepts UUIDs only). A String field
+	// with a Resolver holds an ID in an attribute; a name given to it is resolved.
 	RelType  string
 	Resolver func(ctx context.Context, c *terrakube.Client, parentIDs []string, name string) (string, error)
 }
@@ -523,15 +524,27 @@ func changedPatch(cmd *cobra.Command, fields []FieldDef, obj any) terrakube.Patc
 }
 
 // addRelationships adds the Relationship flags set on cmd to p: an ID as is, a
-// name through the field's Resolver, and "" as a cleared link.
+// name through the field's Resolver, and "" as a cleared link. It also resolves
+// names given to String fields that have a Resolver (attributes holding an ID).
 func addRelationships[T any](ctx context.Context, client *terrakube.Client, cmd *cobra.Command, fields []FieldDef, parentIDs []string, p *terrakube.Patch) error {
 	for _, f := range fields {
 		flag := cmd.Flags().Lookup(f.Flag)
-		if f.Type != Relationship || flag == nil || !flag.Changed {
+		if flag == nil || !flag.Changed || f.Resolver == nil && f.Type != Relationship {
 			continue
 		}
 		sf, _ := reflect.TypeFor[T]().FieldByName(f.StructField) // checked by checkFields
 		name := strings.Split(sf.Tag.Get("jsonapi"), ",")[1]
+		if f.Type == String {
+			// An attribute holding an ID (e.g. defaultTemplate): resolve a name to it.
+			if val := flag.Value.String(); val != "" && !IsUUID(val) {
+				id, err := f.Resolver(ctx, client, parentIDs, val)
+				if err != nil {
+					return err
+				}
+				p.Attributes[name] = id
+			}
+			continue
+		}
 		if p.Relationships == nil {
 			p.Relationships = map[string]terrakube.Relationship{}
 		}

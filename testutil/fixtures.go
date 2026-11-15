@@ -214,7 +214,7 @@ func FixtureVCSList() []*terrakube.VCS {
 func FixtureWorkspaceTag() *terrakube.WorkspaceTag {
 	return &terrakube.WorkspaceTag{
 		ID:    "wt1a2b3c-d4e5-6789-abcd-ef1234567890",
-		TagID: "tag-prod-001",
+		TagID: "e1f2a3b4-c5d6-4789-8abc-def012345678",
 	}
 }
 

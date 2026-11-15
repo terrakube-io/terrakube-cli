@@ -94,7 +94,7 @@ func TestCmdJobCreateE2E(t *testing.T) {
 		"job", "create",
 		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--workspace-id", "d4e5f6a7-b8c9-0123-defa-234567890123",
-		"--template-reference", "tpl-plan",
+		"--template-reference", "c3d4e5f6-a7b8-4901-9cde-f12345678901",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -116,8 +116,8 @@ func TestCmdJobCreateE2E(t *testing.T) {
 	if !ok {
 		t.Fatal("expected request body data to contain attributes")
 	}
-	if attrs["templateReference"] != "tpl-plan" {
-		t.Errorf("expected templateReference 'tpl-plan', got %v", attrs["templateReference"])
+	if attrs["templateReference"] != "c3d4e5f6-a7b8-4901-9cde-f12345678901" {
+		t.Errorf("expected templateReference 'c3d4e5f6-a7b8-4901-9cde-f12345678901', got %v", attrs["templateReference"])
 	}
 	relationships, ok := data["relationships"].(map[string]interface{})
 	if !ok {
@@ -202,7 +202,7 @@ func TestCmdJobCreateTargetAndReplaceAddrs(t *testing.T) {
 		"job", "create",
 		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--workspace-id", "d4e5f6a7-b8c9-0123-defa-234567890123",
-		"--template-reference", "tpl-apply",
+		"--template-reference", "c3d4e5f6-a7b8-4901-9cde-f12345678902",
 		"--target-addrs", "module.vpc.aws_subnet.public[0]",
 		"--replace-addrs", "aws_instance.web",
 	)
@@ -233,7 +233,7 @@ func TestCmdJobCreateOutputFlags(t *testing.T) {
 		"job", "create",
 		"--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
 		"--workspace-id", "d4e5f6a7-b8c9-0123-defa-234567890123",
-		"--template-reference", "tpl-plan",
+		"--template-reference", "c3d4e5f6-a7b8-4901-9cde-f12345678901",
 		"--job-output", "log-text",
 		"--output", "table",
 	)

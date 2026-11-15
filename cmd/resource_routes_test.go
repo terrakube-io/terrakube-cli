@@ -63,7 +63,7 @@ var routeCases = []routeCase{
 		cmd: "implementation", typ: "implementation", parents: []string{"organization", "provider", "provider-version"},
 		base: routeOrg + "provider/{2}/version/{3}/implementation", create: []string{"--arch", "a", "--filename", "f", "--os", "o"},
 	},
-	{cmd: "job", typ: "job", parents: []string{"organization", "workspace"}, base: routeOrg + "job", create: []string{"--template-reference", "t"}},
+	{cmd: "job", typ: "job", parents: []string{"organization", "workspace"}, base: routeOrg + "job", create: []string{"--template-reference", "77777777-7777-4777-8777-777777777777"}},
 	{cmd: "module", typ: "module", parents: []string{"organization"}, base: routeOrg + "module", create: []string{"--name", "n"}},
 	{cmd: "module-version", typ: "module_version", parents: []string{"organization", "module"}, base: routeOrg + "module/{2}/version", create: []string{"--version", "1.0.0"}},
 	{
@@ -109,9 +109,9 @@ var routeCases = []routeCase{
 	// The schedule API is keyed by workspace alone; the org flag is not part of the path.
 	{
 		cmd: "workspace-schedule", typ: "schedule", parents: []string{"organization", "workspace"}, base: "workspace/{2}/schedule",
-		create: []string{"--schedule", "0 0 * * *", "--template-id", "t"},
+		create: []string{"--schedule", "0 0 * * *", "--template-id", "77777777-7777-4777-8777-777777777777"},
 	},
-	{cmd: "workspace-tag", typ: "workspacetag", parents: []string{"organization", "workspace"}, base: routeOrgWs + "workspaceTag", create: []string{"--tag-id", "t"}},
+	{cmd: "workspace-tag", typ: "workspacetag", parents: []string{"organization", "workspace"}, base: routeOrgWs + "workspaceTag", create: []string{"--tag-id", "77777777-7777-4777-8777-777777777777"}},
 }
 
 // routeNotChecked lists resource-shaped commands this table deliberately skips.

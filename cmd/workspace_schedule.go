@@ -37,7 +37,7 @@ func init() {
 		},
 		Fields: []resource.FieldDef{
 			{StructField: "Schedule", Flag: "schedule", Type: resource.String, Required: true, Description: "Cron expression"},
-			{StructField: "TemplateID", Flag: "template-id", Type: resource.String, Required: true, Description: "Template reference ID"},
+			{StructField: "TemplateID", Flag: "template-id", Type: resource.String, Required: true, Resolver: templateResolver, Description: "Template, by name or ID"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.WorkspaceSchedule, error) {
 			return c.WorkspaceSchedules.List(ctx, pIDs[1], opts)
