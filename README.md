@@ -29,6 +29,7 @@ For full CLI reference documentation, visit our official guide at [https://docs.
   - [7. Run a Plan or Apply and Wait for It](#7-run-a-plan-or-apply-and-wait-for-it)
   - [8. Enforce Policies](#8-enforce-policies)
   - [9. Other Resource Fields](#9-other-resource-fields)
+  - [10. Work with State](#10-work-with-state)
 - [Breaking Changes](#breaking-changes)
 - [Contributing](#contributing)
 - [Security](#security)
@@ -432,6 +433,17 @@ terrakube job approve 42 -o my-org
 - Registry: `module-version` and `provider-version` take `--status DEPRECATED --deprecation-message "..."`; `provider` takes `--registry-namespace` (needed with `--imported`); `module` takes `--vcs` and `--ssh` (names or IDs) for private repositories.
 - Jobs: `job create --variables region=eu-west-1 --variables size=3` passes run variables to that job only.
 - `workspace-schedule` takes `--enabled` and `--description`, `workspace-tag` takes `--value`, and `variable` takes `--incomplete`.
+
+### 10. Work with State
+
+`state` reads a workspace's Terraform state through the API with your token, so no `curl` is needed. Workspaces are given by name or ID.
+
+```bash
+terrakube state pull prod -o my-org > prod.tfstate             # current state, byte for byte
+terrakube state pull prod -o my-org --version <HISTORY_ID> -f old.tfstate
+```
+
+`--version` takes an ID from `history list` and writes that version's raw state (the same format as without it). The CLI only sends the token to the configured API: if a history entry points at another host, `state pull` fails with exit code 1 and sends nothing there.
 
 ## Breaking Changes
 
