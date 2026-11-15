@@ -3,9 +3,10 @@ package resource
 import (
 	"context"
 	"testing"
+	"time"
 
-	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
+	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
 type testResource struct {
@@ -17,8 +18,8 @@ type testResource struct {
 
 func testRuntime() Runtime {
 	return Runtime{
-		NewClient:  func() *terrakube.Client { return nil },
-		GetContext:  func() context.Context { return context.Background() },
+		NewClient:  func() (*terrakube.Client, error) { return nil, nil },
+		GetContext: func() context.Context { return context.Background() },
 		GetOutput:  func() string { return "json" },
 	}
 }
@@ -38,10 +39,18 @@ func testConfig() Config[testResource] {
 			{StructField: "Desc", Flag: "description", Short: "d", Type: String, Description: "widget description"},
 			{StructField: "Flag", Flag: "flag", Short: "f", Type: Bool, Description: "widget flag"},
 		},
-		List:   func(_ context.Context, _ *terrakube.Client, _ []string, _ *terrakube.ListOptions) ([]*testResource, error) { return nil, nil },
-		Get:    func(_ context.Context, _ *terrakube.Client, _ []string, _ string) (*testResource, error) { return nil, nil },
-		Create: func(_ context.Context, _ *terrakube.Client, _ []string, _ *testResource) (*testResource, error) { return nil, nil },
-		Update: func(_ context.Context, _ *terrakube.Client, _ []string, _ *testResource) (*testResource, error) { return nil, nil },
+		List: func(_ context.Context, _ *terrakube.Client, _ []string, _ *terrakube.ListOptions) ([]*testResource, error) {
+			return nil, nil
+		},
+		Get: func(_ context.Context, _ *terrakube.Client, _ []string, _ string) (*testResource, error) {
+			return nil, nil
+		},
+		Create: func(_ context.Context, _ *terrakube.Client, _ []string, _ terrakube.Patch) (*testResource, error) {
+			return nil, nil
+		},
+		Update: func(_ context.Context, _ *terrakube.Client, _ []string, _ string, _ terrakube.Patch) (*testResource, error) {
+			return nil, nil
+		},
 		Delete: func(_ context.Context, _ *terrakube.Client, _ []string, _ string) error { return nil },
 	}
 }
@@ -88,8 +97,10 @@ func TestRegister_OnlyListAndDelete(t *testing.T) {
 		Runtime: testRuntime(),
 		Name:    "partial",
 		Fields:  []FieldDef{},
-		List:    func(_ context.Context, _ *terrakube.Client, _ []string, _ *terrakube.ListOptions) ([]*testResource, error) { return nil, nil },
-		Delete:  func(_ context.Context, _ *terrakube.Client, _ []string, _ string) error { return nil },
+		List: func(_ context.Context, _ *terrakube.Client, _ []string, _ *terrakube.ListOptions) ([]*testResource, error) {
+			return nil, nil
+		},
+		Delete: func(_ context.Context, _ *terrakube.Client, _ []string, _ string) error { return nil },
 	}
 	Register(root, cfg)
 
@@ -160,11 +171,16 @@ func TestRegister_CreateRequiredFlags(t *testing.T) {
 	if nameFlag == nil {
 		t.Fatal("expected --name flag on create")
 	}
+	if _, ok := nameFlag.Annotations[cobra.BashCompOneRequiredFlag]; !ok {
+		t.Error("expected --name to be marked required on create")
+	}
 
-	// Check that description is NOT required on create
 	descFlag := createCmd.Flags().Lookup("description")
 	if descFlag == nil {
 		t.Fatal("expected --description flag on create")
+	}
+	if _, ok := descFlag.Annotations[cobra.BashCompOneRequiredFlag]; ok {
+		t.Error("expected --description not to be required on create")
 	}
 }
 
@@ -221,7 +237,7 @@ func TestPopulateFields(t *testing.T) {
 	}
 
 	r := &testResource{}
-	if err := populateFields(cmd, fields, r); err != nil {
+	if err := populateChangedFields(cmd, fields, r); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -246,8 +262,9 @@ func TestPopulateFields_EmptyStringLeavesPointerNil(t *testing.T) {
 		{StructField: "Desc", Flag: "description", Type: String},
 	}
 
+	_ = cmd.Flags().Set("description", "")
 	r := &testResource{}
-	if err := populateFields(cmd, fields, r); err != nil {
+	if err := populateChangedFields(cmd, fields, r); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -286,5 +303,48 @@ func TestSetStructField(t *testing.T) {
 	setStructField(r, "ID", "abc-123")
 	if r.ID != "abc-123" {
 		t.Errorf("expected ID 'abc-123', got %q", r.ID)
+	}
+}
+
+func TestCheckFieldsPanicsOnUnknownOrMismatchedField(t *testing.T) {
+	for _, f := range []FieldDef{
+		{StructField: "Gone", Flag: "gone", Type: String},
+		{StructField: "Flag", Flag: "flag", Type: String},
+	} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("checkFields(%s) did not panic", f.StructField)
+				}
+			}()
+			checkFields[testResource]([]FieldDef{f})
+		}()
+	}
+	checkFields[testResource](testConfig().Fields) // valid fields must not panic
+}
+
+func TestSetFieldFromFlagParsesTime(t *testing.T) {
+	type timed struct{ At *time.Time }
+	f := FieldDef{StructField: "At", Flag: "at", Type: String}
+	checkFields[timed]([]FieldDef{f})
+
+	cmd := &cobra.Command{}
+	addFieldFlags(cmd, []FieldDef{f}, false)
+
+	var got timed
+	if err := setFieldFromFlag(cmd, f, &got); err != nil || got.At != nil {
+		t.Fatalf("unset flag: got %v, err %v", got.At, err)
+	}
+	_ = cmd.Flags().Set("at", "2026-01-02T15:04:05Z")
+	if err := setFieldFromFlag(cmd, f, &got); err != nil || got.At == nil || !got.At.Equal(time.Date(2026, 1, 2, 15, 4, 5, 0, time.UTC)) {
+		t.Fatalf("got %v, err %v", got.At, err)
+	}
+	_ = cmd.Flags().Set("at", "2026-01-02T17:04:05.9+02:00")
+	if err := setFieldFromFlag(cmd, f, &got); err != nil || got.At.Format(time.RFC3339Nano) != "2026-01-02T15:04:05Z" {
+		t.Fatalf("want UTC whole seconds, got %v, err %v", got.At, err)
+	}
+	_ = cmd.Flags().Set("at", "tomorrow")
+	if err := setFieldFromFlag(cmd, f, &got); err == nil {
+		t.Fatal("expected error for non-RFC 3339 value")
 	}
 }

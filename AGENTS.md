@@ -4,67 +4,68 @@
 
 Terrakube CLI (`terrakube`) is a command-line tool for managing Terrakube Server resources: organizations, workspaces, modules, variables, teams, and jobs. It handles the full Terraform lifecycle (plan, apply, destroy) through the Terrakube API.
 
-- **Language**: Go 1.26 (module minimum: 1.25)
+- **Language**: Go 1.27
 - **Module path**: `terrakube`
 - **CLI framework**: [cobra](https://github.com/spf13/cobra) + [viper](https://github.com/spf13/viper)
 - **API client**: [github.com/terrakube-io/terrakube-go](https://github.com/terrakube-io/terrakube-go) (JSON:API via [google/jsonapi](https://github.com/google/jsonapi))
 - **Config**: `~/.terrakube-cli.yaml` or `--config` flag
-- **Auth**: Bearer token via config or `TERRAKUBE_TOKEN` env var
+- **Auth**: `terrakube login` (PAT) or `terrakube login --web` (browser, OAuth with PKCE) stores `api_url` and `token`; commands read them from the config or `TERRAKUBE_API_URL` / `TERRAKUBE_TOKEN`
 - **Output formats**: json (default), yaml, table, tsv, none
 
 ## Architecture
 
 ```
 main.go              # Entry point, calls cmd.Execute()
-cmd/                 # Cobra command definitions
-  root.go            # Root command, config init, output rendering
-  <resource>.go      # Parent command for each resource (organization, workspace, etc.)
-  <resource>_<verb>.go  # Hand-written subcommands: create, list, update, delete
-  template.go        # Framework-registered resource (via resource.Register)
-  vcs.go             # Framework-registered resource
-  workspace_tag.go   # Framework-registered resource
+cmd/
+  root.go            # Root command, config init, env handling, --output validation, newClient()
+  login.go logout.go # Write/remove credentials in the config file
+  login_web.go       # login --web: login.v1 discovery, PKCE, loopback callback, token request
+  resolvers.go       # Name-to-ID resolvers for parent flags (resolveByName + quoted RSQL nameFilter)
+  <resource>.go      # One file per resource, each calls resource.Register
+  team_token.go      # Hand-written commands (no generic CRUD shape)
+  operations.go      # Hand-written: JSON:API atomic operations from --file
 internal/
-  output/            # Output rendering (json, yaml, table, tsv, none)
-    renderer.go      # Render(w, data, format) function
-  resource/          # Generic resource framework
-    resource.go      # Config[T], Register[T](), field population
-    resolve.go       # Parent scope name resolution
-testutil/            # Test infrastructure
-  server.go          # HTTP test server for API mocking
-  assertions.go      # Common test assertion helpers
-  fixtures.go        # Shared test data
+  exit/exit.go       # exit codes: 0 ok, 1 error, 2 job failed/rejected/cancelled, 3 timeout
+  jobwait/jobwait.go # Wait: poll a job until a final status (job wait, run --wait)
+  output/renderer.go # Render(w, data, format): json, yaml, table, tsv, none
+  resource/
+    resource.go      # Config[T], Register[T](), flag/field population
+    resolve.go       # Parent scope resolution (UUID passthrough or Resolver)
+testutil/            # HTTP test server, assertions, fixtures
+tests/e2e_operations.bats  # End-to-end suite against a live server
 ```
 
-### Two patterns for resources
+### Resource framework
 
-**Hand-written (legacy)** -- used by organization, workspace, module, variable, team, job. Each verb is a separate file (`cmd/<resource>_<verb>.go`) with its own Cobra command, flag setup, and API call.
+Every resource is registered through `resource.Register[T](rootCmd, resource.Config[T]{...})` in `cmd/<resource>.go`. See `cmd/template.go` for a complete example.
 
-**Framework (preferred for new resources)** -- used by template, vcs, workspace-tag. A single `cmd/<resource>.go` file calls `resource.Register[T]()` with a `resource.Config[T]` struct. The framework generates list, get, create, update, and delete subcommands automatically.
+- `Config[T]` holds Name, Aliases, Parents, Fields, and API closures (List/Get/Create/Update/Delete). Only non-nil closures get a subcommand.
+- `ParentScope` adds one flag per parent (e.g. `--organization`/`-o`, alias `--org`, hidden `--organization-id`). The value is used as-is if it is a UUID (or `RawID` is set), otherwise it goes through `Resolver`. Resolvers live in `cmd/resolvers.go`; new ones should use `resolveByName` with `nameFilter`.
+- `FieldDef` maps a flag to a struct field (String, Bool, Int, StringSlice, `StringMap` for repeated `KEY=VALUE` flags such as `job --variables`), to a to-one relationship (`Relationship`: `RelType` + optional `Resolver`; a UUID is used as is, a name goes through the resolver, `""` clears the link) or to a to-many one (`RelationshipMany`: the IDs or names replace the whole set, `""` empties it). `FileFlag` gives a String field a second flag that reads the value from a file (`template --content-file`); the two exclude each other. On create, `Required` fields are enforced. Create and update send only explicitly set flags: the `Create`/`Update` closures get a `terrakube.Patch` and call the SDK's `CreateFields`/`UpdateFields`, so server defaults apply to unset fields and an explicit `false`/`0`/`""` is kept. An update with no field flag fails before any request.
+- List adds `--filter` (RSQL); `Config.ListFilters` add flags such as `job list --status` that AND `attr=="value"` (quoted with `resource.QuoteRSQL`) onto it. Get, update, and delete take `--id`.
+- `SoftDelete` turns delete into an update of one attribute (`workspace`: `deleted`, with `--hard` for `DELETE`; `organization`: `disabled`, confirmed by typing the name or `--yes`). `resource.IsTerminal` and `resource.Stdin` are variables so tests can fake the prompt.
+- A create that needs exactly one of several flags (`policy-attachment --workspace|--project|--tag`) marks them on the subcommands `Register` returns with Cobra's `MarkFlagsOneRequired`/`MarkFlagsMutuallyExclusive` (`oneTarget` in `cmd/policy_attachment.go`), so a wrong combination fails before any request.
+- Field flags must not be named `output` (it is the global format flag); the job log field is `--job-output`.
+- Executor-only parts are hidden from `--help` but still work: `FieldDef.Hidden` for flags, `Config.HiddenVerbs` for subcommands (job/step/history/github-app-token writes the server allows only to executor or super-service tokens).
 
-### Framework details
+Hand-written commands (`login`, `logout`, `team-token`, `operations`, `job wait|logs|approve|reject|cancel`, `run plan|apply|destroy`, `workspace lock|unlock`, `state ...`) call `newClient()` themselves. `state` subcommands share `newStateScope` (`cmd/state.go`): `-o` plus a workspace argument, name or ID; state files are read through the SDK's `State` service, which never sends the token off the API endpoint (`ErrForeignHost`). Subcommands of a generated resource are added to the command `Register` returns (`jobCmd.AddCommand(newJobWaitCmd())`); `resource.AddScopeFlags`/`ResolveScope` give them the same parent flags. `Config.CreateFlags`/`AfterCreate` add flags to a generated create and take over its rendering (`job create --wait`). To end with an exit code other than 1, return an `*exit.Error`; `Execute` maps it through `run()`.
 
-- `resource.Config[T]` holds Name, Aliases, Parents, Fields, and API closures (List/Get/Create/Update/Delete).
-- `resource.ParentScope` defines parent resources (e.g., organization) with `--<parent>-id` and `--<parent>-name` flags. Name flags use a `Resolver` function for automatic name-to-ID resolution.
-- `resource.FieldDef` maps CLI flags to struct fields with type safety (String, Bool, Int).
-- `resource.Register[T]()` creates a parent command and up to 5 subcommands. Only non-nil API closures get subcommands.
-- On create, all `Required` fields are enforced. On update, only flags that were explicitly set are applied.
-- Output is handled by `internal/output.Render(w, data, format)`.
+### Config, env, and flags
 
-### Adding a new resource (framework pattern)
-
-Create `cmd/<resource>.go` with an `init()` that calls `resource.Register[T]()`. Typical registration is ~30 lines. See `cmd/template.go` for a complete example.
-
-### Adding a new subcommand (hand-written pattern)
-
-Follow existing `cmd/<resource>_<verb>.go` pattern. Register as subcommand of the resource parent. Use `viper` for flag binding with env var support (`TERRAKUBE_` prefix).
-
-### Flag handling
-
-Flags are bound to viper. Environment variables use the `TERRAKUBE_` prefix. Config file values are lowest priority, then env vars, then flags.
+- Config file: `~/.terrakube-cli.yaml` or `--config`. `login` writes only `api_url` and `token` (mode 0600, other keys kept); `logout` removes `token`. Both also remove the Dex refresh data below.
+- `login` takes `--api-url`/`-a` and `--pat`/`-t`, falling back to `TERRAKUBE_API_URL` / `TERRAKUBE_PAT`.
+- `login --web` (excludes `--pat`) reads `login.v1` from `<api_url>/.well-known/terraform.json` and runs the authorization code flow with PKCE (S256) and a `state` check. The callback is `http://localhost:<port>/login` on the first free port of the advertised `ports` range (bound on 127.0.0.1); `--timeout` (default 5m) bounds the wait. The URL is always printed; `openBrowser` (a variable, `open`/`xdg-open`/`rundll32`) is replaced in tests, which fake the server with httptest. `--api-url` falls back to `TERRAKUBE_API_URL`, then the config's `api_url`. Busy ports, a wrong `state`, `error=` in the callback, a failed token request or the timeout end with exit 1 and nothing saved. login.v1 comes in two variants: the Terrakube broker (`<api>/oauth/authorize`, client `terraform-cli`, ports 10000-10010) returns a Terrakube token that lives as long as the user chose on the consent page (no refresh token); Dex (`<dex>/auth?scope=...offline_access...`, ports 10000-10001) returns a short-lived access token and a `refresh_token`.
+- Dex refresh (`cmd/token_refresh.go`): when the token response has a `refresh_token`, `setSession` also saves `refresh_token`, `token_expires_at` (Unix seconds, from `expires_in`), `token_endpoint` and `client_id`; a response without one (the broker) removes them. `newClient` calls `refreshSavedToken` first: if the token comes from the config (no `TERRAKUBE_TOKEN`/`TERRAKUBE_PAT`), has refresh data and expires within a minute, it posts `grant_type=refresh_token` to `token_endpoint`, saves the new tokens (mode 0600; the old refresh token is kept if the response has none) and updates viper so the rest of the run uses them. Any refresh failure returns exactly `session expired, run terrakube login --web` (exit 1). A PAT (no refresh data) is never touched.
+- Other commands read `api_url` from `TERRAKUBE_API_URL` or the config. The token comes from `TERRAKUBE_TOKEN`, then `TERRAKUBE_PAT`, then the config `token`. If either value is missing the command fails with "not logged in".
+- `applyEnv` (`cmd/root.go`) fills a flag from `TERRAKUBE_<FLAG>` (uppercase, `-` to `_`) only when the flag was not set explicitly, and only for:
+  - parent-scope flags, via `resource.EnvAnnotation` (e.g. `TERRAKUBE_ORGANIZATION` or `TERRAKUBE_ORGANIZATION_ID`, `TERRAKUBE_WORKSPACE` or `TERRAKUBE_WORKSPACE_ID`). This includes `Optional` parents: an exported `TERRAKUBE_WORKSPACE` scopes `notification-configuration` to that workspace;
+  - `--output` (`TERRAKUBE_OUTPUT`) and `--hide-nulls` (`TERRAKUBE_HIDE_NULLS`).
+- Field flags (`--name`, `--id`, `--description`, ...) are never read from env or the config file.
+- `--output` is validated before any API call.
 
 ### Output rendering
 
-Call `output.Render(w, data, format)` from `internal/output/renderer.go`. Supports json, yaml, table, tsv, none formats. Table rendering uses reflection to extract struct fields; fields tagged with `jsonapi "relation,..."` are skipped.
+Call `output.Render(w, data, format)` from `internal/output/renderer.go`. For data that is not a resource struct (`state outputs`, `state diff`), build string rows and call `output.RenderRows` for table/tsv. `state diff` is the one command whose default is text: it prints json/yaml/table/tsv only when `--output` (or `TERRAKUBE_OUTPUT`) is set explicitly. Supports json, yaml, table, tsv, none formats. Table rendering uses reflection to extract struct fields; a to-one relation (except `organization`) becomes a column with the related ID, to-many relations are skipped. Empty lists render as `[]` in JSON.
 
 ## Building and Testing
 
@@ -76,18 +77,19 @@ mise run vulncheck      # govulncheck ./...
 mise run check          # all of the above
 ```
 
-Dev environment: `mise install` sets up Go 1.26.11, golangci-lint, govulncheck, gofumpt.
+Dev environment: `mise install` sets up Go 1.27.4, golangci-lint 2.15.0, govulncheck, gofumpt. Lint config is `.golangci.yml` (gofumpt formatter).
 
 ## CI/CD
 
+All GitHub Actions are pinned by commit SHA. Dependabot (`.github/dependabot.yml`) updates Go modules and actions weekly.
+
 - **PR builds**: `.github/workflows/go.yml` - build, test (with `-race`), golangci-lint, govulncheck, `go mod tidy` check, coverage delta PR comment
 - **CodeQL**: `.github/workflows/codeql.yml` - SAST analysis on PRs and weekly
-- **Releases**: `.github/workflows/release.yml` - cross-compiles (linux/windows/darwin, 386/amd64), publishes to GitHub Releases, bumps Homebrew formula
+- **Releases**: `.github/workflows/release.yml` runs GoReleaser (`.goreleaser.yaml`) when a GitHub release is created: archives for linux and darwin (amd64, arm64) and windows (amd64, 386), the multi-arch `azbuilder/terrakube-cli` image on Docker Hub, and the `terrakube-cli` snap on the Snap Store (channel from the tag: `-rc` candidate, `-beta` beta, other pre-release edge, else stable)
 - **Pre-commit**: `.pre-commit-config.yaml` - golangci-lint, build, test, go mod tidy, govulncheck
 
 ## Conventions
 
-- Test infrastructure in `testutil/` (`server.go`, `assertions.go`, `fixtures.go`). Tests in `cmd/cmd_test.go`, `cmd/render_test.go`.
-- Error handling: use `cobra.CheckErr()` for fatal errors in commands, return errors from client methods.
-- Environment variable naming: `TERRAKUBE_<FLAG_NAME>` (uppercase, underscores).
+- Test infrastructure in `testutil/` (`server.go`, `assertions.go`, `fixtures.go`). Unit tests live next to the code (`cmd/<resource>_test.go`, `internal/*/*_test.go`).
+- Error handling: commands use `RunE` and return errors; do not exit from inside a command.
 - Commit messages: conventional commits format `type(scope): description`.

@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
-	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/google/jsonapi"
+	terrakube "github.com/terrakube-io/terrakube-go"
 
 	"terrakube/testutil"
 )
@@ -186,8 +187,8 @@ func TestCmdTemplateNameResolution(t *testing.T) {
 
 		if strings.Contains(r.URL.Path, "/organization") && !strings.Contains(r.URL.Path, "/template") {
 			resolverCalled = true
-			if !strings.Contains(r.URL.RawQuery, "name%3D%3Dacme-corp") && !strings.Contains(r.URL.RawQuery, "name==acme-corp") {
-				t.Errorf("expected org list filter with name==acme-corp, got query: %s", r.URL.RawQuery)
+			if q, _ := url.QueryUnescape(r.URL.RawQuery); !strings.Contains(q, `name=="acme-corp"`) {
+				t.Errorf(`expected org list filter with name=="acme-corp", got query: %s`, q)
 			}
 			org := &terrakube.Organization{ID: "resolved-org-id", Name: "acme-corp"}
 			_ = jsonapi.MarshalPayload(w, []*terrakube.Organization{org})

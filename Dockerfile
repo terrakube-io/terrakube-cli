@@ -1,4 +1,4 @@
-FROM dhi.io/golang:1.26-debian13-dev AS build
+FROM dhi.io/golang:1.27-debian13-dev AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download

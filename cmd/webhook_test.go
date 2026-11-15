@@ -41,8 +41,8 @@ func TestCmdWebhookListE2E(t *testing.T) {
 	if !strings.Contains(out, "wh1a2b3c") {
 		t.Errorf("expected output to contain 'wh1a2b3c', got: %s", out)
 	}
-	if !strings.Contains(out, "PUSH") {
-		t.Errorf("expected output to contain 'PUSH', got: %s", out)
+	if !strings.Contains(out, "gh-hook-789") {
+		t.Errorf("expected output to contain 'gh-hook-789', got: %s", out)
 	}
 }
 

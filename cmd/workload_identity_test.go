@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/google/jsonapi"
-	"github.com/spf13/viper"
 	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
@@ -22,6 +21,7 @@ func isolateOIDCEnv(t *testing.T) string {
 	t.Setenv("HOME", home)
 	t.Setenv("USERPROFILE", home) // os.UserHomeDir on Windows
 	t.Setenv("APPDATA", home)
+	cfgFile = "" // login writes <home>/.terrakube-cli.yaml
 	t.Setenv("TERRAKUBE_OIDC_TOKEN", "")
 	t.Setenv("ACTIONS_ID_TOKEN_REQUEST_URL", "")
 	t.Setenv("ACTIONS_ID_TOKEN_REQUEST_TOKEN", "")
@@ -75,7 +75,7 @@ func TestCmdLoginOIDCGitHubActionsWritesTerraformCredentials(t *testing.T) {
 	if err := os.MkdirAll(filepath.Dir(credsPath), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	existing := `{"credentials":{"app.terraform.io":{"token":"keep-me"}}}`
+	existing := `{"credentials":{"registry.example.com":{"token":"keep-me"}}}`
 	if err := os.WriteFile(credsPath, []byte(existing), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -85,8 +85,8 @@ func TestCmdLoginOIDCGitHubActionsWritesTerraformCredentials(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v (out=%s)", err, out)
 	}
-	if viper.GetString("token") != "gh-oidc-jwt" || viper.GetString("api_url") != ts.URL {
-		t.Errorf("unexpected config: api_url=%q token=%q", viper.GetString("api_url"), viper.GetString("token"))
+	if got := readConfig(t, filepath.Join(home, ".terrakube-cli.yaml")); got["token"] != "gh-oidc-jwt" || got["api_url"] != ts.URL {
+		t.Errorf("unexpected config: %v", got)
 	}
 
 	b, err := os.ReadFile(credsPath)
@@ -103,7 +103,7 @@ func TestCmdLoginOIDCGitHubActionsWritesTerraformCredentials(t *testing.T) {
 	if doc.Credentials[host].Token != "gh-oidc-jwt" {
 		t.Errorf("expected token for %s, got %s", host, b)
 	}
-	if doc.Credentials["app.terraform.io"].Token != "keep-me" {
+	if doc.Credentials["registry.example.com"].Token != "keep-me" {
 		t.Errorf("existing credentials were not preserved: %s", b)
 	}
 	if runtime.GOOS != "windows" {
@@ -275,5 +275,33 @@ func TestTerraformHost(t *testing.T) {
 		if _, err := terraformHost(in); err == nil {
 			t.Errorf("terraformHost(%q): expected error", in)
 		}
+	}
+}
+
+func TestCmdLoginWebAndTerraformCredentialsMutuallyExclusive(t *testing.T) {
+	resetGlobalFlags()
+	isolateOIDCEnv(t)
+	_, err := executeCommand("login", "-a", "http://localhost:1", "--web", "--terraform-credentials")
+	if err == nil || !strings.Contains(err.Error(), "none of the others can be") {
+		t.Fatalf("expected mutually exclusive flags error, got %v", err)
+	}
+}
+
+func TestCmdLoginOIDCClearsRefreshData(t *testing.T) {
+	resetGlobalFlags()
+	home := isolateOIDCEnv(t)
+	cfg := filepath.Join(home, ".terrakube-cli.yaml")
+	if err := os.WriteFile(cfg, []byte("token: dex\nrefresh_token: r\ntoken_expires_at: 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("TERRAKUBE_OIDC_TOKEN", "ci-jwt")
+	ts := terrakubeServer(t, "ci-jwt")
+
+	if _, err := executeCommand("login", "-a", ts.URL, "--oidc"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	got := readConfig(t, cfg)
+	if got["token"] != "ci-jwt" || got["refresh_token"] != nil || got["token_expires_at"] != nil {
+		t.Errorf("unexpected config: %v", got)
 	}
 }

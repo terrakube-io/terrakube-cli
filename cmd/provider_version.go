@@ -36,6 +36,8 @@ func init() {
 		Fields: []resource.FieldDef{
 			{StructField: "VersionNumber", Flag: "version-number", Type: resource.String, Required: true, Description: "Provider version number"},
 			{StructField: "Protocols", Flag: "protocols", Type: resource.String, Description: "Supported protocols"},
+			{StructField: "Status", Flag: "status", Type: resource.String, Description: "Version status, e.g. DEPRECATED"},
+			{StructField: "DeprecationMessage", Flag: "deprecation-message", Type: resource.String, Description: "Message shown for a deprecated version"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.ProviderVersion, error) {
 			return c.ProviderVersions.List(ctx, pIDs[0], pIDs[1], opts)
@@ -43,11 +45,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.ProviderVersion, error) {
 			return c.ProviderVersions.Get(ctx, pIDs[0], pIDs[1], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, v *terrakube.ProviderVersion) (*terrakube.ProviderVersion, error) {
-			return c.ProviderVersions.Create(ctx, pIDs[0], pIDs[1], v)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.ProviderVersion, error) {
+			return c.ProviderVersions.CreateFields(ctx, pIDs[0], pIDs[1], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, v *terrakube.ProviderVersion) (*terrakube.ProviderVersion, error) {
-			return c.ProviderVersions.Update(ctx, pIDs[0], pIDs[1], v)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.ProviderVersion, error) {
+			return c.ProviderVersions.UpdateFields(ctx, pIDs[0], pIDs[1], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.ProviderVersions.Delete(ctx, pIDs[0], pIDs[1], id)

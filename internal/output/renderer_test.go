@@ -141,9 +141,9 @@ func TestRenderTable_Single(t *testing.T) {
 	if !strings.Contains(out, "test-item") {
 		t.Errorf("expected table to contain Name, got:\n%s", out)
 	}
-	// Relation field should be skipped
-	if strings.Contains(out, "rel-1") {
-		t.Errorf("expected table to skip relation field, got:\n%s", out)
+	// AC-14: a to-one relation shows as a column with the related ID.
+	if !strings.Contains(out, "rel-1") {
+		t.Errorf("expected table to show the related ID, got:\n%s", out)
 	}
 }
 
@@ -239,5 +239,74 @@ func TestRenderTSV_BoolFormatting(t *testing.T) {
 	out := buf.String()
 	if !strings.Contains(out, "true") {
 		t.Errorf("expected true in tsv output, got:\n%s", out)
+	}
+}
+
+func TestExtractRows(t *testing.T) {
+	rows, headers := extractRows(resourceSlice())
+
+	wantHeaders := []string{"ID", "Name", "Description", "Active", "Count", "Related"}
+	if strings.Join(headers, ",") != strings.Join(wantHeaders, ",") {
+		t.Errorf("headers = %v, want %v (to-one relations as ID columns, no duplicates)", headers, wantHeaders)
+	}
+	wantRows := [][]string{
+		{"abc-123", "test-item", "a description", "true", "42", "rel-1"},
+		{"def-456", "other-item", "", "false", "0", ""},
+	}
+	if len(rows) != len(wantRows) {
+		t.Fatalf("got %d rows, want %d", len(rows), len(wantRows))
+	}
+	for i := range wantRows {
+		if strings.Join(rows[i], ",") != strings.Join(wantRows[i], ",") {
+			t.Errorf("row %d = %v, want %v", i, rows[i], wantRows[i])
+		}
+	}
+}
+
+func TestExtractRows_EmptySlice(t *testing.T) {
+	rows, headers := extractRows([]*sampleResource{})
+	if len(rows) != 0 {
+		t.Errorf("expected 0 rows, got %d", len(rows))
+	}
+	if len(headers) != 1 || headers[0] != "ID" {
+		t.Errorf("expected only ID header, got %v", headers)
+	}
+}
+
+func TestRenderJSON_EmptySlice(t *testing.T) {
+	for name, data := range map[string]any{
+		"nil":   []*sampleResource(nil),
+		"empty": []*sampleResource{},
+	} {
+		var buf bytes.Buffer
+		if err := Render(&buf, data, "json"); err != nil {
+			t.Fatalf("%s: unexpected error: %v", name, err)
+		}
+		if got := strings.TrimSpace(buf.String()); got != "[]" {
+			t.Errorf("%s: expected [], got %q", name, got)
+		}
+	}
+}
+
+type linked struct {
+	ID           string    `jsonapi:"primary,linked"`
+	Name         string    `jsonapi:"attr,name"`
+	Organization *nested   `jsonapi:"relation,organization,omitempty"`
+	Vcs          *nested   `jsonapi:"relation,vcs,omitempty"`
+	Jobs         []*nested `jsonapi:"relation,job,omitempty"`
+}
+
+// AC-14: to-one relations become ID columns; the organization (the scope the
+// user passed) and to-many relations stay out.
+func TestExtractRows_ToOneRelations(t *testing.T) {
+	rows, headers := extractRows(&linked{
+		ID: "w1", Name: "n", Organization: &nested{ID: "org"}, Vcs: &nested{ID: "vcs-1"},
+		Jobs: []*nested{{ID: "j1"}},
+	})
+	if got := strings.Join(headers, ","); got != "ID,Name,Vcs" {
+		t.Errorf("headers = %s", got)
+	}
+	if got := strings.Join(rows[0], ","); got != "w1,n,vcs-1" {
+		t.Errorf("row = %s", got)
 	}
 }

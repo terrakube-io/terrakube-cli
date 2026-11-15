@@ -36,7 +36,6 @@ func init() {
 		},
 		Fields: []resource.FieldDef{
 			{StructField: "Name", Flag: "name", Short: "n", Type: resource.String, Required: true, Description: "Address name"},
-			{StructField: "Type", Flag: "type", Type: resource.String, Required: true, Description: "Address type"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Address, error) {
 			return c.Addresses.List(ctx, pIDs[0], pIDs[1], opts)
@@ -44,11 +43,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.Address, error) {
 			return c.Addresses.Get(ctx, pIDs[0], pIDs[1], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, a *terrakube.Address) (*terrakube.Address, error) {
-			return c.Addresses.Create(ctx, pIDs[0], pIDs[1], a)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.Address, error) {
+			return c.Addresses.CreateFields(ctx, pIDs[0], pIDs[1], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, a *terrakube.Address) (*terrakube.Address, error) {
-			return c.Addresses.Update(ctx, pIDs[0], pIDs[1], a)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.Address, error) {
+			return c.Addresses.UpdateFields(ctx, pIDs[0], pIDs[1], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.Addresses.Delete(ctx, pIDs[0], pIDs[1], id)

@@ -2,14 +2,17 @@ package cmd
 
 import (
 	"context"
+	"os"
 
+	"github.com/spf13/cobra"
 	terrakube "github.com/terrakube-io/terrakube-go"
 
+	outputpkg "terrakube/internal/output"
 	"terrakube/internal/resource"
 )
 
 func init() {
-	resource.Register(rootCmd, resource.Config[terrakube.Job]{
+	jobCmd := resource.Register(rootCmd, resource.Config[terrakube.Job]{
 		Runtime: resource.Runtime{
 			NewClient:  newClient,
 			GetContext: getContext,
@@ -36,17 +39,18 @@ func init() {
 			},
 		},
 		Fields: []resource.FieldDef{
-			{StructField: "Command", Flag: "command", Short: "c", Type: resource.String, Required: true, Description: "Command to execute (plan, apply, destroy)"},
-			{StructField: "Output", Flag: "output", Type: resource.String, Description: "Job output log"},
+			{StructField: "TemplateReference", Flag: "template-reference", Short: "t", Type: resource.String, Required: true, Resolver: templateResolver, Description: "Template to run, by name or ID"},
+			{StructField: "Output", Flag: "job-output", Type: resource.String, Hidden: true, Description: "Job output log (executor only)"},
 			{StructField: "Status", Flag: "status", Type: resource.String, Description: "Job status"},
 			{StructField: "CommitID", Flag: "commit-id", Type: resource.String, Description: "VCS commit ID"},
 			{StructField: "OverrideBranch", Flag: "override-branch", Type: resource.String, Description: "Override branch"},
-			{StructField: "OverrideSource", Flag: "override-source", Type: resource.String, Description: "Override source repository"},
+			{StructField: "OverrideSource", Flag: "override-source", Type: resource.String, Hidden: true, Description: "Override source repository (executor only)"},
 			{StructField: "PlanChanges", Flag: "plan-changes", Type: resource.Bool, Description: "Whether plan contains changes"},
 			{StructField: "Refresh", Flag: "refresh", Type: resource.Bool, Description: "Whether to refresh state"},
 			{StructField: "RefreshOnly", Flag: "refresh-only", Type: resource.Bool, Description: "Refresh state only"},
 			{StructField: "TargetAddrs", Flag: "target-addrs", Type: resource.StringSlice, Description: "Target resource addresses"},
 			{StructField: "ReplaceAddrs", Flag: "replace-addrs", Type: resource.StringSlice, Description: "Replace resource addresses"},
+			{StructField: "Variables", Flag: "variables", Type: resource.StringMap, Description: "Run variable for this job only"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Job, error) {
 			return c.Jobs.List(ctx, pIDs[0], opts)
@@ -54,17 +58,35 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.Job, error) {
 			return c.Jobs.Get(ctx, pIDs[0], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, j *terrakube.Job) (*terrakube.Job, error) {
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.Job, error) {
 			if len(pIDs) > 1 && pIDs[1] != "" {
-				j.Workspace = &terrakube.Workspace{ID: pIDs[1]}
+				p.Relationships = map[string]terrakube.Relationship{"workspace": {Type: "workspace", ID: &pIDs[1]}}
 			}
-			return c.Jobs.Create(ctx, pIDs[0], j)
+			return c.Jobs.CreateFields(ctx, pIDs[0], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, j *terrakube.Job) (*terrakube.Job, error) {
-			return c.Jobs.Update(ctx, pIDs[0], j)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.Job, error) {
+			return c.Jobs.UpdateFields(ctx, pIDs[0], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.Jobs.Delete(ctx, pIDs[0], id)
 		},
+		// Only executor or super-service tokens may call these; the server answers 403 otherwise.
+		HiddenVerbs: []string{"delete"},
+		CreateFlags: func(cmd *cobra.Command) {
+			cmd.Flags().Bool("wait", false, "wait until the job reaches a final status (see: job wait)")
+			cmd.Flags().Duration("timeout", 0, "with --wait, give up after this long (0 waits without a limit)")
+		},
+		AfterCreate: func(cmd *cobra.Command, ctx context.Context, c *terrakube.Client, pIDs []string, created *terrakube.Job) error {
+			if wait, _ := cmd.Flags().GetBool("wait"); wait {
+				timeout, _ := cmd.Flags().GetDuration("timeout")
+				return waitForJob(ctx, c, pIDs[0], created.ID, timeout)
+			}
+			return outputpkg.Render(os.Stdout, created, output)
+		},
+		ListFilters: []resource.ListFilter{{Flag: "status", Attribute: "status", Description: "only jobs in this status, e.g. waitingApproval"}},
 	})
+	jobCmd.AddCommand(newJobWaitCmd(), newJobLogsCmd())
+	for _, a := range jobActions {
+		jobCmd.AddCommand(newJobActionCmd(a))
+	}
 }

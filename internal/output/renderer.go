@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/google/jsonapi"
 	"github.com/kataras/tablewriter"
@@ -51,9 +53,9 @@ func renderJSON(w io.Writer, data any) error {
 func marshalJSONAPI(data any) ([]byte, error) {
 	v := reflect.ValueOf(data)
 
-	// Handle nil/empty slices — return "null" to match old behavior.
+	// Empty or nil slices render as an empty JSON array.
 	if v.Kind() == reflect.Slice && v.Len() == 0 {
-		return json.MarshalIndent(nil, "", "    ")
+		return []byte("[]"), nil
 	}
 
 	if !isJSONAPIStruct(v) {
@@ -163,6 +165,29 @@ func renderYAML(w io.Writer, data any) error {
 
 func renderTable(w io.Writer, data any) error {
 	rows, headers := extractRows(data)
+	return writeTable(w, headers, rows)
+}
+
+func renderTSV(w io.Writer, data any) error {
+	rows, _ := extractRows(data)
+	return writeTSV(w, rows)
+}
+
+// RenderRows writes rows that are already strings as a table (with headers)
+// or as tsv (without), for data that is not a resource struct. Other formats
+// are an error: callers handle json, yaml and none themselves.
+func RenderRows(w io.Writer, headers []string, rows [][]string, format string) error {
+	switch format {
+	case "table":
+		return writeTable(w, headers, rows)
+	case "tsv":
+		return writeTSV(w, rows)
+	default:
+		return fmt.Errorf("RenderRows: unsupported format %q", format)
+	}
+}
+
+func writeTable(w io.Writer, headers []string, rows [][]string) error {
 	if len(rows) == 0 {
 		return nil
 	}
@@ -176,8 +201,7 @@ func renderTable(w io.Writer, data any) error {
 	return nil
 }
 
-func renderTSV(w io.Writer, data any) error {
-	rows, _ := extractRows(data)
+func writeTSV(w io.Writer, rows [][]string) error {
 	for _, row := range rows {
 		if _, err := fmt.Fprintln(w, strings.Join(row, "\t")); err != nil {
 			return err
@@ -187,7 +211,9 @@ func renderTSV(w io.Writer, data any) error {
 }
 
 // extractRows converts a struct or slice of structs into string rows and headers.
-// ID is always the first column. Fields tagged with jsonapi "relation,..." are skipped.
+// ID is always the first column. A to-one relation (other than organization, the
+// scope the user passed) becomes a column with the related ID; to-many relations
+// are skipped.
 func extractRows(data any) ([][]string, []string) {
 	v := reflect.ValueOf(data)
 	headers := []string{"ID"}
@@ -218,6 +244,15 @@ func appendFields(d reflect.Value, row []string, headers []string, buildHeaders 
 		}
 		tag := field.Tag.Get("jsonapi")
 		if strings.HasPrefix(tag, "relation,") {
+			// Columns stay aligned across rows: the related ID, or "" when unset.
+			name := strings.Split(tag, ",")[1]
+			if field.Type.Kind() != reflect.Pointer || name == "organization" {
+				continue
+			}
+			if buildHeaders {
+				headers = append(headers, field.Name)
+			}
+			row = append(row, relatedID(d.Field(j)))
 			continue
 		}
 		if buildHeaders {
@@ -226,6 +261,18 @@ func appendFields(d reflect.Value, row []string, headers []string, buildHeaders 
 		row = append(row, formatFieldValue(d.Field(j)))
 	}
 	return row, headers
+}
+
+// relatedID returns the ID of a to-one relation, or "" when it is unset.
+func relatedID(v reflect.Value) string {
+	if v.IsNil() {
+		return ""
+	}
+	id := v.Elem().FieldByName("ID")
+	if !id.IsValid() || id.Kind() != reflect.String {
+		return ""
+	}
+	return id.String()
 }
 
 func formatFieldValue(v reflect.Value) string {
@@ -237,17 +284,43 @@ func formatFieldValue(v reflect.Value) string {
 			return ""
 		}
 		elem := v.Elem()
+		if t, ok := elem.Interface().(time.Time); ok {
+			return t.Format(time.RFC3339)
+		}
 		switch elem.Kind() {
 		case reflect.String:
 			return elem.String()
 		case reflect.Bool:
 			return fmt.Sprintf("%t", elem.Bool())
 		default:
-			return fmt.Sprintf("%v", elem.Interface())
+			return formatFieldValue(elem)
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return fmt.Sprintf("%d", v.Int())
+	case reflect.Slice, reflect.Array:
+		// A list joins its items with commas; an empty one is an empty cell.
+		items := make([]string, v.Len())
+		for i := range items {
+			items[i] = formatFieldValue(v.Index(i))
+		}
+		return strings.Join(items, ",")
+	case reflect.Map:
+		// key=value pairs sorted by key, so the output is stable.
+		pairs := make([]string, 0, v.Len())
+		for _, k := range v.MapKeys() {
+			pairs = append(pairs, fmt.Sprintf("%v=%s", k.Interface(), formatFieldValue(v.MapIndex(k))))
+		}
+		sort.Strings(pairs)
+		return strings.Join(pairs, ",")
+	case reflect.Interface:
+		if v.IsNil() {
+			return ""
+		}
+		return formatFieldValue(v.Elem())
 	default:
-		return v.String()
+		if v.Kind() == reflect.String {
+			return v.String()
+		}
+		return fmt.Sprintf("%v", v.Interface())
 	}
 }

@@ -39,6 +39,7 @@ func init() {
 			{StructField: "PlanJob", Flag: "plan-job", Type: resource.Bool, Description: "Allow plan job execution"},
 			{StructField: "ApproveJob", Flag: "approve-job", Type: resource.Bool, Description: "Allow approving jobs"},
 			{StructField: "Role", Flag: "role", Type: resource.String, Description: "Project access role"},
+			{StructField: "DestroyJob", Flag: "destroy-job", Type: resource.Bool, Description: "Allow destroy jobs"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.ProjectAccess, error) {
 			return c.ProjectAccess.List(ctx, pIDs[0], pIDs[1], opts)
@@ -46,11 +47,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.ProjectAccess, error) {
 			return c.ProjectAccess.Get(ctx, pIDs[0], pIDs[1], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, a *terrakube.ProjectAccess) (*terrakube.ProjectAccess, error) {
-			return c.ProjectAccess.Create(ctx, pIDs[0], pIDs[1], a)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.ProjectAccess, error) {
+			return c.ProjectAccess.CreateFields(ctx, pIDs[0], pIDs[1], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, a *terrakube.ProjectAccess) (*terrakube.ProjectAccess, error) {
-			return c.ProjectAccess.Update(ctx, pIDs[0], pIDs[1], a)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.ProjectAccess, error) {
+			return c.ProjectAccess.UpdateFields(ctx, pIDs[0], pIDs[1], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.ProjectAccess.Delete(ctx, pIDs[0], pIDs[1], id)

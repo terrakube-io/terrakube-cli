@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
+	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
 // resolveParents resolves parent resource IDs from flags.
@@ -50,4 +50,15 @@ func resolveParent(ctx context.Context, client *terrakube.Client, cmd *cobra.Com
 func IsUUID(s string) bool {
 	_, err := uuid.Parse(s)
 	return err == nil
+}
+
+// AddScopeFlags adds the parent flags (with env fallback) to a hand-written command.
+func AddScopeFlags(cmd *cobra.Command, parents []ParentScope) {
+	addParentFlags(cmd, parents)
+}
+
+// ResolveScope resolves a hand-written command's parent flags to IDs, the same
+// way generated commands do.
+func ResolveScope(ctx context.Context, client *terrakube.Client, cmd *cobra.Command, parents []ParentScope) ([]string, error) {
+	return resolveParents(ctx, client, cmd, parents)
 }

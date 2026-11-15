@@ -44,6 +44,7 @@ func init() {
 			{StructField: "SigningSecret", Flag: "signing-secret", Type: resource.String, Description: "Signing secret for payload verification"},
 			{StructField: "Active", Flag: "active", Type: resource.Bool, Description: "Whether notification configuration is active"},
 			{StructField: "MessageStyle", Flag: "message-style", Type: resource.String, Description: "Message style (DETAILED, SIMPLE)"},
+			{StructField: "Templates", Flag: "templates", Type: resource.RelationshipMany, RelType: "template", Resolver: templateResolver, Description: "Notify only for jobs of these templates, by name or ID; replaces the set (\"\" empties it)"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.NotificationConfiguration, error) {
 			if len(pIDs) > 1 && pIDs[1] != "" {
@@ -54,14 +55,14 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.NotificationConfiguration, error) {
 			return c.NotificationConfigurations.Get(ctx, pIDs[0], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, r *terrakube.NotificationConfiguration) (*terrakube.NotificationConfiguration, error) {
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.NotificationConfiguration, error) {
 			if len(pIDs) > 1 && pIDs[1] != "" {
-				return c.NotificationConfigurations.CreateForWorkspace(ctx, pIDs[0], pIDs[1], r)
+				return c.NotificationConfigurations.CreateForWorkspaceFields(ctx, pIDs[0], pIDs[1], p)
 			}
-			return c.NotificationConfigurations.Create(ctx, pIDs[0], r)
+			return c.NotificationConfigurations.CreateFields(ctx, pIDs[0], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, r *terrakube.NotificationConfiguration) (*terrakube.NotificationConfiguration, error) {
-			return c.NotificationConfigurations.Update(ctx, pIDs[0], r)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.NotificationConfiguration, error) {
+			return c.NotificationConfigurations.UpdateFields(ctx, pIDs[0], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.NotificationConfigurations.Delete(ctx, pIDs[0], id)

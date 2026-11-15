@@ -30,14 +30,13 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, _ []string, id string) (*terrakube.Organization, error) {
 			return c.Organizations.Get(ctx, id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, _ []string, org *terrakube.Organization) (*terrakube.Organization, error) {
-			return c.Organizations.Create(ctx, org)
+		Create: func(ctx context.Context, c *terrakube.Client, _ []string, p terrakube.Patch) (*terrakube.Organization, error) {
+			return c.Organizations.CreateFields(ctx, p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, _ []string, org *terrakube.Organization) (*terrakube.Organization, error) {
-			return c.Organizations.Update(ctx, org)
+		Update: func(ctx context.Context, c *terrakube.Client, _ []string, id string, p terrakube.Patch) (*terrakube.Organization, error) {
+			return c.Organizations.UpdateFields(ctx, id, p)
 		},
-		Delete: func(ctx context.Context, c *terrakube.Client, _ []string, id string) error {
-			return c.Organizations.Delete(ctx, id)
-		},
+		// No hard delete: the server disables organizations, it never removes them.
+		SoftDelete: &resource.SoftDelete{Attribute: "disabled", Done: "disabled", Confirm: true},
 	})
 }

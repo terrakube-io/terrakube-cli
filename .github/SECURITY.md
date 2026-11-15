@@ -28,4 +28,5 @@ The Terrakube team takes security seriously. If you discover a security vulnerab
 ## Credentials & Token Safety
 
 - Never hardcode Personal Access Tokens (PATs) or sensitive credentials in scripts or repositories.
-- Use environment variables (`TERRAKUBE_PAT`, `TERRAKUBE_API_URL`) or secure secret management systems when running `terrakube-cli` in CI/CD pipelines.
+- In CI/CD pipelines, pass credentials from a secret store as environment variables: `TERRAKUBE_API_URL` plus `TERRAKUBE_TOKEN` (or `TERRAKUBE_PAT`) let commands run without a config file.
+- `terrakube login` stores the token in `~/.terrakube-cli.yaml` (or the `--config` file) with `0600` permissions. Run `terrakube logout` to remove it.

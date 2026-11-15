@@ -28,11 +28,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, _ []string, id string) (*terrakube.Federated, error) {
 			return c.Federated.Get(ctx, id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, _ []string, f *terrakube.Federated) (*terrakube.Federated, error) {
-			return c.Federated.Create(ctx, f)
+		Create: func(ctx context.Context, c *terrakube.Client, _ []string, p terrakube.Patch) (*terrakube.Federated, error) {
+			return c.Federated.CreateFields(ctx, p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, _ []string, f *terrakube.Federated) (*terrakube.Federated, error) {
-			return c.Federated.Update(ctx, f)
+		Update: func(ctx context.Context, c *terrakube.Client, _ []string, id string, p terrakube.Patch) (*terrakube.Federated, error) {
+			return c.Federated.UpdateFields(ctx, id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, _ []string, id string) error {
 			return c.Federated.Delete(ctx, id)

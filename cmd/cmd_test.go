@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -35,34 +36,32 @@ func resetGlobalFlags() {
 		"executionMode", "icon", "provider", "tag-prefix", "tag-id",
 		"manage-provider", "manage-module", "manage-workspace",
 		"manage-state", "manage-collection", "manage-vcs", "manage-template",
-		"cli",
+		"cli", "refresh_token", "token_expires_at", "token_endpoint", "client_id",
 	}
 	for _, key := range viperKeysToReset {
 		viper.Set(key, "")
 	}
 
-	// Point viper at a nonexistent config file to prevent real user config interference.
-	cfgFile = os.DevNull
-
 	// Reset cobra flag state on all commands.
 	resetCobraFlags(rootCmd)
+
+	// Point viper at an empty config file to prevent user config interference.
+	cfgFile = os.DevNull
 }
 
 // resetCobraFlags recursively resets all flags on a command and its subcommands.
 func resetCobraFlags(cmd *cobra.Command) {
-	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		// Set("[]") on a slice flag would yield ["[]"], so clear slices explicitly.
+	reset := func(f *pflag.Flag) {
+		// Set appends to slice and array values once they were set; replace them instead.
 		if sv, ok := f.Value.(pflag.SliceValue); ok {
 			_ = sv.Replace(nil)
 		} else {
 			_ = f.Value.Set(f.DefValue)
 		}
 		f.Changed = false
-	})
-	cmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
-		_ = f.Value.Set(f.DefValue)
-		f.Changed = false
-	})
+	}
+	cmd.Flags().VisitAll(reset)
+	cmd.PersistentFlags().VisitAll(reset)
 	for _, sub := range cmd.Commands() {
 		resetCobraFlags(sub)
 	}
@@ -73,6 +72,7 @@ func executeCommand(args ...string) (string, error) {
 	old := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
+	defer func() { os.Stdout = old }()
 
 	rootCmd.SetArgs(args)
 	rootCmd.SetOut(w)
@@ -92,6 +92,16 @@ func setupTestServer(handler http.Handler) *httptest.Server {
 	viper.Set("api_url", ts.URL)
 	viper.Set("token", "test-token")
 	return ts
+}
+
+// writeTempFile writes content to name inside a fresh temp dir (mode 0600) and returns its path.
+func writeTempFile(t *testing.T, name, content string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return p
 }
 
 func findSubCmd(name string) *cobra.Command {
@@ -259,17 +269,17 @@ func TestCmdTeamCreateMissingOrgId(t *testing.T) {
 	}
 }
 
-func TestCmdJobCreateMissingCommand(t *testing.T) {
+func TestCmdJobCreateMissingTemplateReference(t *testing.T) {
 	resetGlobalFlags()
 	ts := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
 	defer ts.Close()
 
 	_, err := executeCommand("job", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
-		t.Fatal("expected error for job create without --command, got nil")
+		t.Fatal("expected error for job create without --template-reference, got nil")
 	}
-	if !strings.Contains(err.Error(), "command") {
-		t.Errorf("expected error to mention command, got: %v", err)
+	if !strings.Contains(err.Error(), "template-reference") {
+		t.Errorf("expected error to mention template-reference, got: %v", err)
 	}
 }
 
@@ -278,7 +288,7 @@ func TestCmdJobCreateMissingOrgId(t *testing.T) {
 	ts := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
 	defer ts.Close()
 
-	_, err := executeCommand("job", "create", "--command", "plan", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
+	_, err := executeCommand("job", "create", "--template-reference", "c3d4e5f6-a7b8-4901-9cde-f12345678901", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
 		t.Fatal("expected error for job create without --organization, got nil")
 	}
@@ -572,44 +582,7 @@ func TestCmdRootTopLevelCommands(t *testing.T) {
 	}
 }
 
-func TestCmdLogoutE2E(t *testing.T) {
-	resetGlobalFlags()
-
-	out, err := executeCommand("logout")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(out, "logout ok") {
-		t.Errorf("expected 'logout ok' in output, got: %s", out)
-	}
-}
-
 // ----- Login Required Flags -----
-
-func TestCmdLoginMissingApiUrl(t *testing.T) {
-	resetGlobalFlags()
-	viper.Set("api_url", "")
-	_, err := executeCommand("login", "--pat", "some-token")
-	if err == nil {
-		t.Fatal("expected error for login without --api-url, got nil")
-	}
-	if !strings.Contains(err.Error(), "api-url") {
-		t.Errorf("expected error to mention api-url, got: %v", err)
-	}
-}
-
-func TestCmdLoginMissingPat(t *testing.T) {
-	resetGlobalFlags()
-	viper.Set("pat", "")
-	viper.Set("token", "")
-	_, err := executeCommand("login", "--api-url", "http://localhost:8080")
-	if err == nil {
-		t.Fatal("expected error for login without --pat, got nil")
-	}
-	if !strings.Contains(err.Error(), "pat") {
-		t.Errorf("expected error to mention pat, got: %v", err)
-	}
-}
 
 // ----- API Error Handling -----
 
@@ -625,7 +598,9 @@ func TestCmdWorkspaceListAPIError(t *testing.T) {
 	defer ts.Close()
 
 	_, err := executeCommand("workspace", "list", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
-	_ = err
+	if err == nil || !strings.Contains(err.Error(), "500") {
+		t.Fatalf("expected error mentioning 500, got %v", err)
+	}
 }
 
 // ----- Command Help/Usage Tests -----
@@ -693,70 +668,6 @@ func TestCmdJobAlias(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected job command to have alias 'jobs', got aliases: %v", cmd.Aliases)
-	}
-}
-
-// ----- Logout Stub Test -----
-
-func TestCmdLogoutIsStub(t *testing.T) {
-	resetGlobalFlags()
-
-	viper.Set("api_url", "http://localhost:8080")
-	viper.Set("token", "some-secret-token")
-
-	out, err := executeCommand("logout")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !strings.Contains(out, "logout ok") {
-		t.Errorf("expected 'logout ok' in output, got: %s", out)
-	}
-
-	if viper.GetString("token") != "some-secret-token" {
-		t.Error("expected token to remain in viper after logout")
-	}
-	if viper.GetString("api_url") != "http://localhost:8080" {
-		t.Error("expected api_url to remain in viper after logout")
-	}
-}
-
-// ----- Login Config Writing -----
-
-func TestCmdLoginWritesConfig(t *testing.T) {
-	resetGlobalFlags()
-	home := t.TempDir() // login writes <home>/.terrakube-cli.yaml
-	t.Setenv("HOME", home)
-	t.Setenv("USERPROFILE", home)
-
-	desc := "test org"
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		orgs := []*terrakube.Organization{{ID: "org-1", Name: "test-org", Description: &desc}}
-		w.Header().Set("Content-Type", "application/vnd.api+json")
-		_ = jsonapi.MarshalPayload(w, orgs)
-	})
-
-	ts := setupTestServer(handler)
-	defer ts.Close()
-
-	out, err := executeCommand(
-		"login",
-		"--api-url", ts.URL,
-		"--pat", "my-secret-pat",
-	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !strings.Contains(out, "Successfully logged in") {
-		t.Errorf("expected 'Successfully logged in' in output, got: %s", out)
-	}
-
-	if viper.GetString("api_url") != ts.URL {
-		t.Errorf("expected viper api_url to be %q, got %q", ts.URL, viper.GetString("api_url"))
-	}
-	if viper.GetString("token") != "my-secret-pat" {
-		t.Errorf("expected viper token to be 'my-secret-pat', got %q", viper.GetString("token"))
 	}
 }
 

@@ -29,7 +29,6 @@ func init() {
 			{StructField: "Name", Flag: "name", Short: "n", Type: resource.String, Required: true, Description: "Agent name"},
 			{StructField: "Description", Flag: "description", Short: "d", Type: resource.String, Description: "Agent description"},
 			{StructField: "URL", Flag: "url", Short: "u", Type: resource.String, Required: true, Description: "Agent URL"},
-			{StructField: "Type", Flag: "type", Type: resource.String, Description: "Agent type (e.g. KUBERNETES, DOCKER)"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Agent, error) {
 			return c.Agents.List(ctx, pIDs[0], opts)
@@ -37,11 +36,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.Agent, error) {
 			return c.Agents.Get(ctx, pIDs[0], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, a *terrakube.Agent) (*terrakube.Agent, error) {
-			return c.Agents.Create(ctx, pIDs[0], a)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.Agent, error) {
+			return c.Agents.CreateFields(ctx, pIDs[0], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, a *terrakube.Agent) (*terrakube.Agent, error) {
-			return c.Agents.Update(ctx, pIDs[0], a)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.Agent, error) {
+			return c.Agents.UpdateFields(ctx, pIDs[0], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.Agents.Delete(ctx, pIDs[0], id)

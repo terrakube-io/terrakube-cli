@@ -47,11 +47,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.CollectionItem, error) {
 			return c.CollectionItems.Get(ctx, pIDs[0], pIDs[1], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, item *terrakube.CollectionItem) (*terrakube.CollectionItem, error) {
-			return c.CollectionItems.Create(ctx, pIDs[0], pIDs[1], item)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.CollectionItem, error) {
+			return c.CollectionItems.CreateFields(ctx, pIDs[0], pIDs[1], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, item *terrakube.CollectionItem) (*terrakube.CollectionItem, error) {
-			return c.CollectionItems.Update(ctx, pIDs[0], pIDs[1], item)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.CollectionItem, error) {
+			return c.CollectionItems.UpdateFields(ctx, pIDs[0], pIDs[1], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.CollectionItems.Delete(ctx, pIDs[0], pIDs[1], id)

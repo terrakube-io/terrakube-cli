@@ -44,11 +44,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.NotificationTrigger, error) {
 			return c.NotificationTriggers.Get(ctx, pIDs[0], pIDs[1], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, r *terrakube.NotificationTrigger) (*terrakube.NotificationTrigger, error) {
-			return c.NotificationTriggers.Create(ctx, pIDs[0], pIDs[1], r)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.NotificationTrigger, error) {
+			return c.NotificationTriggers.CreateFields(ctx, pIDs[0], pIDs[1], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, r *terrakube.NotificationTrigger) (*terrakube.NotificationTrigger, error) {
-			return c.NotificationTriggers.Update(ctx, pIDs[0], pIDs[1], r)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.NotificationTrigger, error) {
+			return c.NotificationTriggers.UpdateFields(ctx, pIDs[0], pIDs[1], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.NotificationTriggers.Delete(ctx, pIDs[0], pIDs[1], id)

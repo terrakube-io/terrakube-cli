@@ -17,7 +17,10 @@ var createTeamTokenCmd = &cobra.Command{
 	Use:   "create",
 	Short: "generate a new team token",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		client := newClient()
+		client, err := newClient()
+		if err != nil {
+			return err
+		}
 		ctx := getContext()
 
 		desc, _ := cmd.Flags().GetString("description")
@@ -48,7 +51,10 @@ var listTeamTokensCmd = &cobra.Command{
 	Use:   "list",
 	Short: "list team tokens",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		client := newClient()
+		client, err := newClient()
+		if err != nil {
+			return err
+		}
 		ctx := getContext()
 
 		tokens, err := client.TeamTokens.List(ctx)
@@ -65,7 +71,10 @@ var deleteTeamTokenCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "delete a team token",
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		client := newClient()
+		client, err := newClient()
+		if err != nil {
+			return err
+		}
 		ctx := getContext()
 
 		id, _ := cmd.Flags().GetString("id")

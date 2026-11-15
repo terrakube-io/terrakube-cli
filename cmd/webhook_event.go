@@ -46,7 +46,7 @@ func init() {
 			{StructField: "Path", Flag: "path", Type: resource.String, Description: "Webhook event path"},
 			{StructField: "PathType", Flag: "path-type", Type: resource.String, Description: "Path matching type (REGEX, EXACT, GLOB)"},
 			{StructField: "Priority", Flag: "priority", Type: resource.Int, Description: "Priority"},
-			{StructField: "TemplateID", Flag: "template-id", Type: resource.String, Description: "Template ID"},
+			{StructField: "TemplateID", Flag: "template-id", Type: resource.String, Resolver: templateResolver, Description: "Template, by name or ID"},
 			{StructField: "PRWorkflowEnabled", Flag: "pr-workflow-enabled", Type: resource.Bool, Description: "Whether PR workflow is enabled"},
 			{StructField: "PRApplyEnabled", Flag: "pr-apply-enabled", Type: resource.Bool, Description: "Whether PR apply is enabled"},
 		},
@@ -56,11 +56,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.WebhookEvent, error) {
 			return c.WebhookEvents.Get(ctx, pIDs[0], pIDs[1], pIDs[2], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, e *terrakube.WebhookEvent) (*terrakube.WebhookEvent, error) {
-			return c.WebhookEvents.Create(ctx, pIDs[0], pIDs[1], pIDs[2], e)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.WebhookEvent, error) {
+			return c.WebhookEvents.CreateFields(ctx, pIDs[0], pIDs[1], pIDs[2], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, e *terrakube.WebhookEvent) (*terrakube.WebhookEvent, error) {
-			return c.WebhookEvents.Update(ctx, pIDs[0], pIDs[1], pIDs[2], e)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.WebhookEvent, error) {
+			return c.WebhookEvents.UpdateFields(ctx, pIDs[0], pIDs[1], pIDs[2], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.WebhookEvents.Delete(ctx, pIDs[0], pIDs[1], pIDs[2], id)

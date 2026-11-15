@@ -83,3 +83,20 @@ func TestGetBuildInfo(t *testing.T) {
 		t.Errorf("unexpected formatted output:\n%s", formatted)
 	}
 }
+
+// Test binaries carry no vcs.* build settings, so the ldflags placeholders
+// must come back untouched.
+func TestGetBuildInfoKeepsPlaceholdersWithoutVCS(t *testing.T) {
+	oldVersion, oldCommit, oldDate := Version, Commit, Date
+	defer func() { Version, Commit, Date = oldVersion, oldCommit, oldDate }()
+
+	Version, Commit, Date = "dev", "none", "unknown"
+	info := GetBuildInfo()
+
+	if info.Commit != "none" {
+		t.Errorf("Commit = %q, want %q", info.Commit, "none")
+	}
+	if info.Date != "unknown" {
+		t.Errorf("Date = %q, want %q", info.Date, "unknown")
+	}
+}

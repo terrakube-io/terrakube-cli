@@ -7,6 +7,12 @@
 #   - TERRAKUBE_API_URL environment variable set (e.g. http://localhost:8080)
 #   - TERRAKUBE_PAT environment variable set (Bearer token)
 #   - TERRAKUBE_BIN optional (defaults to 'terrakube' or './terrakube')
+#
+# Config isolation: after building the binary, setup_file points HOME at a
+# temporary directory under $BATS_FILE_TMPDIR, so `login`/`logout` write to
+# $HOME/.terrakube-cli.yaml there and never touch your real config.
+# TERRAKUBE_TOKEN and parent-scope env vars (TERRAKUBE_ORGANIZATION[_ID],
+# TERRAKUBE_WORKSPACE[_ID], TERRAKUBE_OUTPUT) are unset for the same reason.
 # ==============================================================================
 
 STATE_FILE="${BATS_FILE_TMPDIR:-/tmp}/terrakube_e2e_state.env"
@@ -23,6 +29,14 @@ setup_file() {
     fi
 
     TERRAKUBE_CMD="$CLI_DIR/terrakube"
+
+    # Isolate CLI config from the developer's real ~/.terrakube-cli.yaml.
+    # Done after `go build` so the Go toolchain still uses the real HOME.
+    E2E_HOME="${BATS_FILE_TMPDIR:-/tmp}/terrakube-home"
+    mkdir -p "$E2E_HOME"
+    export HOME="$E2E_HOME"
+    unset TERRAKUBE_TOKEN TERRAKUBE_ORGANIZATION TERRAKUBE_ORGANIZATION_ID \
+        TERRAKUBE_WORKSPACE TERRAKUBE_WORKSPACE_ID TERRAKUBE_OUTPUT
 
     # 1. Login verification
     if [ -z "$TERRAKUBE_API_URL" ] || [ -z "$TERRAKUBE_PAT" ]; then
@@ -162,7 +176,7 @@ assert_success() {
 @test "3. Create workspace with OpenTofu and update description" {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
 
-    RAND_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     WS_NAME="test${RAND_SUFFIX}"
 
     run "$TERRAKUBE_CMD" workspace create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
@@ -180,7 +194,7 @@ assert_success() {
     [ -n "$WS_ID" ] && [ "$WS_ID" != "null" ]
 
     # Update description to a 6-character random alphanumeric string
-    RAND_DESC=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
+    RAND_DESC=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 6)
     run "$TERRAKUBE_CMD" workspace update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
         --id "$WS_ID" \
         --name "$WS_NAME" \
@@ -199,6 +213,39 @@ assert_success() {
     assert_json_array
     FETCHED_DESC=$(echo "$output" | jq -r '.[0].attributes.description // .[0].description // empty' 2>/dev/null || true)
     [ "$FETCHED_DESC" = "$RAND_DESC" ]
+
+    # Sparse update: only --description is set, other fields must stay unchanged
+    run "$TERRAKUBE_CMD" workspace update -o "$TERRAKUBE_TEST_E2E_ORG_ID" --id "$WS_ID" --description "only-desc" --output json
+    assert_success
+
+    run "$TERRAKUBE_CMD" workspace get -o "$TERRAKUBE_TEST_E2E_ORG_ID" --id "$WS_ID" --output json
+    assert_success
+    [ "$(echo "$output" | jq -r '.attributes.description // .description // empty')" = "only-desc" ]
+    [ "$(echo "$output" | jq -r '.attributes.name // .name // empty')" = "$WS_NAME" ]
+    [ "$(echo "$output" | jq -r '.attributes.source // .source // empty')" = "https://github.com/terrakube-io/terrakube-docker-compose" ]
+    [ "$(echo "$output" | jq -r '.attributes.branch // .branch // empty')" = "main" ]
+    [ "$(echo "$output" | jq -r '.attributes.iacType // .iacType // empty')" = "tofu" ]
+
+    # Name resolution: organization given by name lists the same workspaces as by ID
+    run "$TERRAKUBE_CMD" workspace list -o "$TERRAKUBE_TEST_E2E_ORG_ID" --output json
+    assert_json_array
+    IDS_BY_ID=$(echo "$output" | jq -c '[.[].id] | sort')
+
+    run "$TERRAKUBE_CMD" workspace list -o "bats" --output json
+    assert_json_array
+    IDS_BY_NAME=$(echo "$output" | jq -c '[.[].id] | sort')
+    [ "$IDS_BY_NAME" = "$IDS_BY_ID" ]
+
+    # Parent flag from env: TERRAKUBE_ORGANIZATION_ID fills -o when not passed
+    TERRAKUBE_ORGANIZATION_ID="$TERRAKUBE_TEST_E2E_ORG_ID" run "$TERRAKUBE_CMD" workspace list --output json
+    assert_json_array
+    IDS_BY_ENV=$(echo "$output" | jq -c '[.[].id] | sort')
+    [ "$IDS_BY_ENV" = "$IDS_BY_ID" ]
+
+    # Empty list renders as [] (not null)
+    run "$TERRAKUBE_CMD" workspace list -o "$TERRAKUBE_TEST_E2E_ORG_ID" --filter "name==does-not-exist-xyz" --output json
+    assert_success
+    [ "$output" = "[]" ]
 
     # List workspace and validate Table format
     run "$TERRAKUBE_CMD" workspace list -o "$TERRAKUBE_TEST_E2E_ORG_ID" --output table
@@ -252,6 +299,23 @@ assert_success() {
     [ "$VAL1" = "a" ]
     [ "$VAL2" = "b" ]
     [ "$VAL3" = "c" ]
+
+    # Sensitive variable: a description-only update must not leave it incomplete
+    run "$TERRAKUBE_CMD" variable create -o "$TERRAKUBE_TEST_E2E_ORG_ID" -w "$TERRAKUBE_TEST_E2E_WS_ID" --key "secret1" --value "s3cr3t" --category "ENV" --sensitive --output json
+    assert_success
+    SECRET_ID=$(echo "$output" | jq -r '.id // empty' 2>/dev/null || true)
+    [ -n "$SECRET_ID" ]
+
+    run "$TERRAKUBE_CMD" variable update -o "$TERRAKUBE_TEST_E2E_ORG_ID" -w "$TERRAKUBE_TEST_E2E_WS_ID" --id "$SECRET_ID" --description "d" --output json
+    assert_success
+
+    run "$TERRAKUBE_CMD" variable get -o "$TERRAKUBE_TEST_E2E_ORG_ID" -w "$TERRAKUBE_TEST_E2E_WS_ID" --id "$SECRET_ID" --output json
+    assert_success
+    [ "$(echo "$output" | jq -r '.attributes.description // .description // empty')" = "d" ]
+    echo "$output" | jq -e '(.attributes.incomplete // .incomplete // false) == false' >/dev/null
+
+    run "$TERRAKUBE_CMD" variable delete -o "$TERRAKUBE_TEST_E2E_ORG_ID" -w "$TERRAKUBE_TEST_E2E_WS_ID" --id "$SECRET_ID"
+    assert_success
 
     # Validate Table output format
     run "$TERRAKUBE_CMD" variable list -o "$TERRAKUBE_TEST_E2E_ORG_ID" -w "$TERRAKUBE_TEST_E2E_WS_ID" --output table
@@ -330,7 +394,7 @@ assert_success() {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
 
     # 1. Create provider (name: random + 4 alphanumeric)
-    RAND_PROV_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_PROV_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     PROV_NAME="random${RAND_PROV_SUFFIX}"
     run "$TERRAKUBE_CMD" provider create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
         --name "$PROV_NAME" \
@@ -419,7 +483,7 @@ assert_success() {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
 
     # 1. Create module (name: iam + 4 alphanumeric)
-    RAND_MOD_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_MOD_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     MOD_NAME="iam${RAND_MOD_SUFFIX}"
     MOD_SOURCE="https://github.com/terraform-google-modules/terraform-google-iam"
 
@@ -435,7 +499,7 @@ assert_success() {
     [ -n "$MOD_ID" ] && [ "$MOD_ID" != "null" ]
 
     # 2. Update description using a 4-character random alphanumeric string
-    RAND_MOD_DESC=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_MOD_DESC=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     run "$TERRAKUBE_CMD" module update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
         --id "$MOD_ID" \
         --name "$MOD_NAME" \
@@ -470,7 +534,7 @@ assert_success() {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
 
     # 1. Create global variable (key/val: dummy + 4 alphanumeric)
-    RAND_VAR_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_VAR_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     VAR_KEY="dummy${RAND_VAR_SUFFIX}"
     VAR_VAL="dummy${RAND_VAR_SUFFIX}"
 
@@ -486,7 +550,7 @@ assert_success() {
     [ -n "$GVAR_ID" ] && [ "$GVAR_ID" != "null" ]
 
     # 2. Update key and value to new dummy+4alphanumeric strings
-    RAND_VAR_SUFFIX2=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_VAR_SUFFIX2=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     NEW_VAR_KEY="dummy${RAND_VAR_SUFFIX2}"
     NEW_VAR_VAL="dummy${RAND_VAR_SUFFIX2}"
 
@@ -524,7 +588,7 @@ assert_success() {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
 
     # 1. Create agent (name: agent + 4 alphanumeric, URL: https://localhost:8080)
-    RAND_AGT_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_AGT_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     AGT_NAME="agent${RAND_AGT_SUFFIX}"
 
     run "$TERRAKUBE_CMD" agent create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
@@ -571,7 +635,7 @@ assert_success() {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
 
     # 1. Create SSH key (name: ssh + 4 alphanumeric)
-    RAND_SSH_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_SSH_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     SSH_NAME="ssh${RAND_SSH_SUFFIX}"
     DUMMY_KEY="-----BEGIN RSA PRIVATE KEY-----\ndummykeydata\n-----END RSA PRIVATE KEY-----\n"
 
@@ -621,7 +685,7 @@ assert_success() {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
 
     # 1. Create a new dedicated workspace for workspace-access testing
-    RAND_WSACC_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_WSACC_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     DEDICATED_WS_NAME="wsacc${RAND_WSACC_SUFFIX}"
 
     run "$TERRAKUBE_CMD" workspace create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
@@ -675,7 +739,7 @@ assert_success() {
     assert_success
 
     # 6. Soft-delete and cleanup the dedicated workspace
-    NEW_DEDICATED_WS_NAME=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
+    NEW_DEDICATED_WS_NAME=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 6)
     run "$TERRAKUBE_CMD" workspace update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
         --id "$DEDICATED_WS_ID" \
         --name "$NEW_DEDICATED_WS_NAME" \
@@ -702,10 +766,10 @@ assert_success() {
     step: 100
   - type: \"terraformApply\"
     step: 200"
-    TCL_B64=$(echo "$TCL_RAW" | base64 -w 0)
+    TCL_B64=$(echo "$TCL_RAW" | base64 | tr -d '\n')
 
     # 2. Create template (name: tmpl + 4 alphanumeric, description: desc + 4 alphanumeric, version: 1.0.0)
-    RAND_TPL_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_TPL_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     TPL_NAME="tmpl${RAND_TPL_SUFFIX}"
     TPL_DESC="desc${RAND_TPL_SUFFIX}"
 
@@ -721,7 +785,7 @@ assert_success() {
     [ -n "$TPL_ID" ] && [ "$TPL_ID" != "null" ]
 
     # 3. Update description with a new 4-character random string
-    RAND_TPL_SUFFIX2=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_TPL_SUFFIX2=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     NEW_TPL_DESC="desc${RAND_TPL_SUFFIX2}"
 
     run "$TERRAKUBE_CMD" template update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
@@ -760,7 +824,7 @@ assert_success() {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
 
     # 1. Create temporary workspace for collection-reference testing
-    RAND_COLWS_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_COLWS_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     COL_WS_NAME="colws${RAND_COLWS_SUFFIX}"
 
     run "$TERRAKUBE_CMD" workspace create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
@@ -778,7 +842,7 @@ assert_success() {
     [ -n "$COL_WS_ID" ] && [ "$COL_WS_ID" != "null" ]
 
     # 2. Create collection
-    RAND_COL_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_COL_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     COL_NAME="col${RAND_COL_SUFFIX}"
 
     run "$TERRAKUBE_CMD" collection create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
@@ -792,7 +856,7 @@ assert_success() {
     [ -n "$COL_ID" ] && [ "$COL_ID" != "null" ]
 
     # Update collection description
-    RAND_COL_DESC2="desc$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)"
+    RAND_COL_DESC2="desc$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)"
     run "$TERRAKUBE_CMD" collection update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
         --id "$COL_ID" \
         --name "$COL_NAME" \
@@ -811,7 +875,7 @@ assert_success() {
     assert_success
 
     # 3. Create collection item (category: ENV)
-    RAND_ITEM_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_ITEM_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     ITEM_KEY="dummy${RAND_ITEM_SUFFIX}"
     ITEM_VAL="dummy${RAND_ITEM_SUFFIX}"
 
@@ -864,7 +928,7 @@ assert_success() {
     run "$TERRAKUBE_CMD" collection delete -o "$TERRAKUBE_TEST_E2E_ORG_ID" --id "$COL_ID"
     assert_success
 
-    NEW_COL_WS_NAME=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
+    NEW_COL_WS_NAME=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 6)
     run "$TERRAKUBE_CMD" workspace update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
         --id "$COL_WS_ID" \
         --name "$NEW_COL_WS_NAME" \
@@ -886,7 +950,7 @@ assert_success() {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
 
     # 1. Create temporary workspace for project testing
-    RAND_PRJWS_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_PRJWS_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     PRJ_WS_NAME="prjws${RAND_PRJWS_SUFFIX}"
 
     run "$TERRAKUBE_CMD" workspace create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
@@ -904,7 +968,7 @@ assert_success() {
     [ -n "$PRJ_WS_ID" ] && [ "$PRJ_WS_ID" != "null" ]
 
     # 2. Create project
-    RAND_PRJ_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_PRJ_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     PRJ_NAME="proj${RAND_PRJ_SUFFIX}"
 
     run "$TERRAKUBE_CMD" project create -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
@@ -917,7 +981,7 @@ assert_success() {
     [ -n "$PRJ_ID" ] && [ "$PRJ_ID" != "null" ]
 
     # Update project description
-    NEW_PRJ_DESC="desc$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)"
+    NEW_PRJ_DESC="desc$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)"
     run "$TERRAKUBE_CMD" project update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
         --id "$PRJ_ID" \
         --name "$PRJ_NAME" \
@@ -974,7 +1038,7 @@ assert_success() {
     run "$TERRAKUBE_CMD" project delete -o "$TERRAKUBE_TEST_E2E_ORG_ID" --id "$PRJ_ID"
     assert_success
 
-    NEW_PRJ_WS_NAME=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
+    NEW_PRJ_WS_NAME=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 6)
     run "$TERRAKUBE_CMD" workspace update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
         --id "$PRJ_WS_ID" \
         --name "$NEW_PRJ_WS_NAME" \
@@ -996,7 +1060,7 @@ assert_success() {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
 
     # 1. Create federated identity credential (name: fed + 4 alphanumeric)
-    RAND_FED_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_FED_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     FED_NAME="fed${RAND_FED_SUFFIX}"
 
     run "$TERRAKUBE_CMD" federated create \
@@ -1030,7 +1094,7 @@ assert_success() {
     assert_success
 
     # 2. Create federated claim (claim-key: repository_owner, claim-value: dummy + 4 alphanumeric)
-    RAND_CLAIM_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_CLAIM_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     CLAIM_VAL="dummy${RAND_CLAIM_SUFFIX}"
 
     run "$TERRAKUBE_CMD" federated-claim create \
@@ -1044,7 +1108,7 @@ assert_success() {
     [ -n "$CLAIM_ID" ] && [ "$CLAIM_ID" != "null" ]
 
     # Update claim value
-    RAND_CLAIM_SUFFIX2=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_CLAIM_SUFFIX2=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     NEW_CLAIM_VAL="dummy${RAND_CLAIM_SUFFIX2}"
     run "$TERRAKUBE_CMD" federated-claim update \
         --federated "$FED_ID" \
@@ -1079,7 +1143,7 @@ assert_success() {
     [ -n "$TERRAKUBE_TEST_E2E_ORG_ID" ] || skip "Organization ID not available"
 
     # 1. Create organization notification configuration (Slack)
-    RAND_NOTIF_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_NOTIF_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     NC_NAME="notif${RAND_NOTIF_SUFFIX}"
     NC_URL="https://hooks.slack.com/services/T00/B00/${RAND_NOTIF_SUFFIX}"
 
@@ -1098,7 +1162,7 @@ assert_success() {
     [ -n "$NC_ID" ] && [ "$NC_ID" != "null" ]
 
     # 2. Update description and message style
-    RAND_NC_DESC=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
+    RAND_NC_DESC=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 6)
     run "$TERRAKUBE_CMD" notification-configuration update \
         -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
         --id "$NC_ID" \
@@ -1163,7 +1227,7 @@ assert_success() {
     assert_success
 
     # 7. Workspace-level notification configuration with dedicated temporary workspace
-    RAND_WS_SUFFIX=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 4)
+    RAND_WS_SUFFIX=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 4)
     TEMP_WS_NAME="wsnotif${RAND_WS_SUFFIX}"
     run "$TERRAKUBE_CMD" workspace create \
         -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
@@ -1211,7 +1275,7 @@ assert_success() {
     assert_success
 
     # Soft-delete temporary workspace
-    NEW_TEMP_WS_NAME=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
+    NEW_TEMP_WS_NAME=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 6)
     run "$TERRAKUBE_CMD" workspace update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
         --id "$TEMP_WS_ID" \
         --name "$NEW_TEMP_WS_NAME" \
@@ -1268,7 +1332,7 @@ assert_success() {
     fi
 
     # Update workspace name to 6-character alphanumeric string and set deleted=true
-    NEW_WS_NAME=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 6)
+    NEW_WS_NAME=$(head /dev/urandom | LC_ALL=C tr -dc 'a-z0-9' | head -c 6)
     run "$TERRAKUBE_CMD" workspace update -o "$TERRAKUBE_TEST_E2E_ORG_ID" \
         --id "$TERRAKUBE_TEST_E2E_WS_ID" \
         --name "$NEW_WS_NAME" \
@@ -1301,4 +1365,18 @@ assert_success() {
     assert_success
 
     # Organization "bats" is NOT deleted and kept for future executions.
+}
+
+# ==============================================================================
+# Step 19: Logout
+# ==============================================================================
+
+@test "19. Logout removes the token" {
+    run "$TERRAKUBE_CMD" logout
+    assert_success
+
+    # TERRAKUBE_PAT is exported for the suite and is a token fallback; blank it here
+    TERRAKUBE_PAT="" run "$TERRAKUBE_CMD" organization list --output json
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"not logged in"* ]]
 }

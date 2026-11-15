@@ -39,6 +39,10 @@ func init() {
 			{StructField: "ManageState", Flag: "manage-state", Type: resource.Bool, Description: "Manage state permission"},
 			{StructField: "ManageWorkspace", Flag: "manage-workspace", Type: resource.Bool, Description: "Manage workspace permission"},
 			{StructField: "ManageJob", Flag: "manage-job", Type: resource.Bool, Description: "Manage job permission"},
+			{StructField: "PlanJob", Flag: "plan-job", Type: resource.Bool, Description: "Plan job permission"},
+			{StructField: "ApproveJob", Flag: "approve-job", Type: resource.Bool, Description: "Approve job permission"},
+			{StructField: "DestroyJob", Flag: "destroy-job", Type: resource.Bool, Description: "Destroy job permission"},
+			{StructField: "Role", Flag: "role", Type: resource.String, Description: "Role on the workspace"},
 			{StructField: "Name", Flag: "name", Short: "n", Type: resource.String, Required: true, Description: "Team name for access"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.WorkspaceAccess, error) {
@@ -47,11 +51,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.WorkspaceAccess, error) {
 			return c.WorkspaceAccess.Get(ctx, pIDs[0], pIDs[1], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, a *terrakube.WorkspaceAccess) (*terrakube.WorkspaceAccess, error) {
-			return c.WorkspaceAccess.Create(ctx, pIDs[0], pIDs[1], a)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.WorkspaceAccess, error) {
+			return c.WorkspaceAccess.CreateFields(ctx, pIDs[0], pIDs[1], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, a *terrakube.WorkspaceAccess) (*terrakube.WorkspaceAccess, error) {
-			return c.WorkspaceAccess.Update(ctx, pIDs[0], pIDs[1], a)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.WorkspaceAccess, error) {
+			return c.WorkspaceAccess.UpdateFields(ctx, pIDs[0], pIDs[1], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.WorkspaceAccess.Delete(ctx, pIDs[0], pIDs[1], id)

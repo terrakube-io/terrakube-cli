@@ -10,6 +10,7 @@ For full CLI reference documentation, visit our official guide at [https://docs.
   - [Snap Package (Ubuntu / Linux)](#snap-package-ubuntu--linux)
   - [Linux & macOS](#linux--macos)
   - [Windows](#windows)
+  - [Docker](#docker)
 - [Adding Terrakube CLI to PATH](#adding-terrakube-cli-to-path)
   - [Linux & macOS](#linux--macos-1)
   - [Windows](#windows-1)
@@ -25,6 +26,11 @@ For full CLI reference documentation, visit our official guide at [https://docs.
   - [4. Create a Workspace (OpenTofu & Docker Compose)](#4-create-a-workspace-opentofu--docker-compose)
   - [5. Add Workspace Environment Variables & Tags](#5-add-workspace-environment-variables--tags)
   - [6. Configure Notifications (Slack / Teams / Webhook)](#6-configure-notifications-slack--teams--webhook)
+  - [7. Run a Plan or Apply and Wait for It](#7-run-a-plan-or-apply-and-wait-for-it)
+  - [8. Enforce Policies](#8-enforce-policies)
+  - [9. Other Resource Fields](#9-other-resource-fields)
+  - [10. Work with State](#10-work-with-state)
+- [Breaking Changes](#breaking-changes)
 - [Contributing](#contributing)
 - [Security](#security)
 
@@ -32,40 +38,56 @@ For full CLI reference documentation, visit our official guide at [https://docs.
 
 ## Download & Installation
 
-You can download pre-compiled binaries directly from our [GitHub Releases](https://github.com/terrakube-io/terrakube-cli/releases/latest) page, or install via Snap on Linux/Ubuntu.
+Pre-compiled archives are published on [GitHub Releases](https://github.com/terrakube-io/terrakube-cli/releases/latest) for Linux and macOS (amd64, arm64) and Windows (amd64, 386). The CLI is also available from the Snap Store and as a Docker image.
 
 ### Snap Package (Ubuntu / Linux)
 
-You can install the local `.snap` package:
+Install from the Snap Store:
 
 ```bash
-sudo snap install --dangerous terrakube-cli_*.snap
+sudo snap install terrakube-cli
 ```
 
-Both `terrakube` and `terrakube-cli` commands will be available:
+The snap exposes the command as `terrakube-cli`. To call it as `terrakube`, add an alias:
 
 ```bash
+sudo snap alias terrakube-cli terrakube
 terrakube --version
-terrakube-cli --help
 ```
+
+To install a locally built snap instead, see [Building Snap Package Locally](#building-snap-package-locally).
 
 ### Linux & macOS (Bash / Zsh)
 
-Download the binary using `curl` or `wget`:
+Release archives are named `terrakube_<version>_<os>_<arch>.tar.gz` (version without the leading `v`). Download and extract one with `curl`:
 
 ```bash
-# Example: Download latest Linux amd64 binary
-curl -sSL -o terrakube https://github.com/terrakube-io/terrakube-cli/releases/latest/download/terrakube-linux-amd64
-chmod +x terrakube
+# Example: Linux amd64; replace VERSION with a release from the Releases page
+VERSION="x.y.z"
+curl -sSLO "https://github.com/terrakube-io/terrakube-cli/releases/download/v${VERSION}/terrakube_${VERSION}_linux_amd64.tar.gz"
+tar -xzf "terrakube_${VERSION}_linux_amd64.tar.gz" terrakube
 ```
 
 ### Windows (PowerShell)
 
-Download the binary using PowerShell:
+Windows releases are `.zip` archives:
 
 ```powershell
-# Download latest Windows amd64 binary
-Invoke-WebRequest -Uri "https://github.com/terrakube-io/terrakube-cli/releases/latest/download/terrakube-windows-amd64.exe" -OutFile "terrakube.exe"
+# Example: Windows amd64; replace $Version with a release from the Releases page
+$Version = "x.y.z"
+Invoke-WebRequest -Uri "https://github.com/terrakube-io/terrakube-cli/releases/download/v$Version/terrakube_${Version}_windows_amd64.zip" -OutFile "terrakube.zip"
+Expand-Archive terrakube.zip -DestinationPath .
+```
+
+### Docker
+
+A multi-arch image (linux/amd64, linux/arm64) is published to Docker Hub as [`azbuilder/terrakube-cli`](https://hub.docker.com/r/azbuilder/terrakube-cli). The entrypoint is `terrakube`, so pass credentials as environment variables:
+
+```bash
+docker run --rm \
+  -e TERRAKUBE_API_URL="https://terrakube-api.platform.local" \
+  -e TERRAKUBE_TOKEN="XXXXXXXXXXXXX" \
+  azbuilder/terrakube-cli organization list
 ```
 
 ---
@@ -142,7 +164,7 @@ terrakube --version
 
 ### Prerequisites
 
-- [Go](https://go.dev/) 1.22 or higher
+- [Go](https://go.dev/) 1.27 or higher
 
 ### Compiling the Binary
 
@@ -203,6 +225,8 @@ Terrakube CLI includes comprehensive end-to-end integration tests written using 
 > export TERRAKUBE_API_URL="https://terrakube-api.platform.local"
 > export TERRAKUBE_PAT="XXXXXXXXXXXXX"  # Replace with a valid Terrakube Admin Personal Access Token
 > ```
+>
+> The suite builds `./terrakube` and runs `terrakube login` with these values. It sets `HOME` to a temporary directory first, so your own `~/.terrakube-cli.yaml` is not modified.
 
 Execute the E2E operations test suite:
 
@@ -224,12 +248,32 @@ Authenticate against your Terrakube server using your API URL and Personal Acces
 terrakube login -a "https://terrakube-api.platform.local" -t "XXXXXXXXXXXXX"
 ```
 
+`login` checks the credentials against the server and saves `api_url` and `token` to `~/.terrakube-cli.yaml` (or the file given with `--config`) with `0600` permissions. It also reads `TERRAKUBE_API_URL` and `TERRAKUBE_PAT` when the flags are omitted:
+
+```bash
+export TERRAKUBE_API_URL="https://terrakube-api.platform.local"
+export TERRAKUBE_PAT="XXXXXXXXXXXXX"
+terrakube login
+```
+
+To log in through the browser instead of with a PAT, use `--web`:
+
+```bash
+terrakube login --web --api-url "https://terrakube-api.platform.local"
+```
+
+`login --web` reads `login.v1` from the server's `/.well-known/terraform.json`, prints the login URL and opens it in the browser (`open` on macOS, `xdg-open` on Linux, `rundll32` on Windows; on a headless machine, copy the URL instead). It runs the OAuth authorization code flow with PKCE (S256) and waits up to `--timeout` (default `5m`) for the redirect to `http://localhost:<port>/login`, on the first free port in the range the server advertises. `--api-url` falls back to `TERRAKUBE_API_URL`, then to `api_url` in the config. If no advertised port is free, the callback's `state` does not match, the login is denied or the timeout passes, it exits with code 1 and saves nothing.
+
+What it saves depends on the server:
+
+- with the Terrakube login broker (`/oauth/authorize`), a Terrakube token; you choose its lifetime on the consent page, and it is used like a PAT;
+- with Dex (`/auth`), the Dex access token, plus the `refresh_token`, the token's expiry and the token endpoint and client ID needed to renew it.
+
+The Dex access token is short-lived. Before a command uses a saved Dex token that has expired or expires within a minute, the CLI exchanges the refresh token for a new one and saves it (mode `0600`). If that fails, the command exits with code 1 and `session expired, run terrakube login --web`. A token from `TERRAKUBE_TOKEN` or `TERRAKUBE_PAT`, and a PAT saved by `terrakube login`, are never refreshed. `terrakube login` with a PAT and `terrakube logout` remove the saved refresh data.
+
 #### Workload identity in CI/CD
 
-Inside GitHub Actions, GitLab CI, Bitbucket Pipelines or Azure Pipelines, `--oidc` detects the platform,
-obtains its OIDC token and logs in with it. Terrakube accepts the token when a `federated` credential matches
-its issuer, audience and claims. `--terraform-credentials` also writes the token to
-`~/.terraform.d/credentials.tfrc.json` for `terraform init` / `tofu init`.
+Inside GitHub Actions, GitLab CI, Bitbucket Pipelines or Azure Pipelines, `login --oidc` detects the platform, obtains its OIDC token and logs in with it. Terrakube accepts the token when a `federated` credential matches its issuer, audience and claims. `--terraform-credentials` also writes the token to `~/.terraform.d/credentials.tfrc.json` (`%APPDATA%\terraform.d` on Windows) for `terraform init` / `tofu init`; `--terraform-host` picks other hosts than the API URL's.
 
 ```yaml
 # GitHub Actions
@@ -247,13 +291,28 @@ plan:
     - terrakube login -a https://terrakube-api.example.com --oidc --terraform-credentials
 ```
 
-Bitbucket needs `oidc: true` on the step. Azure Pipelines needs a workload identity service connection, with
-`SYSTEM_ACCESSTOKEN: $(System.AccessToken)` and `AZURESUBSCRIPTION_SERVICE_CONNECTION_ID` mapped into the step `env`.
-Elsewhere, pass `--oidc-token-file` or set `TERRAKUBE_OIDC_TOKEN`. OIDC tokens are short-lived, so log in right before use.
+Bitbucket needs `oidc: true` on the step. Azure Pipelines needs a workload identity service connection, with `SYSTEM_ACCESSTOKEN: $(System.AccessToken)` and `AZURESUBSCRIPTION_SERVICE_CONNECTION_ID` mapped into the step `env`. Elsewhere, pass `--oidc-token-file` or set `TERRAKUBE_OIDC_TOKEN`. OIDC tokens are short-lived and never refreshed, so log in right before use.
 
-`--oidc` requires an https API URL, and GitHub Actions requires `--oidc-audience` because the default audience is
-trusted by other services too. Azure Pipelines tokens always carry the Azure AD audience, so give the service connection
-no Azure role assignments. The token is stored in HOME, so clean it up on persistent self-hosted runners.
+`--oidc` requires an https API URL, and GitHub Actions requires `--oidc-audience` because the default audience is trusted by other services too. Azure Pipelines tokens always carry the Azure AD audience, so give the service connection no Azure role assignments. The token is stored in HOME, so clean it up on persistent self-hosted runners.
+
+To run commands without a config file (for example in CI), set `TERRAKUBE_API_URL` and a token. The token is taken from the first of these that is set: `TERRAKUBE_TOKEN`, `TERRAKUBE_PAT`, the `token` saved in the config file. `terrakube logout` removes the stored token (a token in the environment still applies).
+
+Parent-scope flags can also come from the environment when not passed on the command line, for example `TERRAKUBE_ORGANIZATION` (or `TERRAKUBE_ORGANIZATION_ID`) for `-o` and `TERRAKUBE_WORKSPACE` (or `TERRAKUBE_WORKSPACE_ID`) for `-w`, as do `TERRAKUBE_OUTPUT` and `TERRAKUBE_HIDE_NULLS`. Other flags such as `--name` or `--id` must be passed explicitly.
+
+> [!NOTE]
+> An exported `TERRAKUBE_WORKSPACE` / `TERRAKUBE_WORKSPACE_ID` also applies where the workspace is optional. For example, `notification-configuration list` and `create` then work on that workspace instead of the organization. Unset it to work at organization level.
+
+Manage your personal access tokens and check who you are logged in as:
+
+```bash
+terrakube pat create --days 30 --description "ci pipeline"   # prints the token once, with its id
+terrakube pat list
+terrakube pat delete --id <PAT_ID>
+terrakube whoami                                  # your teams (identity provider groups)
+terrakube whoami --org my-org --workspace prod    # plus your effective permissions there
+```
+
+`--days 0` asks for a token that does not expire; the server refuses it when it caps token lifetimes. The server lets only a user logged in through the browser (`terrakube login --web`) create tokens; with a PAT login `pat create` gets 403.
 
 ### 2. Create an Organization
 
@@ -266,6 +325,8 @@ terrakube organization create \
   --execution-mode "remote" \
   --output json
 ```
+
+The settings from the workspace's Settings page are flags of `workspace create|update`: `--template` (default template), `--require-approve-to-apply`, `--restrict-apply-to-configured-branch`, `--allow-remote-apply`, `--global-remote-state`, `--shared-ids` (comma-separated workspace IDs that may read the state) and `--module-ssh-key` (name or ID; `""` clears it).
 
 *Save the returned organization ID (e.g., `09e86337-b6bb-49e0-82aa-c114ad0f41ab`) for subsequent operations.*
 
@@ -288,8 +349,12 @@ terrakube team create \
   --manage-job \
   --plan-job \
   --approve-job \
+  --destroy-job \
+  --manage-policies \
   --output table
 ```
+
+`workspace-access` grants a team rights on one workspace (`--plan-job`, `--approve-job`, `--destroy-job`, `--role`, and the `--manage-*` flags); `project-access` does the same for a project.
 
 ### 4. Create a Workspace (OpenTofu & Docker Compose)
 
@@ -340,7 +405,7 @@ terrakube variable create \
    terrakube workspace-tag create \
      -o "09e86337-b6bb-49e0-82aa-c114ad0f41ab" \
      -w "<WORKSPACE_ID>" \
-     --tag-id "<TAG_ID>" \
+     --tag-id "<TAG_NAME_OR_ID>" \
      --output table
    ```
 
@@ -358,6 +423,8 @@ terrakube variable create \
      --output json
    ```
 
+   `--templates Plan,Apply` limits a configuration to jobs of those templates (names or IDs; the list replaces the current set, `--templates ""` empties it).
+
 2. Add a trigger on job completion or failure:
    ```bash
    terrakube notification-trigger create \
@@ -366,6 +433,103 @@ terrakube variable create \
      --job-status "completed" \
      --output table
    ```
+
+---
+
+### 7. Run a Plan or Apply and Wait for It
+
+`run plan|apply|destroy` starts a job on a workspace. The template decides what the job does: pass `-t` with a template name or ID, or set `TERRAKUBE_TEMPLATE_PLAN`, `TERRAKUBE_TEMPLATE_APPLY` or `TERRAKUBE_TEMPLATE_DESTROY`. Without either, `run apply` uses the workspace's default template.
+
+```bash
+terrakube run plan -o "my-org" -w "prod" -t "Plan" --target module.network --wait --timeout 30m
+echo $?   # 0 completed or no changes, 1 error, 2 failed, rejected or cancelled, 3 timed out
+```
+
+`job create --wait` and `job wait <job-id>` wait the same way, so a CI step can branch on the exit code. `job logs <job-id>` prints every step's log in order (`--step 200` for one step); `--follow` streams the running step until the job ends and exits with the same codes.
+
+A job waiting for approval is listed with `job list -o my-org -w prod --status waitingApproval` and handled with `job approve <job-id>`, `job reject <job-id>` or `job cancel <job-id>`. Each checks the job's current status first and changes nothing if it does not allow the action. `workspace lock prod -o my-org --reason "release freeze"` stops new runs on a workspace until `workspace unlock prod -o my-org`.
+
+A run trigger starts a run in one workspace after an apply in another. `-w` is the workspace that gets the run, `--source` the one whose apply fires it; without `--template` the run uses the destination's default template:
+
+```bash
+terrakube run-trigger create -o my-org -w app --source network --template Apply
+terrakube run-trigger update -o my-org -w app --id <TRIGGER_ID> --enabled=false
+```
+
+### 8. Enforce Policies
+
+A policy set points at a repository of OPA policies. Attach it to exactly one workspace, project or tag per attachment (names or IDs); a `policy-attachment` with no target or more than one fails before any request.
+
+```bash
+terrakube policy-set create -o my-org --name baseline --repository https://github.com/acme/policies --enforcement-level SOFT_MANDATORY
+terrakube policy-set-parameter create -o my-org --policy-set baseline --key max_instances --value 3
+terrakube policy-attachment create -o my-org --policy-set baseline --workspace prod
+```
+
+An exemption skips one rule of a policy set until it expires, for one workspace (`--workspace`), one project (`--project`) or, with neither, the whole organization. When a job stops on a soft-mandatory failure, read its evaluations and override one with a justification, then approve the job:
+
+```bash
+terrakube policy-exemption create -o my-org --policy-set baseline --rule deny_public_s3 \
+  --justification "legacy bucket, migration in SEC-12" --ticket SEC-12 --expires-at 2027-01-31T00:00:00Z --workspace prod
+terrakube policy-evaluation list -o my-org --job 42
+terrakube policy-override create -o my-org --job 42 --policy-evaluation <EVALUATION_ID> --justification "accepted risk"
+terrakube job approve 42 -o my-org
+```
+
+`policy-override create` records the user named in your token (email, else user name) as the one who overrode.
+
+### 9. Other Resource Fields
+
+- Templates: `template create --name Plan --content-file plan.yaml` reads the flow from a file instead of `--content`.
+- Registry: `module-version` and `provider-version` take `--status DEPRECATED --deprecation-message "..."`; `provider` takes `--registry-namespace` (needed with `--imported`); `module` takes `--vcs` and `--ssh` (names or IDs) for private repositories.
+- Jobs: `job create --variables region=eu-west-1 --variables size=3` passes run variables to that job only.
+- `workspace-schedule` takes `--enabled` and `--description`, `workspace-tag` takes `--value`, and `variable` takes `--incomplete`.
+
+### 10. Work with State
+
+`state` reads a workspace's Terraform state through the API with your token, so no `curl` is needed. Workspaces are given by name or ID.
+
+```bash
+terrakube state pull prod -o my-org > prod.tfstate             # current state, byte for byte
+terrakube state pull prod -o my-org --version <HISTORY_ID> -f old.tfstate
+```
+
+`--version` takes an ID from `history list` and writes that version's raw state (the same format as without it). The CLI only sends the token to the configured API: if a history entry points at another host, `state pull` fails with exit code 1 and sends nothing there.
+
+`state rollback prod <HISTORY_ID> -o my-org` makes that version the current state, as the UI's rollback does. It asks you to type the workspace name; in scripts pass `--yes`. Without a terminal and without `--yes` it fails before any request.
+
+`state diff prod <HISTORY_ID_A> <HISTORY_ID_B> -o my-org` lists what changed from version A to version B: resource instances by address and outputs by name, never their values.
+
+```text
+Resources: 1 added, 1 removed, 1 changed
+  + aws_s3_bucket.logs[0]
+  - aws_instance.old
+  ~ module.net.aws_subnet.private["b"]
+Outputs: 0 added, 0 removed, 1 changed
+  ~ vpc_id
+```
+
+With an explicit `--output json` (or `yaml`) it prints `{"resources": {"added": [...], "removed": [...], "changed": [...]}, "outputs": {...}}`; `tsv` prints one `change kind address` line per difference.
+
+`state outputs prod -o my-org` prints the outputs of the newest state. With `--output json` (the default) it prints the same map as `terraform output -json`, so CI can read it with `jq -r .vpc_id.value`; `table` and `tsv` print one line per output. Sensitive values print as `(sensitive)` unless `--show-sensitive` is set.
+
+## Breaking Changes
+
+Changes in behaviour that can affect existing scripts:
+
+- `workspace delete` marks the workspace deleted (`deleted=true`), so the server also stops its schedules and jobs; `--hard` sends `DELETE` as before. `organization delete` disables the organization (`disabled=true`) after you type its name, or with `--yes`; without a terminal and without `--yes` it fails before any request.
+- `create` sends only the flags you set; the server applies its defaults to the rest. Before, every attribute was sent, so an unset boolean reached the server as `false` (for example `job create` turned `refresh` off).
+- `update` with no field flag fails before any request (`nothing to update: set at least one field flag, see --help`).
+- Flags that take a template, VCS connection, SSH key, agent, project or tag accept a name as well as an ID. Lookup errors now read `template "x" not found in organization <id>` and `multiple agents match "x": <id>, <id>; pass the ID instead`.
+- `job create` / `job update`: the job log field flag is now `--job-output`. `--output` is always the global output format and is validated before any API call.
+- `job create`: `--command`/`-c` is replaced by `--template-reference`/`-t` (the template ID to run). The server never accepted `command`.
+- Flags for attributes the API does not expose are removed: `webhook --path/--branch/--template-id/--event` (use `webhook-event`), `vcs --refresh-token/--token-expiration`, `address --type`, `agent --type`.
+- `github-app-token --expires-at` takes an RFC 3339 timestamp (`2026-01-02T15:04:05Z`). Dates print as UTC RFC 3339 timestamps.
+- A path in `api_url` is now kept as a prefix: `https://host/terrakube` sends requests to `https://host/terrakube/api/v1/...`. Before, the path was dropped, so an `api_url` ending in `/api/v1` must lose that suffix.
+- Empty lists print `[]` in JSON instead of `null`.
+- The config file only provides `api_url` and `token`. Other keys in it no longer fill flags.
+- Environment variables no longer fill field flags (`--name`, `--id`, `--description`, ...). Only parent-scope flags, `--output`, and `--hide-nulls` are read from `TERRAKUBE_*` variables.
+- Name lookups (for example `-o my-org`) require an exact name match.
 
 ---
 

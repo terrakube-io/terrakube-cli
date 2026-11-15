@@ -42,6 +42,7 @@ func init() {
 			{StructField: "Category", Flag: "category", Short: "c", Type: resource.String, Required: true, Description: "Variable category (ENV, TERRAFORM)"},
 			{StructField: "Sensitive", Flag: "sensitive", Short: "s", Type: resource.Bool, Description: "Whether the variable is sensitive"},
 			{StructField: "Hcl", Flag: "hcl", Type: resource.Bool, Description: "Whether the variable value is HCL"},
+			{StructField: "Incomplete", Flag: "incomplete", Type: resource.Bool, Description: "Mark the variable as needing a value before a run"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Variable, error) {
 			return c.Variables.List(ctx, pIDs[0], pIDs[1], opts)
@@ -49,11 +50,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.Variable, error) {
 			return c.Variables.Get(ctx, pIDs[0], pIDs[1], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, v *terrakube.Variable) (*terrakube.Variable, error) {
-			return c.Variables.Create(ctx, pIDs[0], pIDs[1], v)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.Variable, error) {
+			return c.Variables.CreateFields(ctx, pIDs[0], pIDs[1], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, v *terrakube.Variable) (*terrakube.Variable, error) {
-			return c.Variables.Update(ctx, pIDs[0], pIDs[1], v)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.Variable, error) {
+			return c.Variables.UpdateFields(ctx, pIDs[0], pIDs[1], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.Variables.Delete(ctx, pIDs[0], pIDs[1], id)

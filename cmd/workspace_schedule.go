@@ -37,7 +37,9 @@ func init() {
 		},
 		Fields: []resource.FieldDef{
 			{StructField: "Schedule", Flag: "schedule", Type: resource.String, Required: true, Description: "Cron expression"},
-			{StructField: "TemplateID", Flag: "template-id", Type: resource.String, Required: true, Description: "Template reference ID"},
+			{StructField: "TemplateID", Flag: "template-id", Type: resource.String, Required: true, Resolver: templateResolver, Description: "Template, by name or ID"},
+			{StructField: "Enabled", Flag: "enabled", Type: resource.Bool, Description: "Run the schedule"},
+			{StructField: "Description", Flag: "description", Short: "d", Type: resource.String, Description: "Schedule description"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.WorkspaceSchedule, error) {
 			return c.WorkspaceSchedules.List(ctx, pIDs[1], opts)
@@ -45,11 +47,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.WorkspaceSchedule, error) {
 			return c.WorkspaceSchedules.Get(ctx, pIDs[1], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, s *terrakube.WorkspaceSchedule) (*terrakube.WorkspaceSchedule, error) {
-			return c.WorkspaceSchedules.Create(ctx, pIDs[1], s)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.WorkspaceSchedule, error) {
+			return c.WorkspaceSchedules.CreateFields(ctx, pIDs[1], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, s *terrakube.WorkspaceSchedule) (*terrakube.WorkspaceSchedule, error) {
-			return c.WorkspaceSchedules.Update(ctx, pIDs[1], s)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.WorkspaceSchedule, error) {
+			return c.WorkspaceSchedules.UpdateFields(ctx, pIDs[1], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.WorkspaceSchedules.Delete(ctx, pIDs[1], id)

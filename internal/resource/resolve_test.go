@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	terrakube "github.com/terrakube-io/terrakube-go"
 	"github.com/spf13/cobra"
+	terrakube "github.com/terrakube-io/terrakube-go"
 )
 
 func TestIsUUID(t *testing.T) {
@@ -225,5 +225,18 @@ func TestResolveParents_RawIDSkipsResolver(t *testing.T) {
 	}
 	if called {
 		t.Error("resolver should not be called for RawID parent")
+	}
+}
+
+func TestScopeHelpersForHandWrittenCommands(t *testing.T) {
+	parents := []ParentScope{{Name: "organization", Flag: "organization", ShortFlag: "o", IDFlag: "organization-id"}}
+	cmd := &cobra.Command{Use: "probe"}
+	AddScopeFlags(cmd, parents)
+	if err := cmd.Flags().Set("organization", testOrgID); err != nil {
+		t.Fatal(err)
+	}
+	ids, err := ResolveScope(context.Background(), nil, cmd, parents)
+	if err != nil || len(ids) != 1 || ids[0] != testOrgID {
+		t.Fatalf("ids=%v err=%v", ids, err)
 	}
 }

@@ -34,11 +34,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.FederatedClaim, error) {
 			return c.FederatedClaims.Get(ctx, pIDs[0], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, fc *terrakube.FederatedClaim) (*terrakube.FederatedClaim, error) {
-			return c.FederatedClaims.Create(ctx, pIDs[0], fc)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.FederatedClaim, error) {
+			return c.FederatedClaims.CreateFields(ctx, pIDs[0], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, fc *terrakube.FederatedClaim) (*terrakube.FederatedClaim, error) {
-			return c.FederatedClaims.Update(ctx, pIDs[0], fc)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.FederatedClaim, error) {
+			return c.FederatedClaims.UpdateFields(ctx, pIDs[0], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.FederatedClaims.Delete(ctx, pIDs[0], id)
