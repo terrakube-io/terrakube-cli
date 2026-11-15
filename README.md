@@ -398,6 +398,18 @@ terrakube policy-set-parameter create -o my-org --policy-set baseline --key max_
 terrakube policy-attachment create -o my-org --policy-set baseline --workspace prod
 ```
 
+An exemption skips one rule of a policy set until it expires, for one workspace (`--workspace`), one project (`--project`) or, with neither, the whole organization. When a job stops on a soft-mandatory failure, read its evaluations and override one with a justification, then approve the job:
+
+```bash
+terrakube policy-exemption create -o my-org --policy-set baseline --rule deny_public_s3 \
+  --justification "legacy bucket, migration in SEC-12" --ticket SEC-12 --expires-at 2027-01-31T00:00:00Z --workspace prod
+terrakube policy-evaluation list -o my-org --job 42
+terrakube policy-override create -o my-org --job 42 --policy-evaluation <EVALUATION_ID> --justification "accepted risk"
+terrakube job approve 42 -o my-org
+```
+
+`policy-override create` records the user named in your token (email, else user name) as the one who overrode.
+
 ## Breaking Changes
 
 Changes in behaviour that can affect existing scripts:

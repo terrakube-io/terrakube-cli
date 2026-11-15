@@ -98,6 +98,15 @@ var routeCases = []routeCase{
 		cmd: "policy-attachment", typ: "policy_attachment", parents: []string{"organization", "policy-set"},
 		base: routeOrg + "policySet/{2}/attachments", create: []string{"--tag", "77777777-7777-4777-8777-777777777777"},
 	},
+	{
+		cmd: "policy-exemption", typ: "policy_exemption", parents: []string{"organization"}, base: routeOrg + "policyExemption",
+		create: []string{"--policy-set", "77777777-7777-4777-8777-777777777777", "--rule", "r", "--justification", "j", "--expires-at", "2027-01-02T15:04:05Z", "--ticket", "OPS-1"},
+	},
+	{cmd: "policy-evaluation", typ: "policy_evaluation", parents: []string{"organization", "job"}, base: routeOrg + "job/{2}/policyEvaluation", verbs: []string{"list", "get"}},
+	{
+		cmd: "policy-override", typ: "policy_override", parents: []string{"organization", "job", "policy-evaluation"},
+		base: routeOrg + "job/{2}/policyEvaluation/{3}/override", create: []string{"--justification", "j"}, verbs: []string{"get", "create"},
+	},
 	{cmd: "project", typ: "project", parents: []string{"organization"}, base: routeOrg + "project", create: []string{"--name", "n"}},
 	{cmd: "project-access", typ: "project_access", parents: []string{"organization", "project"}, base: routeOrg + "project/{2}/projectAccess", create: []string{"--name", "n"}},
 	{cmd: "provider", typ: "provider", parents: []string{"organization"}, base: routeOrg + "provider", create: []string{"--name", "n"}},
