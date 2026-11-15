@@ -111,6 +111,10 @@ var routeCases = []routeCase{
 	{cmd: "project-access", typ: "project_access", parents: []string{"organization", "project"}, base: routeOrg + "project/{2}/projectAccess", create: []string{"--name", "n"}},
 	{cmd: "provider", typ: "provider", parents: []string{"organization"}, base: routeOrg + "provider", create: []string{"--name", "n"}},
 	{cmd: "provider-version", typ: "version", parents: []string{"organization", "provider"}, base: routeOrg + "provider/{2}/version", create: []string{"--version-number", "1.0.0"}},
+	{
+		cmd: "run-trigger", typ: "runTrigger", parents: []string{"organization", "workspace"}, base: routeOrgWs + "runTriggers",
+		create: []string{"--source", "77777777-7777-4777-8777-777777777777"}, update: []string{"--enabled"},
+	},
 	{cmd: "ssh", typ: "ssh", parents: []string{"organization"}, base: routeOrg + "ssh", create: []string{"--name", "n", "--private-key", "k", "--ssh-type", "rsa"}},
 	{cmd: "step", typ: "step", parents: []string{"organization", "job"}, base: routeOrg + "job/{2}/step", create: []string{"--name", "n"}},
 	{cmd: "tag", typ: "tag", parents: []string{"organization"}, base: routeOrg + "tag", create: []string{"--name", "n"}},

@@ -388,6 +388,13 @@ echo $?   # 0 completed or no changes, 1 error, 2 failed, rejected or cancelled,
 
 A job waiting for approval is listed with `job list -o my-org -w prod --status waitingApproval` and handled with `job approve <job-id>`, `job reject <job-id>` or `job cancel <job-id>`. Each checks the job's current status first and changes nothing if it does not allow the action. `workspace lock prod -o my-org --reason "release freeze"` stops new runs on a workspace until `workspace unlock prod -o my-org`.
 
+A run trigger starts a run in one workspace after an apply in another. `-w` is the workspace that gets the run, `--source` the one whose apply fires it; without `--template` the run uses the destination's default template:
+
+```bash
+terrakube run-trigger create -o my-org -w app --source network --template Apply
+terrakube run-trigger update -o my-org -w app --id <TRIGGER_ID> --enabled=false
+```
+
 ### 8. Enforce Policies
 
 A policy set points at a repository of OPA policies. Attach it to exactly one workspace, project or tag per attachment (names or IDs); a `policy-attachment` with no target or more than one fails before any request.
