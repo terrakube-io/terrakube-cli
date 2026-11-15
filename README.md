@@ -49,7 +49,7 @@ Pre-compiled archives are published on [GitHub Releases](https://github.com/terr
 | [Homebrew](#homebrew-macos--linux) | macOS, Linux | `brew install terrakube-io/cli/terrakube` |
 | [Chocolatey](#chocolatey-windows) | Windows | `choco install terrakube` |
 | [packslip](#packslip-verified-install) | macOS, Linux | `packslip install github.com/terrakube-io/terrakube-cli` |
-| [mise](#mise) | macOS, Linux, Windows | `mise use -g github:terrakube-io/terrakube-cli` |
+| [mise](#mise) | macOS, Linux | `mise use -g packslip:github.com/terrakube-io/terrakube-cli` |
 | [Snap Store](#snap-package-ubuntu--linux) | Linux | `sudo snap install terrakube-cli` |
 | [Release archive](#linux--macos-bash--zsh) | macOS, Linux, Windows | download from [GitHub Releases](https://github.com/terrakube-io/terrakube-cli/releases/latest) |
 | [Docker](#docker) | any Docker host | `docker run --rm azbuilder/terrakube-cli --help` |
@@ -87,15 +87,15 @@ Get packslip itself with `mise use -g packslip` or `curl -fsSL https://packslip.
 
 ### mise
 
-[mise](https://mise.jdx.dev) installs the CLI straight from the GitHub release archives:
+[mise](https://mise.jdx.dev) installs the CLI through its `packslip` backend, which checks the release's signed packslip bundle before it installs the archive:
 
 ```bash
-mise use -g github:terrakube-io/terrakube-cli         # latest release
-mise use -g github:terrakube-io/terrakube-cli@x.y.z   # a specific version
+mise use -g packslip:github.com/terrakube-io/terrakube-cli         # latest release
+mise use -g packslip:github.com/terrakube-io/terrakube-cli@x.y.z   # a specific version
 terrakube --version
 ```
 
-In a project, `mise use github:terrakube-io/terrakube-cli@x.y.z` pins the version in `mise.toml`, which also suits CI.
+In a project, `mise use packslip:github.com/terrakube-io/terrakube-cli@x.y.z` pins the version in `mise.toml`, which also suits CI.
 
 ### Snap Package (Ubuntu / Linux)
 
