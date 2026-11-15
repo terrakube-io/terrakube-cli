@@ -46,7 +46,7 @@ Every resource is registered through `resource.Register[T](rootCmd, resource.Con
 - Field flags must not be named `output` (it is the global format flag); the job log field is `--job-output`.
 - Executor-only parts are hidden from `--help` but still work: `FieldDef.Hidden` for flags, `Config.HiddenVerbs` for subcommands (job/step/history/github-app-token writes the server allows only to executor or super-service tokens).
 
-Hand-written commands (`login`, `logout`, `team-token`, `operations`, `job wait|approve|reject|cancel`, `run plan|apply|destroy`, `workspace lock|unlock`) call `newClient()` themselves. Subcommands of a generated resource are added to the command `Register` returns (`jobCmd.AddCommand(newJobWaitCmd())`); `resource.AddScopeFlags`/`ResolveScope` give them the same parent flags. `Config.CreateFlags`/`AfterCreate` add flags to a generated create and take over its rendering (`job create --wait`). To end with an exit code other than 1, return an `*exit.Error`; `Execute` maps it through `run()`.
+Hand-written commands (`login`, `logout`, `team-token`, `operations`, `job wait|logs|approve|reject|cancel`, `run plan|apply|destroy`, `workspace lock|unlock`) call `newClient()` themselves. Subcommands of a generated resource are added to the command `Register` returns (`jobCmd.AddCommand(newJobWaitCmd())`); `resource.AddScopeFlags`/`ResolveScope` give them the same parent flags. `Config.CreateFlags`/`AfterCreate` add flags to a generated create and take over its rendering (`job create --wait`). To end with an exit code other than 1, return an `*exit.Error`; `Execute` maps it through `run()`.
 
 ### Config, env, and flags
 

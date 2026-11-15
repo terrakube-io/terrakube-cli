@@ -84,7 +84,7 @@ func init() {
 		},
 		ListFilters: []resource.ListFilter{{Flag: "status", Attribute: "status", Description: "only jobs in this status, e.g. waitingApproval"}},
 	})
-	jobCmd.AddCommand(newJobWaitCmd())
+	jobCmd.AddCommand(newJobWaitCmd(), newJobLogsCmd())
 	for _, a := range jobActions {
 		jobCmd.AddCommand(newJobActionCmd(a))
 	}

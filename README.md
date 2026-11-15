@@ -383,7 +383,7 @@ terrakube run plan -o "my-org" -w "prod" -t "Plan" --target module.network --wai
 echo $?   # 0 completed or no changes, 1 error, 2 failed, rejected or cancelled, 3 timed out
 ```
 
-`job create --wait` and `job wait <job-id>` wait the same way, so a CI step can branch on the exit code.
+`job create --wait` and `job wait <job-id>` wait the same way, so a CI step can branch on the exit code. `job logs <job-id>` prints every step's log in order (`--step 200` for one step); `--follow` streams the running step until the job ends and exits with the same codes.
 
 A job waiting for approval is listed with `job list -o my-org -w prod --status waitingApproval` and handled with `job approve <job-id>`, `job reject <job-id>` or `job cancel <job-id>`. Each checks the job's current status first and changes nothing if it does not allow the action. `workspace lock prod -o my-org --reason "release freeze"` stops new runs on a workspace until `workspace unlock prod -o my-org`.
 

@@ -37,9 +37,10 @@ func jobStatusServer(t *testing.T, statuses ...string) *int {
 
 func fastPolling(t *testing.T) {
 	t.Helper()
-	old := jobPollInterval
+	old, oldBackoff := jobPollInterval, logReconnectBackoff
 	jobPollInterval = time.Millisecond
-	t.Cleanup(func() { jobPollInterval = old })
+	logReconnectBackoff = func(int) time.Duration { return time.Millisecond }
+	t.Cleanup(func() { jobPollInterval, logReconnectBackoff = old, oldBackoff })
 }
 
 // AC-20: wait until a final status, print it, exit by the status.
