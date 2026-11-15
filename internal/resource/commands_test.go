@@ -535,3 +535,31 @@ func TestCreateCmd_AfterCreateReplacesRendering(t *testing.T) {
 		t.Errorf("follow=%v id=%q out=%q", gotFollow, gotID, out)
 	}
 }
+
+func TestListCmd_ListFiltersAreANDedWithFilter(t *testing.T) {
+	cfg := testConfig()
+	cfg.ListFilters = []ListFilter{{Flag: "state", Attribute: "status", Description: "status"}}
+	var got string
+	cfg.List = func(_ context.Context, _ *terrakube.Client, _ []string, opts *terrakube.ListOptions) ([]*testResource, error) {
+		got = ""
+		if opts != nil {
+			got = opts.Filter
+		}
+		return nil, nil
+	}
+	for _, tt := range []struct {
+		args []string
+		want string
+	}{
+		{nil, ""},
+		{[]string{"--state", `a "b"`}, `status=="a \"b\""`},
+		{[]string{"--filter", "x==1", "--state", "on"}, `x==1;status=="on"`},
+	} {
+		if _, err := runCmd(t, cfg, append([]string{"list", "--organization", testOrgID}, tt.args...)...); err != nil {
+			t.Fatal(err)
+		}
+		if got != tt.want {
+			t.Errorf("%v: filter %q, want %q", tt.args, got, tt.want)
+		}
+	}
+}

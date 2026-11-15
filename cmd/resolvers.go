@@ -6,13 +6,14 @@ import (
 	"strings"
 
 	terrakube "github.com/terrakube-io/terrakube-go"
+
+	"terrakube/internal/resource"
 )
 
 // nameFilter builds an RSQL equality filter with the name as a quoted string,
 // so spaces, ';', ',', quotes and parentheses cannot alter the filter.
 func nameFilter(name string) *terrakube.ListOptions {
-	quoted := strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(name)
-	return &terrakube.ListOptions{Filter: `name=="` + quoted + `"`}
+	return &terrakube.ListOptions{Filter: "name==" + resource.QuoteRSQL(name)}
 }
 
 // resolveByName returns the ID of the single item whose name equals name.

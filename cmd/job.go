@@ -82,6 +82,10 @@ func init() {
 			}
 			return outputpkg.Render(os.Stdout, created, output)
 		},
+		ListFilters: []resource.ListFilter{{Flag: "status", Attribute: "status", Description: "only jobs in this status, e.g. waitingApproval"}},
 	})
 	jobCmd.AddCommand(newJobWaitCmd())
+	for _, a := range jobActions {
+		jobCmd.AddCommand(newJobActionCmd(a))
+	}
 }

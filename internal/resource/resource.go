@@ -99,8 +99,25 @@ type Config[T any] struct {
 
 	// CreateFlags adds extra flags to create; AfterCreate then gets the created
 	// resource and replaces the default rendering (e.g. job create --wait).
+	// ListFilters add list flags that filter on an attribute (job list --status);
+	// they are ANDed with --filter.
+	ListFilters []ListFilter
+
 	CreateFlags func(cmd *cobra.Command)
 	AfterCreate func(cmd *cobra.Command, ctx context.Context, c *terrakube.Client, parentIDs []string, created *T) error
+}
+
+// ListFilter is a list flag that adds Attribute=="value" to the RSQL filter.
+type ListFilter struct {
+	Flag        string
+	Attribute   string
+	Description string
+}
+
+// QuoteRSQL quotes v as an RSQL string, so spaces, ';', ',', quotes and
+// parentheses cannot alter the filter.
+func QuoteRSQL(v string) string {
+	return `"` + strings.NewReplacer(`\`, `\\`, `"`, `\"`).Replace(v) + `"`
 }
 
 // SoftDelete configures a delete that sets Attribute to true.
@@ -170,8 +187,17 @@ func newListCmd[T any](cfg Config[T]) *cobra.Command {
 
 			var opts *terrakube.ListOptions
 			filter, _ := cmd.Flags().GetString("filter")
+			parts := []string{}
 			if filter != "" {
-				opts = &terrakube.ListOptions{Filter: filter}
+				parts = append(parts, filter)
+			}
+			for _, lf := range cfg.ListFilters {
+				if v, _ := cmd.Flags().GetString(lf.Flag); v != "" {
+					parts = append(parts, lf.Attribute+"=="+QuoteRSQL(v))
+				}
+			}
+			if len(parts) > 0 {
+				opts = &terrakube.ListOptions{Filter: strings.Join(parts, ";")}
 			}
 
 			result, err := cfg.List(ctx, client, parentIDs, opts)
@@ -185,6 +211,9 @@ func newListCmd[T any](cfg Config[T]) *cobra.Command {
 
 	addParentFlags(cmd, cfg.Parents)
 	cmd.Flags().String("filter", "", "RSQL filter expression")
+	for _, lf := range cfg.ListFilters {
+		cmd.Flags().String(lf.Flag, "", lf.Description)
+	}
 	return cmd
 }
 
