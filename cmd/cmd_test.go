@@ -36,7 +36,7 @@ func resetGlobalFlags() {
 		"executionMode", "icon", "provider", "tag-prefix", "tag-id",
 		"manage-provider", "manage-module", "manage-workspace",
 		"manage-state", "manage-collection", "manage-vcs", "manage-template",
-		"cli",
+		"cli", "refresh_token", "token_expires_at", "token_endpoint", "client_id",
 	}
 	for _, key := range viperKeysToReset {
 		viper.Set(key, "")

@@ -108,7 +108,8 @@ func initConfig() {
 	viper.SetConfigFile(path)
 	viper.SetConfigType(configType(path))
 
-	// Only api_url and token are read through viper (see newClient).
+	// Only api_url, token and the refresh data of a Dex session are read
+	// through viper (see newClient and refreshSavedToken).
 	viper.SetEnvPrefix(envPrefix)
 	viper.SetEnvKeyReplacer(envReplacer)
 	viper.AutomaticEnv()
@@ -151,13 +152,15 @@ func newClient() (*terrakube.Client, error) {
 		return nil, configErr
 	}
 	endpoint := viper.GetString("api_url")
-	token := currentToken()
-	if endpoint == "" || token == "" {
+	if endpoint == "" || currentToken() == "" {
 		return nil, errors.New(`not logged in: run "terrakube login" or set TERRAKUBE_API_URL and TERRAKUBE_TOKEN (or TERRAKUBE_PAT)`)
+	}
+	if err := refreshSavedToken(); err != nil {
+		return nil, err
 	}
 	return terrakube.NewClient(
 		terrakube.WithEndpoint(endpoint),
-		terrakube.WithToken(token),
+		terrakube.WithToken(currentToken()),
 	)
 }
 

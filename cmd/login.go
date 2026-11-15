@@ -20,8 +20,9 @@ or with --web through the browser.
 
 --web reads login.v1 from the server's /.well-known/terraform.json, opens the
 browser (the URL is also printed) and waits for the login on a local port from
-the advertised range. It saves the token it gets: a Terrakube token from
-the Terrakube login broker, or a Dex token.
+the advertised range. With the Terrakube login broker it saves a Terrakube
+token. With Dex it also saves the refresh token and renews the Dex token
+before a command uses it once it expires.
 
 The API URL should be provided in the following format:
   http://your-server:port
@@ -108,6 +109,9 @@ func login() error {
 		settings["api_url"] = url
 		settings["token"] = pat
 		delete(settings, "pat") // written by older versions of login
+		for _, k := range refreshKeys {
+			delete(settings, k) // a PAT is never refreshed
+		}
 	}); err != nil {
 		return fmt.Errorf("saving configuration: %w", err)
 	}

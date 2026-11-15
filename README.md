@@ -267,7 +267,9 @@ terrakube login --web --api-url "https://terrakube-api.platform.local"
 What it saves depends on the server:
 
 - with the Terrakube login broker (`/oauth/authorize`), a Terrakube token; you choose its lifetime on the consent page, and it is used like a PAT;
-- with Dex (`/auth`), the Dex access token.
+- with Dex (`/auth`), the Dex access token, plus the `refresh_token`, the token's expiry and the token endpoint and client ID needed to renew it.
+
+The Dex access token is short-lived. Before a command uses a saved Dex token that has expired or expires within a minute, the CLI exchanges the refresh token for a new one and saves it (mode `0600`). If that fails, the command exits with code 1 and `session expired, run terrakube login --web`. A token from `TERRAKUBE_TOKEN` or `TERRAKUBE_PAT`, and a PAT saved by `terrakube login`, are never refreshed. `terrakube login` with a PAT and `terrakube logout` remove the saved refresh data.
 
 To run commands without a config file (for example in CI), set `TERRAKUBE_API_URL` and a token. The token is taken from the first of these that is set: `TERRAKUBE_TOKEN`, `TERRAKUBE_PAT`, the `token` saved in the config file. `terrakube logout` removes the stored token (a token in the environment still applies).
 

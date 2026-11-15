@@ -30,6 +30,9 @@ var logoutCmd = &cobra.Command{
 		if err := updateConfig(func(settings map[string]any) {
 			delete(settings, "token")
 			delete(settings, "pat") // written by older versions of login
+			for _, k := range refreshKeys {
+				delete(settings, k)
+			}
 		}); err != nil {
 			return fmt.Errorf("saving configuration: %w", err)
 		}

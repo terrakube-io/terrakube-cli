@@ -131,7 +131,7 @@ func loginWeb(w io.Writer, timeout time.Duration) error {
 
 	if err := updateConfig(func(settings map[string]any) {
 		settings["api_url"] = api
-		settings["token"] = tok.AccessToken
+		setSession(settings, tok, tokenURL, svc.Client)
 		delete(settings, "pat") // written by older versions of login
 	}); err != nil {
 		return fmt.Errorf("saving configuration: %w", err)
