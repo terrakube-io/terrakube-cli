@@ -9,7 +9,7 @@ import (
 )
 
 func init() {
-	resource.Register(rootCmd, resource.Config[terrakube.Job]{
+	jobCmd := resource.Register(rootCmd, resource.Config[terrakube.Job]{
 		Runtime: resource.Runtime{
 			NewClient:  newClient,
 			GetContext: getContext,
@@ -69,4 +69,5 @@ func init() {
 		// Only executor or super-service tokens may call these; the server answers 403 otherwise.
 		HiddenVerbs: []string{"delete"},
 	})
+	jobCmd.AddCommand(newJobWaitCmd())
 }

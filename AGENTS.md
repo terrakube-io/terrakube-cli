@@ -24,6 +24,8 @@ cmd/
   team_token.go      # Hand-written commands (no generic CRUD shape)
   operations.go      # Hand-written: JSON:API atomic operations from --file
 internal/
+  exit/exit.go       # exit codes: 0 ok, 1 error, 2 job failed/rejected/cancelled, 3 timeout
+  jobwait/jobwait.go # Wait: poll a job until a final status (job wait, run --wait)
   output/renderer.go # Render(w, data, format): json, yaml, table, tsv, none
   resource/
     resource.go      # Config[T], Register[T](), flag/field population
@@ -44,7 +46,7 @@ Every resource is registered through `resource.Register[T](rootCmd, resource.Con
 - Field flags must not be named `output` (it is the global format flag); the job log field is `--job-output`.
 - Executor-only parts are hidden from `--help` but still work: `FieldDef.Hidden` for flags, `Config.HiddenVerbs` for subcommands (job/step/history/github-app-token writes the server allows only to executor or super-service tokens).
 
-Hand-written commands (`login`, `logout`, `team-token`, `operations`) call `newClient()` themselves.
+Hand-written commands (`login`, `logout`, `team-token`, `operations`, `job wait`) call `newClient()` themselves. Subcommands of a generated resource are added to the command `Register` returns (`jobCmd.AddCommand(newJobWaitCmd())`); `resource.AddScopeFlags`/`ResolveScope` give them the same parent flags. To end with an exit code other than 1, return an `*exit.Error`; `Execute` maps it through `run()`.
 
 ### Config, env, and flags
 
