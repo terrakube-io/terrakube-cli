@@ -33,7 +33,10 @@ For full CLI reference documentation, visit our official guide at [https://docs.
   - [8. Enforce Policies](#8-enforce-policies)
   - [9. Other Resource Fields](#9-other-resource-fields)
   - [10. Work with State](#10-work-with-state)
-- [Breaking Changes](#breaking-changes)
+- [Compatibility](#compatibility)
+  - [What 1.0 keeps stable](#what-10-keeps-stable)
+  - [Server compatibility](#server-compatibility)
+- [Changelog](CHANGELOG.md)
 - [Contributing](#contributing)
 - [Security](#security)
 
@@ -92,6 +95,12 @@ Install from the Snap Store:
 
 ```bash
 sudo snap install terrakube-cli
+```
+
+Release candidates are published to the `candidate` channel and betas to `beta`. Until 1.0.0 is out, the `stable` channel is empty, so add `--candidate`:
+
+```bash
+sudo snap install terrakube-cli --candidate
 ```
 
 The snap exposes the command as `terrakube-cli`. To call it as `terrakube`, add an alias:
@@ -559,23 +568,49 @@ With an explicit `--output json` (or `yaml`) it prints `{"resources": {"added": 
 
 `state outputs prod -o my-org` prints the outputs of the newest state. With `--output json` (the default) it prints the same map as `terraform output -json`, so CI can read it with `jq -r .vpc_id.value`; `table` and `tsv` print one line per output. Sensitive values print as `(sensitive)` unless `--show-sensitive` is set.
 
-## Breaking Changes
+## Compatibility
 
-Changes in behaviour that can affect existing scripts:
+### What 1.0 keeps stable
 
-- `workspace delete` marks the workspace deleted (`deleted=true`), so the server also stops its schedules and jobs; `--hard` sends `DELETE` as before. `organization delete` disables the organization (`disabled=true`) after you type its name, or with `--yes`; without a terminal and without `--yes` it fails before any request.
-- `create` sends only the flags you set; the server applies its defaults to the rest. Before, every attribute was sent, so an unset boolean reached the server as `false` (for example `job create` turned `refresh` off).
-- `update` with no field flag fails before any request (`nothing to update: set at least one field flag, see --help`).
-- Flags that take a template, VCS connection, SSH key, agent, project or tag accept a name as well as an ID. Lookup errors now read `template "x" not found in organization <id>` and `multiple agents match "x": <id>, <id>; pass the ID instead`.
-- `job create` / `job update`: the job log field flag is now `--job-output`. `--output` is always the global output format and is validated before any API call.
-- `job create`: `--command`/`-c` is replaced by `--template-reference`/`-t` (the template ID to run). The server never accepted `command`.
-- Flags for attributes the API does not expose are removed: `webhook --path/--branch/--template-id/--event` (use `webhook-event`), `vcs --refresh-token/--token-expiration`, `address --type`, `agent --type`.
-- `github-app-token --expires-at` takes an RFC 3339 timestamp (`2026-01-02T15:04:05Z`). Dates print as UTC RFC 3339 timestamps.
-- A path in `api_url` is now kept as a prefix: `https://host/terrakube` sends requests to `https://host/terrakube/api/v1/...`. Before, the path was dropped, so an `api_url` ending in `/api/v1` must lose that suffix.
-- Empty lists print `[]` in JSON instead of `null`.
-- The config file only provides `api_url` and `token`. Other keys in it no longer fill flags.
-- Environment variables no longer fill field flags (`--name`, `--id`, `--description`, ...). Only parent-scope flags, `--output`, and `--hide-nulls` are read from `TERRAKUBE_*` variables.
-- Name lookups (for example `-o my-org`) require an exact name match.
+From 1.0.0 on, the CLI follows [Semantic Versioning](https://semver.org/). Only a new major version may break the following:
+
+- **Commands and flags:** command and subcommand names, flag names and short flags, and what they do.
+- **Structured output:** the field names and value types in `--output json` and `--output yaml`. A minor release may add fields, so parse the output by field name, not by position.
+- **Exit codes:**
+
+  | Code | Meaning |
+  |---|---|
+  | `0` | Success. For a job: `completed` or `noChanges` |
+  | `1` | CLI or API error |
+  | `2` | The job ended `failed`, `rejected` or `cancelled` |
+  | `3` | `--wait` / `job wait` timed out before the job ended |
+
+- **Config file keys:** `api_url` and `token`.
+- **Environment variables:** `TERRAKUBE_API_URL`, `TERRAKUBE_TOKEN`, `TERRAKUBE_PAT`, `TERRAKUBE_ORGANIZATION` / `TERRAKUBE_ORGANIZATION_ID`, `TERRAKUBE_WORKSPACE` / `TERRAKUBE_WORKSPACE_ID`, `TERRAKUBE_OUTPUT`, `TERRAKUBE_HIDE_NULLS`, `TERRAKUBE_TEMPLATE_PLAN` / `_APPLY` / `_DESTROY` and `TERRAKUBE_OIDC_TOKEN`.
+
+These can change in any release:
+
+- `--output table` and `tsv`: column order and set, and wrapping;
+- messages for people: progress and error text, and `--help`;
+- the refresh data that `login --web` stores in the config file next to `token`.
+
+A command or flag that is going away stays for at least one minor release with a deprecation warning, and is removed only in the next major version. [CHANGELOG.md](CHANGELOG.md) lists every change, including what broke between the betas and 1.0.
+
+### Server compatibility
+
+| CLI | Terrakube server |
+|---|---|
+| 1.0.x | 2.34.0 or later. Tested against 2.34.1 |
+
+Policies, run triggers, `login --web` through the Terrakube login broker, and live step logs (`job logs --follow`) all need API features added in 2.34.0. Other commands may work against older servers, but that is not tested.
+
+Known server issues that show up in the CLI. Each is fixed in the linked pull request and will ship in the next server release:
+
+| Issue | Server fix |
+|---|---|
+| `job logs --follow` drops the leading spaces of log lines (the archived log is fine) | [terrakube#3927](https://github.com/terrakube-io/terrakube/pull/3927) |
+| A job cancelled while the server dispatches it can still run | [terrakube#3928](https://github.com/terrakube-io/terrakube/pull/3928) |
+| `policy-exemption create` without `--ticket` returns 409 instead of 400 (the CLI already requires `--ticket`) | [terrakube#3929](https://github.com/terrakube-io/terrakube/pull/3929) |
 
 ---
 
