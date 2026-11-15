@@ -1,6 +1,6 @@
 name: Release check
 
-# Builds a snapshot release (archives, Homebrew formula, Chocolatey package)
+# Builds a snapshot release (archives, Homebrew formula)
 # without publishing, so release config changes are tested before a release.
 on:
   pull_request:
@@ -8,7 +8,6 @@ on:
       - .goreleaser.yaml
       - .github/workflows/release.yml
       - .github/workflows/release-check.yml
-      - .github/scripts/**
 
 permissions:
   contents: read
@@ -28,9 +27,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Put choco on PATH
-        run: echo "$GITHUB_WORKSPACE/.github/scripts" >> "$GITHUB_PATH"
-
       - name: Build a snapshot release
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
@@ -41,7 +37,5 @@ jobs:
           HOMEBREW_TAP_GITHUB_TOKEN: unused
           GORELEASER_SNAP_CHANNEL: latest/edge
 
-      - name: Show the Homebrew formula and Chocolatey package
-        run: |
-          cat dist/homebrew/Formula/terrakube.rb
-          ls -l dist/*.nupkg
+      - name: Show the Homebrew formula
+        run: cat dist/homebrew/Formula/terrakube.rb
