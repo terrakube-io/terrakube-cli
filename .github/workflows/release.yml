@@ -54,6 +54,9 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Put choco on PATH
+        run: echo "$GITHUB_WORKSPACE/.github/scripts" >> "$GITHUB_PATH"
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
@@ -62,6 +65,9 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Pushes Formula/terrakube.rb to terrakube-io/homebrew-cli.
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TOKEN }}
+          CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
           GORELEASER_SNAP_CHANNEL: ${{ steps.channel.outputs.channel }}
 
@@ -77,3 +83,18 @@ jobs:
             echo "No snap package found in dist/"
             exit 1
           fi
+
+  packslip:
+    name: packslip
+    needs: goreleaser
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # upload packslip.sigstore.json to the release
+      id-token: write # sign keylessly with this workflow's identity
+      attestations: write # build provenance for each archive
+    steps:
+      - name: Sign the release archives
+        uses: jdx/packslip@e0340e0c1d10c90a434de2b90f3a1ba345923564 # v1.11.4
+        with:
+          download: terrakube_*_*.tar.gz terrakube_*_*.zip
+          bin: terrakube

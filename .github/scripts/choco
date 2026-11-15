@@ -1,0 +1,6 @@
+#!/bin/sh
+# Runs the Linux build of Chocolatey CLI (on Mono) for GoReleaser's chocolatey
+# pipe, which calls `choco pack` and `choco push` in the repository directory.
+exec docker run --rm -v "$PWD:$PWD" -w "$PWD" \
+  chocolatey/choco:v2.7.5-linux@sha256:310b93c61d401815242864de60e258d81ef3dc73c714f3a94ba498d729a76d8d \
+  choco "$@"

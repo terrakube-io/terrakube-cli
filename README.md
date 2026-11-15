@@ -7,6 +7,9 @@ For full CLI reference documentation, visit our official guide at [https://docs.
 ## Table of Contents
 
 - [Download & Installation](#download--installation)
+  - [Homebrew (macOS / Linux)](#homebrew-macos--linux)
+  - [Chocolatey (Windows)](#chocolatey-windows)
+  - [packslip (verified install)](#packslip-verified-install)
   - [Snap Package (Ubuntu / Linux)](#snap-package-ubuntu--linux)
   - [Linux & macOS](#linux--macos)
   - [Windows](#windows)
@@ -38,7 +41,31 @@ For full CLI reference documentation, visit our official guide at [https://docs.
 
 ## Download & Installation
 
-Pre-compiled archives are published on [GitHub Releases](https://github.com/terrakube-io/terrakube-cli/releases/latest) for Linux and macOS (amd64, arm64) and Windows (amd64, 386). The CLI is also available from the Snap Store and as a Docker image.
+Pre-compiled archives are published on [GitHub Releases](https://github.com/terrakube-io/terrakube-cli/releases/latest) for Linux and macOS (amd64, arm64) and Windows (amd64, 386). The CLI is also available from Homebrew, Chocolatey, the Snap Store, through packslip and as a Docker image.
+
+### Homebrew (macOS / Linux)
+
+```bash
+brew install terrakube-io/cli/terrakube
+terrakube --version
+```
+
+### Chocolatey (Windows)
+
+```powershell
+choco install terrakube
+terrakube --version
+```
+
+New versions appear on Chocolatey after the community moderation; pre-releases need `--prerelease`.
+
+### packslip (verified install)
+
+Every release carries a signed [packslip](https://packslip.dev) bundle (`packslip.sigstore.json`) that lists the archives with their digests and links their build provenance. `packslip install` checks the signature and the digest before it installs `terrakube`:
+
+```bash
+packslip install github.com/terrakube-io/terrakube-cli
+```
 
 ### Snap Package (Ubuntu / Linux)
 

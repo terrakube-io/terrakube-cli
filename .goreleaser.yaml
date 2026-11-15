@@ -90,6 +90,53 @@ snapcrafts:
           - network
 
 # ---------------------------------------------------------------------------
+# Homebrew — formula pushed to the terrakube-io/homebrew-cli tap
+# `brew install terrakube-io/cli/terrakube`
+# ---------------------------------------------------------------------------
+brews:
+  - name: terrakube
+    repository:
+      owner: terrakube-io
+      name: homebrew-cli
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/terrakube-io/terrakube-cli
+    description: Command-line interface for Terrakube
+    license: Apache-2.0
+    commit_msg_template: "terrakube {{ .Tag }}"
+    install: |
+      bin.install "terrakube"
+    test: |
+      assert_match version.to_s, shell_output("#{bin}/terrakube --version")
+
+# ---------------------------------------------------------------------------
+# Chocolatey — `choco install terrakube`. The package downloads the release's
+# Windows zips. The release workflow puts a Docker-based `choco` on PATH
+# (.github/scripts/choco).
+# ---------------------------------------------------------------------------
+chocolateys:
+  - name: terrakube
+    title: Terrakube CLI
+    authors: Terrakube contributors
+    owners: terrakube
+    project_url: https://github.com/terrakube-io/terrakube-cli
+    license_url: https://github.com/terrakube-io/terrakube-cli/blob/main/LICENSE
+    require_license_acceptance: false
+    project_source_url: https://github.com/terrakube-io/terrakube-cli
+    package_source_url: https://github.com/terrakube-io/terrakube-cli
+    docs_url: https://github.com/terrakube-io/terrakube-cli#readme
+    bug_tracker_url: https://github.com/terrakube-io/terrakube-cli/issues
+    tags: terrakube terraform opentofu iac cli
+    summary: Command-line interface for Terrakube
+    description: |
+      The `terrakube` command manages a Terrakube server from the terminal:
+      organizations, workspaces, variables, modules, runs and jobs, policies,
+      state and tokens. Log in with `terrakube login`.
+    release_notes: "https://github.com/terrakube-io/terrakube-cli/releases/tag/{{ .Tag }}"
+    api_key: "{{ .Env.CHOCOLATEY_API_KEY }}"
+    source_repo: https://push.chocolatey.org/
+
+# ---------------------------------------------------------------------------
 # GitHub Release — upload artifacts to the already-created release
 # GoReleaser detects the existing release from GITHUB_REF and uploads to it
 # ---------------------------------------------------------------------------
