@@ -59,7 +59,7 @@ Hand-written commands (`login`, `logout`, `team-token`, `operations`) call `newC
 
 ### Output rendering
 
-Call `output.Render(w, data, format)` from `internal/output/renderer.go`. Supports json, yaml, table, tsv, none formats. Table rendering uses reflection to extract struct fields; fields tagged with `jsonapi "relation,..."` are skipped. Empty lists render as `[]` in JSON.
+Call `output.Render(w, data, format)` from `internal/output/renderer.go`. Supports json, yaml, table, tsv, none formats. Table rendering uses reflection to extract struct fields; a to-one relation (except `organization`) becomes a column with the related ID, to-many relations are skipped. Empty lists render as `[]` in JSON.
 
 ## Building and Testing
 

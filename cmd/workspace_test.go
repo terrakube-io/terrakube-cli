@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/google/jsonapi"
+	terrakube "github.com/terrakube-io/terrakube-go"
 
 	"terrakube/testutil"
 )
@@ -266,5 +267,29 @@ func TestCmdWorkspaceUpdateClearsRelationship(t *testing.T) {
 	}
 	if attrs, _ := data["attributes"].(map[string]interface{}); len(attrs) != 0 {
 		t.Errorf("expected no attributes, got %v", attrs)
+	}
+}
+
+// AC-14: table output shows the workspace's VCS, agent and project IDs.
+func TestCmdWorkspaceGetTableShowsRelationships(t *testing.T) {
+	resetGlobalFlags()
+	ws := testutil.FixtureWorkspace()
+	ws.Vcs = &terrakube.VCS{ID: testVcsID}
+	ws.Agent = &terrakube.Agent{ID: testAgentID}
+	ts := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		_ = jsonapi.MarshalPayload(w, ws)
+	}))
+	defer ts.Close()
+
+	out, err := executeCommand("workspace", "get", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"--id", "d4e5f6a7-b8c9-0123-defa-234567890123", "--output", "table")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"VCS", "AGENT", "PROJECT", testVcsID, testAgentID} {
+		if !strings.Contains(strings.ToUpper(out), strings.ToUpper(want)) {
+			t.Errorf("expected %q in table output:\n%s", want, out)
+		}
 	}
 }
