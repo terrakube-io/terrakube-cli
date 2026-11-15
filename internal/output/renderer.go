@@ -164,6 +164,29 @@ func renderYAML(w io.Writer, data any) error {
 
 func renderTable(w io.Writer, data any) error {
 	rows, headers := extractRows(data)
+	return writeTable(w, headers, rows)
+}
+
+func renderTSV(w io.Writer, data any) error {
+	rows, _ := extractRows(data)
+	return writeTSV(w, rows)
+}
+
+// RenderRows writes rows that are already strings as a table (with headers)
+// or as tsv (without), for data that is not a resource struct. Other formats
+// are an error: callers handle json, yaml and none themselves.
+func RenderRows(w io.Writer, headers []string, rows [][]string, format string) error {
+	switch format {
+	case "table":
+		return writeTable(w, headers, rows)
+	case "tsv":
+		return writeTSV(w, rows)
+	default:
+		return fmt.Errorf("RenderRows: unsupported format %q", format)
+	}
+}
+
+func writeTable(w io.Writer, headers []string, rows [][]string) error {
 	if len(rows) == 0 {
 		return nil
 	}
@@ -177,8 +200,7 @@ func renderTable(w io.Writer, data any) error {
 	return nil
 }
 
-func renderTSV(w io.Writer, data any) error {
-	rows, _ := extractRows(data)
+func writeTSV(w io.Writer, rows [][]string) error {
 	for _, row := range rows {
 		if _, err := fmt.Fprintln(w, strings.Join(row, "\t")); err != nil {
 			return err

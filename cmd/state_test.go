@@ -202,3 +202,77 @@ func TestWriteStateFileRemovesPartialFile(t *testing.T) {
 		t.Errorf("partial file left behind: %v", err)
 	}
 }
+
+const outputsState = `{"values":{"outputs":{
+	"vpc_id":{"value":"vpc-1","type":"string","sensitive":false},
+	"db_password":{"value":"hunter2","type":"string","sensitive":true},
+	"big":{"value":12345678901234567890,"type":"number","sensitive":false},
+	"subnets":{"value":["a","b"],"type":["list","string"],"sensitive":false},
+	"sizes":{"value":{"n":[1.5e3,2]},"type":"map","sensitive":false}}}}`
+
+// AC-38: outputs come from the newest state version; sensitive values print
+// as (sensitive) unless --show-sensitive.
+func TestCmdStateOutputs(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want []string
+		not  []string
+	}{
+		{
+			name: "json hides sensitive",
+			want: []string{`"db_password": {`, `"value": "(sensitive)"`, `"sensitive": true`, `"value": "vpc-1"`, `12345678901234567890`},
+			not:  []string{"hunter2"},
+		},
+		{name: "json shows sensitive", args: []string{"--show-sensitive"}, want: []string{`"value": "hunter2"`}},
+		{
+			name: "tsv",
+			args: []string{"--output", "tsv"},
+			want: []string{"big\t12345678901234567890\tfalse\n", "db_password\t(sensitive)\ttrue\n", "subnets\t[\"a\",\"b\"]\tfalse\n", "vpc_id\tvpc-1\tfalse\n"},
+			not:  []string{"hunter2"},
+		},
+		{name: "table", args: []string{"--output", "table"}, want: []string{"NAME", "VALUE", "SENSITIVE", "(sensitive)", "vpc-1"}, not: []string{"hunter2"}},
+		{name: "none", args: []string{"--output", "none"}, not: []string{"vpc"}},
+		{
+			name: "yaml keeps numbers",
+			args: []string{"--output", "yaml"},
+			want: []string{"value: 12345678901234567890\n", "value: (sensitive)\n", "- 1.5e3\n", "- 2\n"},
+			not:  []string{`"12345678901234567890"`, "hunter2"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			resetGlobalFlags()
+			s := newStateAPI(t)
+			s.addVersion("h1", "old", time.Now().Add(-time.Hour), "{}", `{"values":{"outputs":{"vpc_id":{"value":"stale"}}}}`)
+			s.addVersion("h2", "new", time.Now(), "{}", outputsState)
+			out, err := executeCommand(append([]string{"state", "outputs", "prod", "-o", polOrg}, c.args...)...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, w := range c.want {
+				if !strings.Contains(out, w) {
+					t.Errorf("output lacks %q:\n%s", w, out)
+				}
+			}
+			for _, n := range append(c.not, "stale") {
+				if strings.Contains(out, n) {
+					t.Errorf("output contains %q:\n%s", n, out)
+				}
+			}
+		})
+	}
+}
+
+// AC-38: a workspace without state has no outputs.
+func TestCmdStateOutputsEmpty(t *testing.T) {
+	resetGlobalFlags()
+	newStateAPI(t)
+	out, err := executeCommand("state", "outputs", polWs, "-o", polOrg)
+	if err != nil || strings.TrimSpace(out) != "{}" {
+		t.Errorf("out %q, err %v", out, err)
+	}
+	if _, err := executeCommand("state", "outputs", "nope", "-o", polOrg); err == nil {
+		t.Error("expected an error for an unknown workspace")
+	}
+}

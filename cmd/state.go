@@ -2,14 +2,19 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 	terrakube "github.com/terrakube-io/terrakube-go"
+	"gopkg.in/yaml.v3"
 
+	outputpkg "terrakube/internal/output"
 	"terrakube/internal/resource"
 )
 
@@ -18,7 +23,7 @@ func init() {
 		Use:   "state pull|outputs|rollback|diff",
 		Short: "read, compare and roll back a workspace's Terraform state",
 	}
-	stateCmd.AddCommand(newStatePullCmd())
+	stateCmd.AddCommand(newStatePullCmd(), newStateOutputsCmd())
 	rootCmd.AddCommand(stateCmd)
 }
 
@@ -127,4 +132,94 @@ func writeStateFile(path string, body io.Reader) error {
 		_ = os.Remove(path)
 	}
 	return err
+}
+
+// sensitiveMask replaces sensitive output values unless --show-sensitive.
+const sensitiveMask = "(sensitive)"
+
+// stateOutput is one output in the json/yaml form of state outputs, keyed by
+// name like "terraform output -json".
+type stateOutput struct {
+	Sensitive bool `json:"sensitive" yaml:"sensitive"`
+	Type      any  `json:"type" yaml:"type"`
+	Value     any  `json:"value" yaml:"value"`
+}
+
+func newStateOutputsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "outputs <workspace>",
+		Short: "print a workspace's Terraform outputs",
+		Long: `Print the outputs of the workspace's newest state. json and yaml print a map of
+name to {sensitive, type, value}, like "terraform output -json"; table and tsv
+print one line per output. Sensitive values print as (sensitive) unless
+--show-sensitive is set.`,
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			s, err := newStateScope(cmd, args[0])
+			if err != nil {
+				return err
+			}
+			outs, err := s.client.Outputs.List(s.ctx, s.orgID, s.wsID)
+			if err != nil {
+				return err
+			}
+			show, _ := cmd.Flags().GetBool("show-sensitive")
+			byName := make(map[string]stateOutput, len(outs))
+			rows := make([][]string, 0, len(outs)) // Outputs.List sorts by name
+			for _, o := range outs {
+				v := o.Value
+				if o.Sensitive && !show {
+					v = sensitiveMask
+				}
+				if output == "yaml" {
+					v = yamlNumbers(v)
+				}
+				byName[o.Name] = stateOutput{Sensitive: o.Sensitive, Type: o.Type, Value: v}
+				rows = append(rows, []string{o.Name, outputText(v), strconv.FormatBool(o.Sensitive)})
+			}
+			if output == "table" || output == "tsv" {
+				return outputpkg.RenderRows(os.Stdout, []string{"name", "value", "sensitive"}, rows, output)
+			}
+			return outputpkg.Render(os.Stdout, byName, output)
+		},
+	}
+	resource.AddScopeFlags(cmd, orgScope)
+	cmd.Flags().Bool("show-sensitive", false, "print sensitive values instead of (sensitive)")
+	return cmd
+}
+
+// outputText is v as one line: a string as is, anything else as compact JSON.
+func outputText(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	b, _ := json.Marshal(v) // v was decoded from JSON, so it encodes again
+	return string(b)
+}
+
+// yamlNumbers returns v with its json.Number values as YAML number nodes:
+// yaml would print a json.Number as a quoted string.
+func yamlNumbers(v any) any {
+	switch x := v.(type) {
+	case json.Number:
+		tag := "!!int"
+		if strings.ContainsAny(string(x), ".eE") {
+			tag = "!!float"
+		}
+		return &yaml.Node{Kind: yaml.ScalarNode, Tag: tag, Value: string(x)}
+	case map[string]any:
+		m := make(map[string]any, len(x))
+		for k, e := range x {
+			m[k] = yamlNumbers(e)
+		}
+		return m
+	case []any:
+		l := make([]any, len(x))
+		for i, e := range x {
+			l[i] = yamlNumbers(e)
+		}
+		return l
+	}
+	return v
 }

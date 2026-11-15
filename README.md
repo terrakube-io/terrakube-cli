@@ -445,6 +445,8 @@ terrakube state pull prod -o my-org --version <HISTORY_ID> -f old.tfstate
 
 `--version` takes an ID from `history list` and writes that version's raw state (the same format as without it). The CLI only sends the token to the configured API: if a history entry points at another host, `state pull` fails with exit code 1 and sends nothing there.
 
+`state outputs prod -o my-org` prints the outputs of the newest state. With `--output json` (the default) it prints the same map as `terraform output -json`, so CI can read it with `jq -r .vpc_id.value`; `table` and `tsv` print one line per output. Sensitive values print as `(sensitive)` unless `--show-sensitive` is set.
+
 ## Breaking Changes
 
 Changes in behaviour that can affect existing scripts:
