@@ -36,11 +36,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.SSH, error) {
 			return c.SSH.Get(ctx, pIDs[0], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, s *terrakube.SSH) (*terrakube.SSH, error) {
-			return c.SSH.Create(ctx, pIDs[0], s)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.SSH, error) {
+			return c.SSH.CreateFields(ctx, pIDs[0], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, s *terrakube.SSH) (*terrakube.SSH, error) {
-			return c.SSH.Update(ctx, pIDs[0], s)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.SSH, error) {
+			return c.SSH.UpdateFields(ctx, pIDs[0], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.SSH.Delete(ctx, pIDs[0], id)

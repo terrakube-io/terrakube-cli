@@ -44,11 +44,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.Webhook, error) {
 			return c.Webhooks.Get(ctx, pIDs[0], pIDs[1], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, w *terrakube.Webhook) (*terrakube.Webhook, error) {
-			return c.Webhooks.Create(ctx, pIDs[0], pIDs[1], w)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.Webhook, error) {
+			return c.Webhooks.CreateFields(ctx, pIDs[0], pIDs[1], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, w *terrakube.Webhook) (*terrakube.Webhook, error) {
-			return c.Webhooks.Update(ctx, pIDs[0], pIDs[1], w)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.Webhook, error) {
+			return c.Webhooks.UpdateFields(ctx, pIDs[0], pIDs[1], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.Webhooks.Delete(ctx, pIDs[0], pIDs[1], id)

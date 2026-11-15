@@ -38,7 +38,7 @@ Every resource is registered through `resource.Register[T](rootCmd, resource.Con
 
 - `Config[T]` holds Name, Aliases, Parents, Fields, and API closures (List/Get/Create/Update/Delete). Only non-nil closures get a subcommand.
 - `ParentScope` adds one flag per parent (e.g. `--organization`/`-o`, alias `--org`, hidden `--organization-id`). The value is used as-is if it is a UUID (or `RawID` is set), otherwise it goes through `Resolver`. Resolvers live in `cmd/resolvers.go`; new ones should use `resolveByName` with `nameFilter`.
-- `FieldDef` maps a flag to a struct field (String, Bool, Int, StringSlice). On create, `Required` fields are enforced. On update, only explicitly set flags are applied.
+- `FieldDef` maps a flag to a struct field (String, Bool, Int, StringSlice). On create, `Required` fields are enforced. Create and update send only explicitly set flags: the `Create`/`Update` closures get a `terrakube.Patch` and call the SDK's `CreateFields`/`UpdateFields`, so server defaults apply to unset fields and an explicit `false`/`0`/`""` is kept. An update with no field flag fails before any request.
 - List adds `--filter` (RSQL). Get, update, and delete take `--id`.
 - Field flags must not be named `output` (it is the global format flag); the job log field is `--job-output`.
 

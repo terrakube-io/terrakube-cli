@@ -56,11 +56,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.WebhookEvent, error) {
 			return c.WebhookEvents.Get(ctx, pIDs[0], pIDs[1], pIDs[2], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, e *terrakube.WebhookEvent) (*terrakube.WebhookEvent, error) {
-			return c.WebhookEvents.Create(ctx, pIDs[0], pIDs[1], pIDs[2], e)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.WebhookEvent, error) {
+			return c.WebhookEvents.CreateFields(ctx, pIDs[0], pIDs[1], pIDs[2], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, e *terrakube.WebhookEvent) (*terrakube.WebhookEvent, error) {
-			return c.WebhookEvents.Update(ctx, pIDs[0], pIDs[1], pIDs[2], e)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.WebhookEvent, error) {
+			return c.WebhookEvents.UpdateFields(ctx, pIDs[0], pIDs[1], pIDs[2], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.WebhookEvents.Delete(ctx, pIDs[0], pIDs[1], pIDs[2], id)

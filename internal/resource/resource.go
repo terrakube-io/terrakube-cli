@@ -1,12 +1,9 @@
 package resource
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"reflect"
 	"strings"
@@ -70,10 +67,12 @@ type Config[T any] struct {
 	Parents []ParentScope
 	Fields  []FieldDef
 
-	List   func(ctx context.Context, c *terrakube.Client, parentIDs []string, opts *terrakube.ListOptions) ([]*T, error)
-	Get    func(ctx context.Context, c *terrakube.Client, parentIDs []string, id string) (*T, error)
-	Create func(ctx context.Context, c *terrakube.Client, parentIDs []string, resource *T) (*T, error)
-	Update func(ctx context.Context, c *terrakube.Client, parentIDs []string, resource *T) (*T, error)
+	List func(ctx context.Context, c *terrakube.Client, parentIDs []string, opts *terrakube.ListOptions) ([]*T, error)
+	Get  func(ctx context.Context, c *terrakube.Client, parentIDs []string, id string) (*T, error)
+	// Create and Update receive only the attributes (and relationships) the user set,
+	// so server defaults apply to the rest and explicit false/0/"" values are kept.
+	Create func(ctx context.Context, c *terrakube.Client, parentIDs []string, p terrakube.Patch) (*T, error)
+	Update func(ctx context.Context, c *terrakube.Client, parentIDs []string, id string, p terrakube.Patch) (*T, error)
 	Delete func(ctx context.Context, c *terrakube.Client, parentIDs []string, id string) error
 }
 
@@ -193,11 +192,11 @@ func newCreateCmd[T any](cfg Config[T]) *cobra.Command {
 			}
 
 			resource := new(T)
-			if err := populateFields(cmd, cfg.Fields, resource); err != nil {
+			if err := populateChangedFields(cmd, cfg.Fields, resource); err != nil {
 				return err
 			}
 
-			result, err := cfg.Create(ctx, client, parentIDs, resource)
+			result, err := cfg.Create(ctx, client, parentIDs, changedPatch(cmd, cfg.Fields, resource))
 			if err != nil {
 				return err
 			}
@@ -235,26 +234,11 @@ func newUpdateCmd[T any](cfg Config[T]) *cobra.Command {
 				return err
 			}
 
-			// terrakube-go marshals every attribute (no omitempty), which would
-			// wipe unset fields and write-only secrets. Send only changed attributes.
-			attrs := map[string]any{}
-			rv := reflect.ValueOf(resource).Elem()
-			for _, f := range cfg.Fields {
-				flag := cmd.Flags().Lookup(f.Flag)
-				sf, ok := rv.Type().FieldByName(f.StructField)
-				if flag == nil || !flag.Changed || !ok {
-					continue
-				}
-				if tag := strings.Split(sf.Tag.Get("jsonapi"), ","); len(tag) > 1 && tag[0] == "attr" {
-					attrs[tag[1]] = rv.FieldByIndex(sf.Index).Interface()
-				}
+			patch := changedPatch(cmd, cfg.Fields, resource)
+			if len(patch.Attributes) == 0 && len(patch.Relationships) == 0 {
+				return errors.New("nothing to update: set at least one field flag, see --help")
 			}
-			// ponytail: terrakube-go exposes no sparse update or raw request API, so
-			// the PATCH body is rewritten in the transport. This replaces the client's
-			// HTTP client; carry over any custom TLS/transport here if newClient adds one.
-			_ = terrakube.WithHTTPClient(&http.Client{Transport: sparsePatch{attrs: attrs}})(client)
-
-			result, err := cfg.Update(ctx, client, parentIDs, resource)
+			result, err := cfg.Update(ctx, client, parentIDs, id, patch)
 			if err != nil {
 				return err
 			}
@@ -398,15 +382,6 @@ func addFieldFlags(cmd *cobra.Command, fields []FieldDef, forCreate bool) {
 	}
 }
 
-func populateFields(cmd *cobra.Command, fields []FieldDef, obj any) error {
-	for _, f := range fields {
-		if err := setFieldFromFlag(cmd, f, obj); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func populateChangedFields(cmd *cobra.Command, fields []FieldDef, obj any) error {
 	for _, f := range fields {
 		flag := cmd.Flags().Lookup(f.Flag)
@@ -509,38 +484,20 @@ func setStructField(obj any, name string, val string) {
 	}
 }
 
-// sparsePatch rewrites JSON:API PATCH bodies to {data:{type,id,attributes}}
-// with attributes replaced by attrs (built from changed flags, so omitempty
-// tags can't drop explicit false/""); relationships and included are dropped.
-type sparsePatch struct{ attrs map[string]any }
-
-func (s sparsePatch) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.Method != http.MethodPatch || req.Body == nil {
-		return http.DefaultTransport.RoundTrip(req)
+// changedPatch returns the JSON:API attributes of the flags set on cmd, with
+// the typed values already parsed into obj by populateChangedFields.
+func changedPatch(cmd *cobra.Command, fields []FieldDef, obj any) terrakube.Patch {
+	p := terrakube.Patch{Attributes: map[string]any{}}
+	rv := reflect.ValueOf(obj).Elem()
+	for _, f := range fields {
+		flag := cmd.Flags().Lookup(f.Flag)
+		sf, ok := rv.Type().FieldByName(f.StructField)
+		if flag == nil || !flag.Changed || !ok {
+			continue
+		}
+		if tag := strings.Split(sf.Tag.Get("jsonapi"), ","); len(tag) > 1 && tag[0] == "attr" {
+			p.Attributes[tag[1]] = rv.FieldByIndex(sf.Index).Interface()
+		}
 	}
-	raw, err := io.ReadAll(req.Body)
-	_ = req.Body.Close()
-	if err != nil {
-		return nil, err
-	}
-	var doc struct {
-		Data struct {
-			Type       string         `json:"type"`
-			ID         string         `json:"id"`
-			Attributes map[string]any `json:"attributes,omitempty"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return nil, fmt.Errorf("rewriting update body: %w", err)
-	}
-	doc.Data.Attributes = s.attrs
-	body, err := json.Marshal(doc)
-	if err != nil {
-		return nil, err
-	}
-	req = req.Clone(req.Context())
-	req.Body = io.NopCloser(bytes.NewReader(body))
-	req.ContentLength = int64(len(body))
-	req.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(body)), nil }
-	return http.DefaultTransport.RoundTrip(req)
+	return p
 }

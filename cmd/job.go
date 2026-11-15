@@ -54,14 +54,14 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.Job, error) {
 			return c.Jobs.Get(ctx, pIDs[0], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, j *terrakube.Job) (*terrakube.Job, error) {
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.Job, error) {
 			if len(pIDs) > 1 && pIDs[1] != "" {
-				j.Workspace = &terrakube.Workspace{ID: pIDs[1]}
+				p.Relationships = map[string]terrakube.Relationship{"workspace": {Type: "workspace", ID: &pIDs[1]}}
 			}
-			return c.Jobs.Create(ctx, pIDs[0], j)
+			return c.Jobs.CreateFields(ctx, pIDs[0], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, j *terrakube.Job) (*terrakube.Job, error) {
-			return c.Jobs.Update(ctx, pIDs[0], j)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.Job, error) {
+			return c.Jobs.UpdateFields(ctx, pIDs[0], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.Jobs.Delete(ctx, pIDs[0], id)

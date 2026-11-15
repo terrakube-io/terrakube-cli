@@ -35,11 +35,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.Project, error) {
 			return c.Projects.Get(ctx, pIDs[0], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p *terrakube.Project) (*terrakube.Project, error) {
-			return c.Projects.Create(ctx, pIDs[0], p)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.Project, error) {
+			return c.Projects.CreateFields(ctx, pIDs[0], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, p *terrakube.Project) (*terrakube.Project, error) {
-			return c.Projects.Update(ctx, pIDs[0], p)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.Project, error) {
+			return c.Projects.UpdateFields(ctx, pIDs[0], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.Projects.Delete(ctx, pIDs[0], id)

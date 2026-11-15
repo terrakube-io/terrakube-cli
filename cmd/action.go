@@ -34,11 +34,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, _ []string, id string) (*terrakube.Action, error) {
 			return c.Actions.Get(ctx, id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, _ []string, a *terrakube.Action) (*terrakube.Action, error) {
-			return c.Actions.Create(ctx, a)
+		Create: func(ctx context.Context, c *terrakube.Client, _ []string, p terrakube.Patch) (*terrakube.Action, error) {
+			return c.Actions.CreateFields(ctx, p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, _ []string, a *terrakube.Action) (*terrakube.Action, error) {
-			return c.Actions.Update(ctx, a)
+		Update: func(ctx context.Context, c *terrakube.Client, _ []string, id string, p terrakube.Patch) (*terrakube.Action, error) {
+			return c.Actions.UpdateFields(ctx, id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, _ []string, id string) error {
 			return c.Actions.Delete(ctx, id)

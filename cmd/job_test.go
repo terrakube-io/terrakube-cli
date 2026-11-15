@@ -256,3 +256,56 @@ func TestCmdJobCreateOutputFlags(t *testing.T) {
 		t.Errorf("expected output attribute 'log-text', got %v", body.Data.Attributes["output"])
 	}
 }
+
+// captureJobCreate runs `job create` with args and returns the attributes of the POST body.
+func captureJobCreate(t *testing.T, args ...string) map[string]interface{} {
+	t.Helper()
+	resetGlobalFlags()
+
+	var body []byte
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		body, _ = io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/vnd.api+json")
+		w.WriteHeader(http.StatusCreated)
+		_ = jsonapi.MarshalPayload(w, testutil.FixtureJob())
+	})
+	ts := setupTestServer(handler)
+	defer ts.Close()
+
+	base := []string{"job", "create", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--workspace-id", "d4e5f6a7-b8c9-0123-defa-234567890123", "--template-reference", "b2c3d4e5-f6a7-8901-bcde-f12345678901"}
+	if _, err := executeCommand(append(base, args...)...); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var payload struct {
+		Data struct {
+			Attributes map[string]interface{} `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		t.Fatalf("failed to parse POST body %q: %v", body, err)
+	}
+	return payload.Data.Attributes
+}
+
+// AC-2: an explicit false reaches the server instead of being dropped.
+func TestCmdJobCreateSendsExplicitFalse(t *testing.T) {
+	attrs := captureJobCreate(t, "--refresh=false", "--plan-changes=false")
+	for _, key := range []string{"refresh", "planChanges"} {
+		v, ok := attrs[key]
+		if !ok || v != false {
+			t.Errorf("expected %s=false in the body, got %v (present=%v); attributes: %v", key, v, ok, attrs)
+		}
+	}
+}
+
+// AC-1, AC-3: only the flags the user set are sent, so server defaults apply to the rest.
+func TestCmdJobCreateSendsOnlySetFlags(t *testing.T) {
+	attrs := captureJobCreate(t, "--refresh-only")
+	if len(attrs) != 2 || attrs["templateReference"] != "b2c3d4e5-f6a7-8901-bcde-f12345678901" || attrs["refreshOnly"] != true {
+		t.Errorf("expected only templateReference and refreshOnly=true, got %v", attrs)
+	}
+}
