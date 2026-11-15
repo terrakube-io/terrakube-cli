@@ -34,6 +34,8 @@ func init() {
 			{StructField: "Source", Flag: "source", Short: "s", Type: resource.String, Description: "Module source repository URL"},
 			{StructField: "Folder", Flag: "folder", Short: "f", Type: resource.String, Description: "Module folder path"},
 			{StructField: "TagPrefix", Flag: "tag-prefix", Short: "t", Type: resource.String, Description: "Tag prefix"},
+			{StructField: "Vcs", Flag: "vcs", Type: resource.Relationship, RelType: "vcs", Resolver: vcsResolver, Description: "VCS connection for a private repository, by name or ID (\"\" clears it)"},
+			{StructField: "SSH", Flag: "ssh", Type: resource.Relationship, RelType: "ssh", Resolver: sshResolver, Description: "SSH key for a private repository, by name or ID (\"\" clears it)"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Module, error) {
 			return c.Modules.List(ctx, pIDs[0], opts)

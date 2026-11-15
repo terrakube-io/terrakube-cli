@@ -29,6 +29,7 @@ func init() {
 			{StructField: "Name", Flag: "name", Short: "n", Type: resource.String, Required: true, Description: "Provider name"},
 			{StructField: "Description", Flag: "description", Short: "d", Type: resource.String, Description: "Provider description"},
 			{StructField: "Imported", Flag: "imported", Type: resource.Bool, Description: "Whether provider is imported"},
+			{StructField: "RegistryNamespace", Flag: "registry-namespace", Type: resource.String, Description: "Public registry namespace of an imported provider, e.g. hashicorp"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Provider, error) {
 			return c.Providers.List(ctx, pIDs[0], opts)

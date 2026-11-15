@@ -30,6 +30,11 @@ const (
 	StringSlice
 	// Relationship is a to-one JSON:API relationship set by ID or name; "" clears it.
 	Relationship
+	// StringMap is a map attribute set by repeated KEY=VALUE flags (job --variables).
+	StringMap
+	// RelationshipMany is a to-many relationship set by IDs or names (comma-separated
+	// or repeated); the list replaces the whole set, and "" empties it.
+	RelationshipMany
 )
 
 // ParentScope defines a parent resource for name-to-ID resolution.
@@ -53,6 +58,10 @@ type FieldDef struct {
 	Required    bool
 	Description string
 	Hidden      bool // left out of --help: only executor or super-service tokens may set it
+	// FileFlag, for a String field, adds --<FileFlag> <path> that reads the value
+	// from a file instead (template --content-file). The two flags exclude each
+	// other, and a Required field needs one of them.
+	FileFlag string
 
 	// For Relationship fields: StructField names the relation field (its jsonapi
 	// tag gives the relationship name), RelType is the JSON:API type of the target,
@@ -458,9 +467,18 @@ func checkFields[T any](fields []FieldDef) {
 			fits = ft.Kind() >= reflect.Int && ft.Kind() <= reflect.Int64
 		case StringSlice:
 			fits = ft == reflect.TypeFor[[]string]()
-		case Relationship:
+		case Relationship, RelationshipMany:
+			kind := reflect.Struct
+			if f.Type == RelationshipMany {
+				kind = reflect.Slice // of pointers to the target struct
+			}
 			tag := strings.Split(sf.Tag.Get("jsonapi"), ",")
-			fits = ft.Kind() == reflect.Struct && len(tag) > 1 && tag[0] == "relation" && f.RelType != ""
+			fits = ft.Kind() == kind && len(tag) > 1 && tag[0] == "relation" && f.RelType != ""
+		case StringMap:
+			fits = ft.Kind() == reflect.Map && ft.Key().Kind() == reflect.String
+		}
+		if f.FileFlag != "" && f.Type != String {
+			fits = false
 		}
 		if !fits {
 			panic(fmt.Sprintf("%s.%s is %s, cannot hold flag --%s", t.Name(), f.StructField, sf.Type, f.Flag))
@@ -511,11 +529,20 @@ func addFieldFlags(cmd *cobra.Command, fields []FieldDef, forCreate bool) {
 			cmd.Flags().BoolP(f.Flag, f.Short, false, desc)
 		case Int:
 			cmd.Flags().IntP(f.Flag, f.Short, 0, desc)
-		case StringSlice:
+		case StringSlice, RelationshipMany:
 			cmd.Flags().StringSliceP(f.Flag, f.Short, nil, desc)
+		case StringMap:
+			cmd.Flags().StringArrayP(f.Flag, f.Short, nil, desc+" (KEY=VALUE, repeatable)")
 		}
 
-		if forCreate && f.Required {
+		if f.FileFlag != "" {
+			cmd.Flags().String(f.FileFlag, "", fmt.Sprintf("read --%s from this file", f.Flag))
+			cmd.MarkFlagsMutuallyExclusive(f.Flag, f.FileFlag)
+		}
+		switch {
+		case forCreate && f.Required && f.FileFlag != "":
+			cmd.MarkFlagsOneRequired(f.Flag, f.FileFlag)
+		case forCreate && f.Required:
 			_ = cmd.MarkFlagRequired(f.Flag)
 		}
 		if f.Hidden {
@@ -524,10 +551,17 @@ func addFieldFlags(cmd *cobra.Command, fields []FieldDef, forCreate bool) {
 	}
 }
 
+// changed reports whether f's flag, or its FileFlag, was set on cmd.
+func changed(cmd *cobra.Command, f FieldDef) bool {
+	if f.FileFlag != "" && cmd.Flags().Changed(f.FileFlag) {
+		return true
+	}
+	return cmd.Flags().Changed(f.Flag)
+}
+
 func populateChangedFields(cmd *cobra.Command, fields []FieldDef, obj any) error {
 	for _, f := range fields {
-		flag := cmd.Flags().Lookup(f.Flag)
-		if flag == nil || !flag.Changed {
+		if !changed(cmd, f) {
 			continue
 		}
 		if err := setFieldFromFlag(cmd, f, obj); err != nil {
@@ -545,10 +579,18 @@ func setFieldFromFlag(cmd *cobra.Command, f FieldDef, obj any) error {
 	}
 
 	switch f.Type {
-	case Relationship:
+	case Relationship, RelationshipMany:
 		// Sent as a relationship by addRelationships, not stored in the struct.
 	case String:
 		val, _ := cmd.Flags().GetString(f.Flag)
+		if f.FileFlag != "" && cmd.Flags().Changed(f.FileFlag) {
+			path, _ := cmd.Flags().GetString(f.FileFlag)
+			b, err := os.ReadFile(path) //nolint:gosec // the user names the file to send
+			if err != nil {
+				return fmt.Errorf("--%s: %w", f.FileFlag, err)
+			}
+			val = string(b)
+		}
 		if err := setStringField(field, val); err != nil {
 			return fmt.Errorf("--%s: %w", f.Flag, err)
 		}
@@ -561,6 +603,17 @@ func setFieldFromFlag(cmd *cobra.Command, f FieldDef, obj any) error {
 	case StringSlice:
 		val, _ := cmd.Flags().GetStringSlice(f.Flag)
 		setStringSliceField(field, val)
+	case StringMap:
+		pairs, _ := cmd.Flags().GetStringArray(f.Flag)
+		m := reflect.MakeMap(field.Type())
+		for _, kv := range pairs {
+			k, v, ok := strings.Cut(kv, "=")
+			if !ok {
+				return fmt.Errorf("--%s: %q is not KEY=VALUE", f.Flag, kv)
+			}
+			m.SetMapIndex(reflect.ValueOf(k), reflect.ValueOf(v).Convert(field.Type().Elem()))
+		}
+		field.Set(m)
 	}
 	return nil
 }
@@ -634,9 +687,8 @@ func changedPatch(cmd *cobra.Command, fields []FieldDef, obj any) terrakube.Patc
 	p := terrakube.Patch{Attributes: map[string]any{}}
 	rv := reflect.ValueOf(obj).Elem()
 	for _, f := range fields {
-		flag := cmd.Flags().Lookup(f.Flag)
 		sf, ok := rv.Type().FieldByName(f.StructField)
-		if flag == nil || !flag.Changed || !ok {
+		if !changed(cmd, f) || !ok {
 			continue
 		}
 		if tag := strings.Split(sf.Tag.Get("jsonapi"), ","); len(tag) > 1 && tag[0] == "attr" {
@@ -652,7 +704,7 @@ func changedPatch(cmd *cobra.Command, fields []FieldDef, obj any) terrakube.Patc
 func addRelationships[T any](ctx context.Context, client *terrakube.Client, cmd *cobra.Command, fields []FieldDef, parentIDs []string, p *terrakube.Patch) error {
 	for _, f := range fields {
 		flag := cmd.Flags().Lookup(f.Flag)
-		if flag == nil || !flag.Changed || f.Resolver == nil && f.Type != Relationship {
+		if flag == nil || !flag.Changed || f.Resolver == nil && f.Type != Relationship && f.Type != RelationshipMany {
 			continue
 		}
 		sf, _ := reflect.TypeFor[T]().FieldByName(f.StructField) // checked by checkFields
@@ -671,21 +723,41 @@ func addRelationships[T any](ctx context.Context, client *terrakube.Client, cmd 
 		if p.Relationships == nil {
 			p.Relationships = map[string]terrakube.Relationship{}
 		}
-		val := flag.Value.String()
-		switch {
-		case val == "":
-			p.Relationships[name] = terrakube.Relationship{}
-		case IsUUID(val):
-			p.Relationships[name] = terrakube.Relationship{Type: f.RelType, ID: &val}
-		case f.Resolver == nil:
-			return fmt.Errorf("--%s: %q is not a UUID", f.Flag, val)
-		default:
-			id, err := f.Resolver(ctx, client, parentIDs, val)
-			if err != nil {
-				return err
+		if f.Type == RelationshipMany {
+			vals, _ := cmd.Flags().GetStringSlice(f.Flag)
+			rel := terrakube.Relationship{Type: f.RelType, Many: true}
+			for _, val := range vals {
+				id, err := resolveRef(ctx, client, f, parentIDs, val)
+				if err != nil {
+					return err
+				}
+				rel.IDs = append(rel.IDs, id)
 			}
-			p.Relationships[name] = terrakube.Relationship{Type: f.RelType, ID: &id}
+			p.Relationships[name] = rel
+			continue
 		}
+		val := flag.Value.String()
+		if val == "" {
+			p.Relationships[name] = terrakube.Relationship{}
+			continue
+		}
+		id, err := resolveRef(ctx, client, f, parentIDs, val)
+		if err != nil {
+			return err
+		}
+		p.Relationships[name] = terrakube.Relationship{Type: f.RelType, ID: &id}
 	}
 	return nil
+}
+
+// resolveRef returns val if it is a UUID, else the ID f's Resolver finds for it.
+func resolveRef(ctx context.Context, client *terrakube.Client, f FieldDef, parentIDs []string, val string) (string, error) {
+	switch {
+	case IsUUID(val):
+		return val, nil
+	case f.Resolver == nil:
+		return "", fmt.Errorf("--%s: %q is not a UUID", f.Flag, val)
+	default:
+		return f.Resolver(ctx, client, parentIDs, val)
+	}
 }

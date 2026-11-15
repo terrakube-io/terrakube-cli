@@ -28,6 +28,7 @@ For full CLI reference documentation, visit our official guide at [https://docs.
   - [6. Configure Notifications (Slack / Teams / Webhook)](#6-configure-notifications-slack--teams--webhook)
   - [7. Run a Plan or Apply and Wait for It](#7-run-a-plan-or-apply-and-wait-for-it)
   - [8. Enforce Policies](#8-enforce-policies)
+  - [9. Other Resource Fields](#9-other-resource-fields)
 - [Breaking Changes](#breaking-changes)
 - [Contributing](#contributing)
 - [Security](#security)
@@ -370,6 +371,8 @@ terrakube variable create \
      --output json
    ```
 
+   `--templates Plan,Apply` limits a configuration to jobs of those templates (names or IDs; the list replaces the current set, `--templates ""` empties it).
+
 2. Add a trigger on job completion or failure:
    ```bash
    terrakube notification-trigger create \
@@ -422,6 +425,13 @@ terrakube job approve 42 -o my-org
 ```
 
 `policy-override create` records the user named in your token (email, else user name) as the one who overrode.
+
+### 9. Other Resource Fields
+
+- Templates: `template create --name Plan --content-file plan.yaml` reads the flow from a file instead of `--content`.
+- Registry: `module-version` and `provider-version` take `--status DEPRECATED --deprecation-message "..."`; `provider` takes `--registry-namespace` (needed with `--imported`); `module` takes `--vcs` and `--ssh` (names or IDs) for private repositories.
+- Jobs: `job create --variables region=eu-west-1 --variables size=3` passes run variables to that job only.
+- `workspace-schedule` takes `--enabled` and `--description`, `workspace-tag` takes `--value`, and `variable` takes `--incomplete`.
 
 ## Breaking Changes
 

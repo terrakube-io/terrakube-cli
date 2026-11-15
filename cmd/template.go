@@ -29,7 +29,7 @@ func init() {
 			{StructField: "Name", Flag: "name", Short: "n", Type: resource.String, Required: true, Description: "Template name"},
 			{StructField: "Description", Flag: "description", Short: "d", Type: resource.String, Description: "Template description"},
 			{StructField: "Version", Flag: "version", Type: resource.String, Description: "Template version"},
-			{StructField: "Content", Flag: "content", Short: "c", Type: resource.String, Required: true, Description: "Template content (HCL)"},
+			{StructField: "Content", Flag: "content", Short: "c", Type: resource.String, Required: true, FileFlag: "content-file", Description: "Template content (YAML flow)"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Template, error) {
 			return c.Templates.List(ctx, pIDs[0], opts)

@@ -36,6 +36,8 @@ func init() {
 		Fields: []resource.FieldDef{
 			{StructField: "VersionNumber", Flag: "version-number", Type: resource.String, Required: true, Description: "Provider version number"},
 			{StructField: "Protocols", Flag: "protocols", Type: resource.String, Description: "Supported protocols"},
+			{StructField: "Status", Flag: "status", Type: resource.String, Description: "Version status, e.g. DEPRECATED"},
+			{StructField: "DeprecationMessage", Flag: "deprecation-message", Type: resource.String, Description: "Message shown for a deprecated version"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.ProviderVersion, error) {
 			return c.ProviderVersions.List(ctx, pIDs[0], pIDs[1], opts)

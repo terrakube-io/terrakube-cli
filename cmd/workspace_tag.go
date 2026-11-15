@@ -37,6 +37,7 @@ func init() {
 		},
 		Fields: []resource.FieldDef{
 			{StructField: "TagID", Flag: "tag-id", Type: resource.String, Required: true, Resolver: tagResolver, Description: "Tag to associate, by name or ID"},
+			{StructField: "Value", Flag: "value", Type: resource.String, Description: "Tag value"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.WorkspaceTag, error) {
 			return c.WorkspaceTags.List(ctx, pIDs[0], pIDs[1], opts)

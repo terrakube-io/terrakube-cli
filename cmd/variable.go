@@ -42,6 +42,7 @@ func init() {
 			{StructField: "Category", Flag: "category", Short: "c", Type: resource.String, Required: true, Description: "Variable category (ENV, TERRAFORM)"},
 			{StructField: "Sensitive", Flag: "sensitive", Short: "s", Type: resource.Bool, Description: "Whether the variable is sensitive"},
 			{StructField: "Hcl", Flag: "hcl", Type: resource.Bool, Description: "Whether the variable value is HCL"},
+			{StructField: "Incomplete", Flag: "incomplete", Type: resource.Bool, Description: "Mark the variable as needing a value before a run"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Variable, error) {
 			return c.Variables.List(ctx, pIDs[0], pIDs[1], opts)
