@@ -344,7 +344,7 @@ terrakube variable create \
    terrakube workspace-tag create \
      -o "09e86337-b6bb-49e0-82aa-c114ad0f41ab" \
      -w "<WORKSPACE_ID>" \
-     --tag-id "<TAG_ID>" \
+     --tag-id "<TAG_NAME_OR_ID>" \
      --output table
    ```
 
@@ -377,6 +377,9 @@ terrakube variable create \
 
 Changes in behaviour that can affect existing scripts:
 
+- `create` sends only the flags you set; the server applies its defaults to the rest. Before, every attribute was sent, so an unset boolean reached the server as `false` (for example `job create` turned `refresh` off).
+- `update` with no field flag fails before any request (`nothing to update: set at least one field flag, see --help`).
+- Flags that take a template, VCS connection, SSH key, agent, project or tag accept a name as well as an ID. Lookup errors now read `template "x" not found in organization <id>` and `multiple agents match "x": <id>, <id>; pass the ID instead`.
 - `job create` / `job update`: the job log field flag is now `--job-output`. `--output` is always the global output format and is validated before any API call.
 - `job create`: `--command`/`-c` is replaced by `--template-reference`/`-t` (the template ID to run). The server never accepted `command`.
 - Flags for attributes the API does not expose are removed: `webhook --path/--branch/--template-id/--event` (use `webhook-event`), `vcs --refresh-token/--token-expiration`, `address --type`, `agent --type`.
