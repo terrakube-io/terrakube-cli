@@ -385,7 +385,7 @@ echo $?   # 0 completed or no changes, 1 error, 2 failed, rejected or cancelled,
 
 `job create --wait` and `job wait <job-id>` wait the same way, so a CI step can branch on the exit code.
 
-A job waiting for approval is listed with `job list -o my-org -w prod --status waitingApproval` and handled with `job approve <job-id>`, `job reject <job-id>` or `job cancel <job-id>`. Each checks the job's current status first and changes nothing if it does not allow the action.
+A job waiting for approval is listed with `job list -o my-org -w prod --status waitingApproval` and handled with `job approve <job-id>`, `job reject <job-id>` or `job cancel <job-id>`. Each checks the job's current status first and changes nothing if it does not allow the action. `workspace lock prod -o my-org --reason "release freeze"` stops new runs on a workspace until `workspace unlock prod -o my-org`.
 
 ## Breaking Changes
 
