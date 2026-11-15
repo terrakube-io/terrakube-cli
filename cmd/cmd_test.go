@@ -51,14 +51,17 @@ func resetGlobalFlags() {
 
 // resetCobraFlags recursively resets all flags on a command and its subcommands.
 func resetCobraFlags(cmd *cobra.Command) {
-	cmd.Flags().VisitAll(func(f *pflag.Flag) {
-		_ = f.Value.Set(f.DefValue)
+	reset := func(f *pflag.Flag) {
+		// Set appends to slice and array values once they were set; replace them instead.
+		if sv, ok := f.Value.(pflag.SliceValue); ok {
+			_ = sv.Replace(nil)
+		} else {
+			_ = f.Value.Set(f.DefValue)
+		}
 		f.Changed = false
-	})
-	cmd.PersistentFlags().VisitAll(func(f *pflag.Flag) {
-		_ = f.Value.Set(f.DefValue)
-		f.Changed = false
-	})
+	}
+	cmd.Flags().VisitAll(reset)
+	cmd.PersistentFlags().VisitAll(reset)
 	for _, sub := range cmd.Commands() {
 		resetCobraFlags(sub)
 	}

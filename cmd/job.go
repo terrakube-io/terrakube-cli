@@ -2,9 +2,12 @@ package cmd
 
 import (
 	"context"
+	"os"
 
+	"github.com/spf13/cobra"
 	terrakube "github.com/terrakube-io/terrakube-go"
 
+	outputpkg "terrakube/internal/output"
 	"terrakube/internal/resource"
 )
 
@@ -68,6 +71,17 @@ func init() {
 		},
 		// Only executor or super-service tokens may call these; the server answers 403 otherwise.
 		HiddenVerbs: []string{"delete"},
+		CreateFlags: func(cmd *cobra.Command) {
+			cmd.Flags().Bool("wait", false, "wait until the job reaches a final status (see: job wait)")
+			cmd.Flags().Duration("timeout", 0, "with --wait, give up after this long (0 waits without a limit)")
+		},
+		AfterCreate: func(cmd *cobra.Command, ctx context.Context, c *terrakube.Client, pIDs []string, created *terrakube.Job) error {
+			if wait, _ := cmd.Flags().GetBool("wait"); wait {
+				timeout, _ := cmd.Flags().GetDuration("timeout")
+				return waitForJob(ctx, c, pIDs[0], created.ID, timeout)
+			}
+			return outputpkg.Render(os.Stdout, created, output)
+		},
 	})
 	jobCmd.AddCommand(newJobWaitCmd())
 }

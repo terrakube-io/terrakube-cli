@@ -96,6 +96,11 @@ type Config[T any] struct {
 	// HiddenVerbs lists subcommands (e.g. "delete") left out of --help because the
 	// server allows them only to executor or super-service tokens. They still run.
 	HiddenVerbs []string
+
+	// CreateFlags adds extra flags to create; AfterCreate then gets the created
+	// resource and replaces the default rendering (e.g. job create --wait).
+	CreateFlags func(cmd *cobra.Command)
+	AfterCreate func(cmd *cobra.Command, ctx context.Context, c *terrakube.Client, parentIDs []string, created *T) error
 }
 
 // SoftDelete configures a delete that sets Attribute to true.
@@ -246,6 +251,9 @@ func newCreateCmd[T any](cfg Config[T]) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if cfg.AfterCreate != nil {
+				return cfg.AfterCreate(cmd, ctx, client, parentIDs, result)
+			}
 
 			return output.Render(os.Stdout, result, cfg.GetOutput())
 		},
@@ -253,6 +261,9 @@ func newCreateCmd[T any](cfg Config[T]) *cobra.Command {
 
 	addParentFlags(cmd, cfg.Parents)
 	addFieldFlags(cmd, cfg.Fields, true)
+	if cfg.CreateFlags != nil {
+		cfg.CreateFlags(cmd)
+	}
 	return cmd
 }
 

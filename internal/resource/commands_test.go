@@ -513,3 +513,25 @@ func TestCheckFields_RelationshipNeedsRelationFieldAndType(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateCmd_AfterCreateReplacesRendering(t *testing.T) {
+	cfg := testConfig()
+	cfg.Create = func(context.Context, *terrakube.Client, []string, terrakube.Patch) (*testResource, error) {
+		return &testResource{ID: "c1", Name: "made"}, nil
+	}
+	cfg.CreateFlags = func(cmd *cobra.Command) { cmd.Flags().Bool("follow", false, "") }
+	var gotFollow bool
+	var gotID string
+	cfg.AfterCreate = func(cmd *cobra.Command, _ context.Context, _ *terrakube.Client, _ []string, created *testResource) error {
+		gotFollow, _ = cmd.Flags().GetBool("follow")
+		gotID = created.ID
+		return nil
+	}
+	out, err := runCmd(t, cfg, "create", "--organization", testOrgID, "--name", "n", "--follow")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !gotFollow || gotID != "c1" || out != "" {
+		t.Errorf("follow=%v id=%q out=%q", gotFollow, gotID, out)
+	}
+}
