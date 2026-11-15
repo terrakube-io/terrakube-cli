@@ -1,14 +1,17 @@
 package resource
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"strings"
 	"time"
 
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	terrakube "github.com/terrakube-io/terrakube-go"
@@ -83,7 +86,26 @@ type Config[T any] struct {
 	Create func(ctx context.Context, c *terrakube.Client, parentIDs []string, p terrakube.Patch) (*T, error)
 	Update func(ctx context.Context, c *terrakube.Client, parentIDs []string, id string, p terrakube.Patch) (*T, error)
 	Delete func(ctx context.Context, c *terrakube.Client, parentIDs []string, id string) error
+
+	// SoftDelete, when set, makes delete set an attribute through Update instead of
+	// sending DELETE (the server's hooks only clean up on the attribute).
+	SoftDelete *SoftDelete
 }
+
+// SoftDelete configures a delete that sets Attribute to true.
+type SoftDelete struct {
+	Attribute string // e.g. "deleted" or "disabled"
+	Done      string // printed after the name, e.g. "marked as deleted"
+	Hard      bool   // add --hard, which sends DELETE through Config.Delete
+	Confirm   bool   // ask for the resource name on a TTY, or require --yes
+}
+
+// IsTerminal reports whether stdin is a terminal; Stdin is where the delete
+// confirmation is read. Both are variables so tests can replace them.
+var (
+	IsTerminal           = func() bool { return isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd()) }
+	Stdin      io.Reader = os.Stdin
+)
 
 // Register creates Cobra commands for the resource and adds them to root.
 func Register[T any](root *cobra.Command, cfg Config[T]) *cobra.Command {
@@ -107,7 +129,7 @@ func Register[T any](root *cobra.Command, cfg Config[T]) *cobra.Command {
 	if cfg.Update != nil {
 		parentCmd.AddCommand(newUpdateCmd(cfg))
 	}
-	if cfg.Delete != nil {
+	if cfg.Delete != nil || cfg.SoftDelete != nil {
 		parentCmd.AddCommand(newDeleteCmd(cfg))
 	}
 	return parentCmd
@@ -281,11 +303,21 @@ func newUpdateCmd[T any](cfg Config[T]) *cobra.Command {
 }
 
 func newDeleteCmd[T any](cfg Config[T]) *cobra.Command {
+	soft := cfg.SoftDelete
 	cmd := &cobra.Command{
 		Use:          "delete",
 		Short:        fmt.Sprintf("delete a %s resource", cfg.Name),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			confirm := false
+			if soft != nil && soft.Confirm {
+				yes, _ := cmd.Flags().GetBool("yes")
+				if !yes && !IsTerminal() {
+					return fmt.Errorf("%s delete needs confirmation: run it in a terminal or pass --yes", cfg.Name)
+				}
+				confirm = !yes
+			}
+
 			client, err := cfg.NewClient()
 			if err != nil {
 				return err
@@ -298,11 +330,26 @@ func newDeleteCmd[T any](cfg Config[T]) *cobra.Command {
 			}
 
 			id, _ := cmd.Flags().GetString("id")
-			if err := cfg.Delete(ctx, client, parentIDs, id); err != nil {
+			if confirm {
+				if err := confirmByName(ctx, cmd, cfg, client, parentIDs, id); err != nil {
+					return err
+				}
+			}
+
+			hard, _ := cmd.Flags().GetBool("hard")
+			if soft == nil || hard {
+				if err := cfg.Delete(ctx, client, parentIDs, id); err != nil {
+					return err
+				}
+				_, err = fmt.Fprintf(os.Stdout, "%s deleted\n", cfg.Name)
 				return err
 			}
 
-			_, err = fmt.Fprintf(os.Stdout, "%s deleted\n", cfg.Name)
+			p := terrakube.Patch{Attributes: map[string]any{soft.Attribute: true}}
+			if _, err := cfg.Update(ctx, client, parentIDs, id, p); err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(os.Stdout, "%s %s\n", cfg.Name, soft.Done)
 			return err
 		},
 	}
@@ -310,7 +357,29 @@ func newDeleteCmd[T any](cfg Config[T]) *cobra.Command {
 	addParentFlags(cmd, cfg.Parents)
 	cmd.Flags().String("id", "", fmt.Sprintf("%s ID", cfg.Name))
 	_ = cmd.MarkFlagRequired("id")
+	if soft != nil && soft.Hard {
+		cmd.Flags().Bool("hard", false, fmt.Sprintf("send DELETE instead of setting %s=true", soft.Attribute))
+	}
+	if soft != nil && soft.Confirm {
+		cmd.Flags().Bool("yes", false, "skip the confirmation prompt")
+	}
 	return cmd
+}
+
+// confirmByName reads the resource's name from the terminal and fails unless it
+// matches the stored name.
+func confirmByName[T any](ctx context.Context, cmd *cobra.Command, cfg Config[T], client *terrakube.Client, parentIDs []string, id string) error {
+	current, err := cfg.Get(ctx, client, parentIDs, id)
+	if err != nil {
+		return err
+	}
+	name := reflect.ValueOf(current).Elem().FieldByName("Name").String()
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Type the %s name (%s) to confirm: ", cfg.Name, name)
+	typed, _ := bufio.NewReader(Stdin).ReadString('\n')
+	if strings.TrimSpace(typed) != name {
+		return fmt.Errorf("confirmation did not match %q: nothing changed", name)
+	}
+	return nil
 }
 
 var timeType = reflect.TypeFor[time.Time]()

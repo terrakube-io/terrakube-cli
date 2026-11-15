@@ -377,6 +377,7 @@ terrakube variable create \
 
 Changes in behaviour that can affect existing scripts:
 
+- `workspace delete` marks the workspace deleted (`deleted=true`), so the server also stops its schedules and jobs; `--hard` sends `DELETE` as before. `organization delete` disables the organization (`disabled=true`) after you type its name, or with `--yes`; without a terminal and without `--yes` it fails before any request.
 - `create` sends only the flags you set; the server applies its defaults to the rest. Before, every attribute was sent, so an unset boolean reached the server as `false` (for example `job create` turned `refresh` off).
 - `update` with no field flag fails before any request (`nothing to update: set at least one field flag, see --help`).
 - Flags that take a template, VCS connection, SSH key, agent, project or tag accept a name as well as an ID. Lookup errors now read `template "x" not found in organization <id>` and `multiple agents match "x": <id>, <id>; pass the ID instead`.

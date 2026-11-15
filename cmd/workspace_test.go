@@ -132,32 +132,6 @@ func TestCmdWorkspaceCreateE2E(t *testing.T) {
 	}
 }
 
-func TestCmdWorkspaceDeleteE2E(t *testing.T) {
-	resetGlobalFlags()
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodDelete {
-			t.Errorf("expected DELETE, got %s", r.Method)
-		}
-		if !strings.Contains(r.URL.Path, "workspace/ws-del") {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
-		w.WriteHeader(http.StatusNoContent)
-	})
-
-	ts := setupTestServer(handler)
-	defer ts.Close()
-
-	out, err := executeCommand("workspace", "delete", "--organization-id", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "--id", "ws-del")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !strings.Contains(out, "workspace deleted") {
-		t.Errorf("expected 'workspace deleted' in output, got: %s", out)
-	}
-}
-
 func TestCmdWorkspaceListMissingOrg(t *testing.T) {
 	resetGlobalFlags()
 

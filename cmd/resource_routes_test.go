@@ -34,8 +34,11 @@ type routeCase struct {
 	itemBase string
 	create   []string // required create flags
 	update   []string // a field flag for update when create has none
-	verbs    []string
-	extra    []string // extra args for every verb (e.g. an optional parent)
+	del      []string // extra delete flags (workspace --hard sends DELETE)
+	// softDelete: delete sends PATCH to the item instead of DELETE.
+	softDelete bool
+	verbs      []string
+	extra      []string // extra args for every verb (e.g. an optional parent)
 }
 
 var routeAllVerbs = []string{"list", "get", "create", "update", "delete"}
@@ -80,7 +83,8 @@ var routeCases = []routeCase{
 		cmd: "notification-trigger", typ: "notification_trigger", parents: []string{"organization", "notification-configuration"},
 		base: routeOrg + "notificationConfiguration/{2}/triggers", create: []string{"--job-status", "COMPLETED"},
 	},
-	{cmd: "organization", typ: "organization", base: "organization", create: []string{"--name", "n"}},
+	// organization delete is a soft delete: PATCH disabled=true instead of DELETE.
+	{cmd: "organization", typ: "organization", base: "organization", create: []string{"--name", "n"}, del: []string{"--yes"}, softDelete: true},
 	{
 		cmd: "organization-variable", typ: "globalvar", parents: []string{"organization"}, base: routeOrg + "globalvar",
 		create: []string{"--category", "TERRAFORM", "--key", "k", "--value", "v"},
@@ -104,7 +108,7 @@ var routeCases = []routeCase{
 	},
 	{cmd: "webhook", typ: "webhook", parents: []string{"organization", "workspace"}, base: routeOrgWs + "webhook", update: []string{"--remote-hook-id", "r"}},
 	{cmd: "webhook-event", typ: "webhook_event", parents: []string{"organization", "workspace", "webhook"}, base: routeOrgWs + "webhook/{3}/events", update: []string{"--branch", "main"}},
-	{cmd: "workspace", typ: "workspace", parents: []string{"organization"}, base: routeOrg + "workspace", create: []string{"--name", "n"}},
+	{cmd: "workspace", typ: "workspace", parents: []string{"organization"}, base: routeOrg + "workspace", create: []string{"--name", "n"}, del: []string{"--hard"}},
 	{cmd: "workspace-access", typ: "access", parents: []string{"organization", "workspace"}, base: routeOrgWs + "access", create: []string{"--name", "n"}},
 	// The schedule API is keyed by workspace alone; the org flag is not part of the path.
 	{
@@ -190,7 +194,10 @@ func TestResourceRoutes(t *testing.T) {
 				}
 				verbArgs, want = append([]string{"--id", routeID}, upd...), "PATCH "+item
 			case "delete":
-				verbArgs, want = []string{"--id", routeID}, "DELETE "+item
+				verbArgs, want = append([]string{"--id", routeID}, c.del...), "DELETE "+item
+				if c.softDelete {
+					want = "PATCH " + item
+				}
 			}
 			name := c.name
 			if name == "" {

@@ -58,5 +58,7 @@ func init() {
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.Workspaces.Delete(ctx, pIDs[0], id)
 		},
+		// The server stops a workspace's schedules and jobs only when deleted=true is set.
+		SoftDelete: &resource.SoftDelete{Attribute: "deleted", Done: "marked as deleted", Hard: true},
 	})
 }
