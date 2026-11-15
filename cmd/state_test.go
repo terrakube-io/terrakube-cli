@@ -25,6 +25,8 @@ type stateAPI struct {
 	files   map[string][]byte    // state files by name, e.g. "v1.raw.json"
 	history []*terrakube.History // Output may be relative to the server URL
 	calls   []string             // "METHOD path" of every request
+
+	failRollback bool // answer the rollback with 404, as for a version too old
 }
 
 const stateDir = "/tfstate/v1/organization/" + polOrg + "/workspace/" + polWs + "/"
@@ -41,6 +43,9 @@ func newStateAPI(t *testing.T) *stateAPI {
 		case r.Method == http.MethodGet && p == apiWs:
 			w.Header().Set("Content-Type", "application/vnd.api+json")
 			_ = jsonapi.MarshalPayload(w, []*terrakube.Workspace{{ID: polWs, Name: "prod"}})
+		case r.Method == http.MethodGet && p == apiWs+"/"+polWs:
+			w.Header().Set("Content-Type", "application/vnd.api+json")
+			_ = jsonapi.MarshalPayload(w, &terrakube.Workspace{ID: polWs, Name: "prod"})
 		case r.Method == http.MethodGet && p == apiWs+"/"+polWs+"/history":
 			w.Header().Set("Content-Type", "application/vnd.api+json")
 			_ = jsonapi.MarshalPayload(w, s.absHistory())
@@ -63,6 +68,10 @@ func newStateAPI(t *testing.T) *stateAPI {
 			}
 			_, _ = w.Write(b)
 		case r.Method == http.MethodPut && strings.HasPrefix(p, stateDir+"rollback/"):
+			if s.failRollback {
+				http.Error(w, "Raw Terraform state not found", http.StatusNotFound)
+				return
+			}
 			_, _ = w.Write([]byte("rolled back"))
 		default:
 			t.Errorf("unexpected request %s %s", r.Method, p)
@@ -274,5 +283,79 @@ func TestCmdStateOutputsEmpty(t *testing.T) {
 	}
 	if _, err := executeCommand("state", "outputs", "nope", "-o", polOrg); err == nil {
 		t.Error("expected an error for an unknown workspace")
+	}
+}
+
+const rollbackPut = "PUT " + stateDir + "rollback/8f1c.json"
+
+// AC-39: with --yes, or the workspace name typed on a terminal, rollback
+// sends the rollback request for that version.
+func TestCmdStateRollback(t *testing.T) {
+	cases := []struct {
+		name, ws, typed string
+		tty             bool
+		args            []string
+	}{
+		{name: "yes without terminal", ws: "prod", args: []string{"--yes"}},
+		{name: "typed name", ws: "prod", tty: true, typed: "prod\n"},
+		{name: "typed name for an ID", ws: polWs, tty: true, typed: "prod\n"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			resetGlobalFlags()
+			fakeTerminal(t, c.tty, c.typed)
+			s := newStateAPI(t)
+			s.addVersion("h1", "8f1c", time.Now(), rawState, "")
+			out, err := executeCommand(append([]string{"state", "rollback", c.ws, "h1", "-o", polOrg}, c.args...)...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			reqs := s.requests()
+			if reqs[len(reqs)-1] != rollbackPut {
+				t.Errorf("requests %v", reqs)
+			}
+			if !strings.Contains(out, "rolled back to state version h1") {
+				t.Errorf("stdout %q", out)
+			}
+		})
+	}
+}
+
+// AC-39: without a terminal and without --yes nothing is sent at all; a
+// wrong name, an unknown version or one of another workspace sends no rollback.
+func TestCmdStateRollbackRefused(t *testing.T) {
+	cases := []struct {
+		name, typed, want string
+		tty               bool
+		version           string
+	}{
+		{name: "no terminal", want: "state rollback needs confirmation: run it in a terminal or pass --yes", version: "h1"},
+		{name: "wrong name", tty: true, typed: "staging\n", want: `confirmation did not match "prod": nothing changed`, version: "h1"},
+		{name: "unknown version", tty: true, typed: "prod\n", want: "not found", version: "nope"},
+		{name: "other workspace", tty: true, typed: "prod\n", want: "belongs to workspace other-ws", version: "h2"},
+		{name: "server refuses", tty: true, typed: "prod\n", want: "state version h1 has no raw state on the server, so it cannot be restored", version: "h1"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			resetGlobalFlags()
+			fakeTerminal(t, c.tty, c.typed)
+			s := newStateAPI(t)
+			s.addVersion("h1", "8f1c", time.Now(), rawState, "")
+			s.failRollback = c.name == "server refuses"
+			s.history = append(s.history, &terrakube.History{ID: "h2", Output: stateDir + "state/x.json", Workspace: &terrakube.Workspace{ID: "other-ws"}})
+			_, err := executeCommand("state", "rollback", "prod", c.version, "-o", polOrg)
+			if err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("expected %q, got %v", c.want, err)
+			}
+			reqs := s.requests()
+			if c.name == "no terminal" && len(reqs) != 0 {
+				t.Errorf("expected no request, got %v", reqs)
+			}
+			for _, r := range reqs {
+				if strings.HasPrefix(r, "PUT") && !s.failRollback {
+					t.Errorf("rollback sent: %v", reqs)
+				}
+			}
+		})
 	}
 }

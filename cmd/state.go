@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -23,7 +24,7 @@ func init() {
 		Use:   "state pull|outputs|rollback|diff",
 		Short: "read, compare and roll back a workspace's Terraform state",
 	}
-	stateCmd.AddCommand(newStatePullCmd(), newStateOutputsCmd())
+	stateCmd.AddCommand(newStatePullCmd(), newStateOutputsCmd(), newStateRollbackCmd())
 	rootCmd.AddCommand(stateCmd)
 }
 
@@ -222,4 +223,69 @@ func yamlNumbers(v any) any {
 		return l
 	}
 	return v
+}
+
+func newStateRollbackCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "rollback <workspace> <history-id>",
+		Short: "make an earlier state version the workspace's current state",
+		Long: `Make the state of one history entry (see: history list) the workspace's current
+state, as the UI's rollback does. On a terminal it asks you to type the
+workspace name; without a terminal it needs --yes.`,
+		Args:         cobra.ExactArgs(2),
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			yes, _ := cmd.Flags().GetBool("yes")
+			if !yes && !resource.IsTerminal() {
+				return errors.New("state rollback needs confirmation: run it in a terminal or pass --yes")
+			}
+			s, err := newStateScope(cmd, args[0])
+			if err != nil {
+				return err
+			}
+			h, err := s.version(args[1])
+			if err != nil {
+				return err
+			}
+			// The server does not check that the version belongs to the workspace.
+			if h.Workspace != nil && h.Workspace.ID != "" && h.Workspace.ID != s.wsID {
+				return fmt.Errorf("state version %s belongs to workspace %s, not %s", h.ID, h.Workspace.ID, s.ws)
+			}
+			if !yes {
+				if err := s.confirm(cmd, h); err != nil {
+					return err
+				}
+			}
+			if err := s.client.State.Rollback(s.ctx, s.orgID, s.wsID, h); err != nil {
+				if terrakube.IsNotFound(err) {
+					return fmt.Errorf("state version %s has no raw state on the server, so it cannot be restored: %w", h.ID, err)
+				}
+				return err
+			}
+			_, err = fmt.Fprintf(os.Stdout, "workspace %s rolled back to state version %s\n", s.ws, h.ID)
+			return err
+		},
+	}
+	resource.AddScopeFlags(cmd, orgScope)
+	cmd.Flags().Bool("yes", false, "skip the confirmation prompt")
+	return cmd
+}
+
+// confirm asks for the workspace name on the terminal and fails unless it is
+// typed back exactly.
+func (s *stateScope) confirm(cmd *cobra.Command, h *terrakube.History) error {
+	name := s.ws
+	if resource.IsUUID(name) {
+		ws, err := s.client.Workspaces.Get(s.ctx, s.orgID, s.wsID)
+		if err != nil {
+			return err
+		}
+		name = ws.Name
+	}
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Roll back workspace %s to state version %s (serial %d)? Type the workspace name to confirm: ", name, h.ID, h.Serial)
+	typed, _ := bufio.NewReader(resource.Stdin).ReadString('\n')
+	if strings.TrimSpace(typed) != name {
+		return fmt.Errorf("confirmation did not match %q: nothing changed", name)
+	}
+	return nil
 }

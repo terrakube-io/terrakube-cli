@@ -20,6 +20,10 @@ func TestHandWrittenCommandsReportAPIErrors(t *testing.T) {
 		{"workspace", "lock", runWs, "-o", runOrg},
 		{"workspace", "unlock", "prod", "-o", runOrg},
 		{"job", "logs", "42", "-o", "my-org"},
+		{"state", "pull", runWs, "-o", runOrg},
+		{"state", "outputs", runWs, "-o", runOrg},
+		{"state", "rollback", runWs, "h1", "-o", runOrg, "--yes"},
+		{"state", "pull", "prod", "-o", "my-org"},
 	}
 	for _, args := range commands {
 		t.Run(args[0]+" "+args[1], func(t *testing.T) {
@@ -45,6 +49,7 @@ func TestHandWrittenCommandsNeedLogin(t *testing.T) {
 		{"job", "reject", "42", "-o", runOrg},
 		{"run", "destroy", "-o", runOrg, "-w", runWs},
 		{"workspace", "lock", runWs, "-o", runOrg},
+		{"state", "outputs", runWs, "-o", runOrg},
 	} {
 		resetGlobalFlags()
 		if _, err := executeCommand(args...); err == nil {
