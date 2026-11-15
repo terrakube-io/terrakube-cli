@@ -273,6 +273,8 @@ terrakube organization create \
   --output json
 ```
 
+The settings from the workspace's Settings page are flags of `workspace create|update`: `--template` (default template), `--require-approve-to-apply`, `--restrict-apply-to-configured-branch`, `--allow-remote-apply`, `--global-remote-state`, `--shared-ids` (comma-separated workspace IDs that may read the state) and `--module-ssh-key` (name or ID; `""` clears it).
+
 *Save the returned organization ID (e.g., `09e86337-b6bb-49e0-82aa-c114ad0f41ab`) for subsequent operations.*
 
 ### 3. Create an Admin Team & Assign Permissions
@@ -294,8 +296,12 @@ terrakube team create \
   --manage-job \
   --plan-job \
   --approve-job \
+  --destroy-job \
+  --manage-policies \
   --output table
 ```
+
+`workspace-access` grants a team rights on one workspace (`--plan-job`, `--approve-job`, `--destroy-job`, `--role`, and the `--manage-*` flags); `project-access` does the same for a project.
 
 ### 4. Create a Workspace (OpenTofu & Docker Compose)
 

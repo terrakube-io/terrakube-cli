@@ -39,6 +39,7 @@ func init() {
 			{StructField: "PlanJob", Flag: "plan-job", Type: resource.Bool, Description: "Allow plan job execution"},
 			{StructField: "ApproveJob", Flag: "approve-job", Type: resource.Bool, Description: "Allow approving jobs"},
 			{StructField: "Role", Flag: "role", Type: resource.String, Description: "Project access role"},
+			{StructField: "DestroyJob", Flag: "destroy-job", Type: resource.Bool, Description: "Allow destroy jobs"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.ProjectAccess, error) {
 			return c.ProjectAccess.List(ctx, pIDs[0], pIDs[1], opts)

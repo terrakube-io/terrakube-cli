@@ -42,6 +42,12 @@ func init() {
 			{StructField: "Agent", Flag: "agent", Type: resource.Relationship, RelType: "agent", Resolver: agentResolver, Description: "Agent pool, by name or ID (\"\" clears it)"},
 			{StructField: "Project", Flag: "project", Type: resource.Relationship, RelType: "project", Resolver: projectResolver, Description: "Project, by name or ID (\"\" clears it)"},
 			{StructField: "TemplateID", Flag: "template", Type: resource.String, Resolver: templateResolver, Description: "Default template, by name or ID (\"\" clears it)"},
+			{StructField: "RequireApproveToApply", Flag: "require-approve-to-apply", Type: resource.Bool, Description: "Require approval before an apply"},
+			{StructField: "RestrictApplyToConfiguredBranch", Flag: "restrict-apply-to-configured-branch", Type: resource.Bool, Description: "Apply only runs of the workspace's branch"},
+			{StructField: "AllowRemoteApply", Flag: "allow-remote-apply", Type: resource.Bool, Description: "Allow applies started from a remote CLI run"},
+			{StructField: "GlobalRemoteState", Flag: "global-remote-state", Type: resource.Bool, Description: "Let every workspace in the organization read this state (server default: true)"},
+			{StructField: "SharedIDs", Flag: "shared-ids", Type: resource.String, Description: "Comma-separated IDs of the workspaces that may read this state when --global-remote-state=false"},
+			{StructField: "ModuleSSHKey", Flag: "module-ssh-key", Type: resource.String, Resolver: sshResolver, Description: "SSH key for private module sources, by name or ID (\"\" clears it)"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Workspace, error) {
 			return c.Workspaces.List(ctx, pIDs[0], opts)

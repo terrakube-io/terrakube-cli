@@ -39,6 +39,10 @@ func init() {
 			{StructField: "ManageState", Flag: "manage-state", Type: resource.Bool, Description: "Manage state permission"},
 			{StructField: "ManageWorkspace", Flag: "manage-workspace", Type: resource.Bool, Description: "Manage workspace permission"},
 			{StructField: "ManageJob", Flag: "manage-job", Type: resource.Bool, Description: "Manage job permission"},
+			{StructField: "PlanJob", Flag: "plan-job", Type: resource.Bool, Description: "Plan job permission"},
+			{StructField: "ApproveJob", Flag: "approve-job", Type: resource.Bool, Description: "Approve job permission"},
+			{StructField: "DestroyJob", Flag: "destroy-job", Type: resource.Bool, Description: "Destroy job permission"},
+			{StructField: "Role", Flag: "role", Type: resource.String, Description: "Role on the workspace"},
 			{StructField: "Name", Flag: "name", Short: "n", Type: resource.String, Required: true, Description: "Team name for access"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.WorkspaceAccess, error) {
