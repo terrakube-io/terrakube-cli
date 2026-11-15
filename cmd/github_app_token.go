@@ -29,14 +29,16 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, _ []string, id string) (*terrakube.GithubAppToken, error) {
 			return c.GithubAppTokens.Get(ctx, id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, _ []string, t *terrakube.GithubAppToken) (*terrakube.GithubAppToken, error) {
-			return c.GithubAppTokens.Create(ctx, t)
+		Create: func(ctx context.Context, c *terrakube.Client, _ []string, p terrakube.Patch) (*terrakube.GithubAppToken, error) {
+			return c.GithubAppTokens.CreateFields(ctx, p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, _ []string, t *terrakube.GithubAppToken) (*terrakube.GithubAppToken, error) {
-			return c.GithubAppTokens.Update(ctx, t)
+		Update: func(ctx context.Context, c *terrakube.Client, _ []string, id string, p terrakube.Patch) (*terrakube.GithubAppToken, error) {
+			return c.GithubAppTokens.UpdateFields(ctx, id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, _ []string, id string) error {
 			return c.GithubAppTokens.Delete(ctx, id)
 		},
+		// Only executor or super-service tokens may call these; the server answers 403 otherwise.
+		HiddenVerbs: []string{"create", "update", "delete"},
 	})
 }

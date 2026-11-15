@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"reflect"
 	"strings"
@@ -66,7 +64,7 @@ func TestCommands_NewClientError(t *testing.T) {
 		{"list", "--organization", testOrgID},
 		{"get", "--organization", testOrgID, "--id", "x"},
 		{"create", "--organization", testOrgID, "--name", "n"},
-		{"update", "--organization", testOrgID, "--id", "x"},
+		{"update", "--organization", testOrgID, "--id", "x", "--name", "n"},
 		{"delete", "--organization", testOrgID, "--id", "x"},
 	} {
 		t.Run(args[0], func(t *testing.T) {
@@ -100,10 +98,10 @@ func TestCommands_APIErrors(t *testing.T) {
 		return nil, apiErr
 	}
 	cfg.Get = func(context.Context, *terrakube.Client, []string, string) (*testResource, error) { return nil, apiErr }
-	cfg.Create = func(context.Context, *terrakube.Client, []string, *testResource) (*testResource, error) {
+	cfg.Create = func(context.Context, *terrakube.Client, []string, terrakube.Patch) (*testResource, error) {
 		return nil, apiErr
 	}
-	cfg.Update = func(context.Context, *terrakube.Client, []string, *testResource) (*testResource, error) {
+	cfg.Update = func(context.Context, *terrakube.Client, []string, string, terrakube.Patch) (*testResource, error) {
 		return nil, apiErr
 	}
 	cfg.Delete = func(context.Context, *terrakube.Client, []string, string) error { return apiErr }
@@ -112,7 +110,7 @@ func TestCommands_APIErrors(t *testing.T) {
 		{"list", "--organization", testOrgID},
 		{"get", "--organization", testOrgID, "--id", "x"},
 		{"create", "--organization", testOrgID, "--name", "n"},
-		{"update", "--organization", testOrgID, "--id", "x"},
+		{"update", "--organization", testOrgID, "--id", "x", "--name", "n"},
 		{"delete", "--organization", testOrgID, "--id", "x"},
 	} {
 		t.Run(args[0], func(t *testing.T) {
@@ -206,51 +204,55 @@ func richConfig() Config[richResource] {
 
 func TestCreateCmd_PopulatesTypedFields(t *testing.T) {
 	cfg := richConfig()
-	var got *richResource
-	cfg.Create = func(_ context.Context, _ *terrakube.Client, _ []string, r *richResource) (*richResource, error) {
-		got = r
-		return r, nil
+	var got terrakube.Patch
+	cfg.Create = func(_ context.Context, _ *terrakube.Client, _ []string, p terrakube.Patch) (*richResource, error) {
+		got = p
+		return &richResource{ID: "r1"}, nil
 	}
 	_, err := runCmd(t, cfg, "create", "--organization", testOrgID,
 		"--name", "n", "--count", "3", "--limit", "7", "--tags", "a,b", "--on=true", "--at", "2026-01-02T15:04:05Z")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Name != "n" || got.Count != 3 {
-		t.Errorf("name/count: %+v", got)
+	a := got.Attributes
+	if a["name"] != "n" || a["count"] != 3 {
+		t.Errorf("name/count: %v", a)
 	}
-	if got.Limit == nil || *got.Limit != 7 {
-		t.Errorf("expected pointer Limit 7, got %v", got.Limit)
+	if limit, ok := a["limit"].(*int); !ok || *limit != 7 {
+		t.Errorf("expected pointer limit 7, got %#v", a["limit"])
 	}
-	if !reflect.DeepEqual(got.Tags, []string{"a", "b"}) {
-		t.Errorf("tags: %v", got.Tags)
+	if !reflect.DeepEqual(a["tags"], []string{"a", "b"}) {
+		t.Errorf("tags: %v", a["tags"])
 	}
-	if got.On == nil || !*got.On {
-		t.Errorf("expected On=true, got %v", got.On)
+	if on, ok := a["on"].(*bool); !ok || !*on {
+		t.Errorf("expected on=true, got %#v", a["on"])
 	}
-	if got.At == nil || !got.At.Equal(time.Date(2026, 1, 2, 15, 4, 5, 0, time.UTC)) {
-		t.Errorf("at: %v", got.At)
+	if at, ok := a["at"].(*time.Time); !ok || !at.Equal(time.Date(2026, 1, 2, 15, 4, 5, 0, time.UTC)) {
+		t.Errorf("at: %#v", a["at"])
 	}
 }
 
-func TestCreateCmd_EmptyStringSliceLeavesNil(t *testing.T) {
+func TestCreateCmd_SendsOnlySetFlags(t *testing.T) {
 	cfg := richConfig()
-	var got *richResource
-	cfg.Create = func(_ context.Context, _ *terrakube.Client, _ []string, r *richResource) (*richResource, error) {
-		got = r
-		return r, nil
+	var got terrakube.Patch
+	cfg.Create = func(_ context.Context, _ *terrakube.Client, _ []string, p terrakube.Patch) (*richResource, error) {
+		got = p
+		return &richResource{ID: "r1"}, nil
 	}
-	if _, err := runCmd(t, cfg, "create", "--organization", testOrgID); err != nil {
+	if _, err := runCmd(t, cfg, "create", "--organization", testOrgID, "--on=false"); err != nil {
 		t.Fatal(err)
 	}
-	if got.Tags != nil {
-		t.Errorf("expected nil Tags, got %v", got.Tags)
+	if len(got.Attributes) != 1 {
+		t.Fatalf("expected only the set flag, got %v", got.Attributes)
+	}
+	if on, ok := got.Attributes["on"].(*bool); !ok || *on {
+		t.Errorf("expected explicit on=false, got %#v", got.Attributes["on"])
 	}
 }
 
 func TestCreateCmd_InvalidTimestampError(t *testing.T) {
 	cfg := richConfig()
-	cfg.Create = func(context.Context, *terrakube.Client, []string, *richResource) (*richResource, error) {
+	cfg.Create = func(context.Context, *terrakube.Client, []string, terrakube.Patch) (*richResource, error) {
 		t.Error("Create must not be called when flag parsing fails")
 		return nil, nil
 	}
@@ -266,7 +268,7 @@ func TestSetFieldFromFlag_UnknownStructField(t *testing.T) {
 	addFieldFlags(cmd, []FieldDef{f}, false)
 	err := setFieldFromFlag(cmd, f, &testResource{})
 	wantErr(t, err, `struct has no field "Nope"`)
-	wantErr(t, populateFields(cmd, []FieldDef{f}, &testResource{}), `struct has no field "Nope"`)
+	wantErr(t, setFieldFromFlag(cmd, f, &testResource{}), `struct has no field "Nope"`)
 
 	_ = cmd.Flags().Set("nope", "x")
 	wantErr(t, populateChangedFields(cmd, []FieldDef{f}, &testResource{}), `struct has no field "Nope"`)
@@ -309,9 +311,10 @@ func TestSetBoolField_NonPointer(t *testing.T) {
 func TestUpdateCmd_RendersResult(t *testing.T) {
 	cfg := richConfig()
 	cfg.NewClient = func() (*terrakube.Client, error) { return realClient(t), nil }
-	var sent *richResource
-	cfg.Update = func(_ context.Context, _ *terrakube.Client, _ []string, r *richResource) (*richResource, error) {
-		sent = r
+	var sentID string
+	var sent terrakube.Patch
+	cfg.Update = func(_ context.Context, _ *terrakube.Client, _ []string, id string, p terrakube.Patch) (*richResource, error) {
+		sentID, sent = id, p
 		return &richResource{ID: "id-1", Name: "from-api"}, nil
 	}
 	cfg.Get = func(context.Context, *terrakube.Client, []string, string) (*richResource, error) {
@@ -322,8 +325,8 @@ func TestUpdateCmd_RendersResult(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if sent.ID != "id-1" || sent.Name != "new" || sent.Count != 0 {
-		t.Errorf("only changed fields + ID expected, got %+v", sent)
+	if sentID != "id-1" || len(sent.Attributes) != 1 || sent.Attributes["name"] != "new" {
+		t.Errorf("only changed fields + ID expected, got id=%q %v", sentID, sent.Attributes)
 	}
 	if !strings.Contains(out, "from-api") {
 		t.Errorf("expected API result rendered, got %q", out)
@@ -333,7 +336,7 @@ func TestUpdateCmd_RendersResult(t *testing.T) {
 func TestUpdateCmd_EmptyResultFallsBackToGet(t *testing.T) {
 	cfg := richConfig()
 	cfg.NewClient = func() (*terrakube.Client, error) { return realClient(t), nil }
-	cfg.Update = func(context.Context, *terrakube.Client, []string, *richResource) (*richResource, error) {
+	cfg.Update = func(context.Context, *terrakube.Client, []string, string, terrakube.Patch) (*richResource, error) {
 		return nil, nil // 204 No Content
 	}
 	cfg.Get = func(_ context.Context, _ *terrakube.Client, _ []string, id string) (*richResource, error) {
@@ -351,7 +354,7 @@ func TestUpdateCmd_EmptyResultFallsBackToGet(t *testing.T) {
 func TestUpdateCmd_EmptyIDResultFallsBackToSentFieldsWhenGetFails(t *testing.T) {
 	cfg := richConfig()
 	cfg.NewClient = func() (*terrakube.Client, error) { return realClient(t), nil }
-	cfg.Update = func(context.Context, *terrakube.Client, []string, *richResource) (*richResource, error) {
+	cfg.Update = func(context.Context, *terrakube.Client, []string, string, terrakube.Patch) (*richResource, error) {
 		return &richResource{}, nil
 	}
 	cfg.Get = func(context.Context, *terrakube.Client, []string, string) (*richResource, error) {
@@ -369,7 +372,7 @@ func TestUpdateCmd_EmptyIDResultFallsBackToSentFieldsWhenGetFails(t *testing.T) 
 func TestUpdateCmd_NoGetConfigured(t *testing.T) {
 	cfg := richConfig()
 	cfg.NewClient = func() (*terrakube.Client, error) { return realClient(t), nil }
-	cfg.Update = func(context.Context, *terrakube.Client, []string, *richResource) (*richResource, error) {
+	cfg.Update = func(context.Context, *terrakube.Client, []string, string, terrakube.Patch) (*richResource, error) {
 		return nil, nil
 	}
 	out, err := runCmd(t, cfg, "update", "--organization", testOrgID, "--id", "id-4", "--name", "sent")
@@ -384,89 +387,12 @@ func TestUpdateCmd_NoGetConfigured(t *testing.T) {
 func TestUpdateCmd_InvalidTimestampError(t *testing.T) {
 	cfg := richConfig()
 	cfg.NewClient = func() (*terrakube.Client, error) { return realClient(t), nil }
-	cfg.Update = func(context.Context, *terrakube.Client, []string, *richResource) (*richResource, error) {
+	cfg.Update = func(context.Context, *terrakube.Client, []string, string, terrakube.Patch) (*richResource, error) {
 		t.Error("Update must not be called")
 		return nil, nil
 	}
 	_, err := runCmd(t, cfg, "update", "--organization", testOrgID, "--id", "x", "--at", "nope")
 	if err == nil || !strings.HasPrefix(err.Error(), "--at: want an RFC 3339 timestamp") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func patchServer(t *testing.T, got *string, method *string) *httptest.Server {
-	t.Helper()
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		b, _ := io.ReadAll(r.Body)
-		*got, *method = string(b), r.Method
-		w.WriteHeader(http.StatusNoContent)
-	}))
-	t.Cleanup(srv.Close)
-	return srv
-}
-
-func TestSparsePatch_RewritesPatchBody(t *testing.T) {
-	var body, method string
-	srv := patchServer(t, &body, &method)
-
-	hc := &http.Client{Transport: sparsePatch{attrs: map[string]any{"name": "new"}}}
-	in := `{"data":{"type":"widget","id":"w1","attributes":{"name":"old","other":"x"},"relationships":{"a":{}}},"included":[1]}`
-	req, _ := http.NewRequest(http.MethodPatch, srv.URL, strings.NewReader(in))
-	resp, err := hc.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = resp.Body.Close()
-
-	if method != http.MethodPatch {
-		t.Errorf("method=%s", method)
-	}
-	want := `{"data":{"type":"widget","id":"w1","attributes":{"name":"new"}}}`
-	if body != want {
-		t.Errorf("body=%s want %s", body, want)
-	}
-}
-
-func TestSparsePatch_NonPatchPassesThrough(t *testing.T) {
-	var body, method string
-	srv := patchServer(t, &body, &method)
-
-	hc := &http.Client{Transport: sparsePatch{attrs: map[string]any{"name": "new"}}}
-	req, _ := http.NewRequest(http.MethodPost, srv.URL, strings.NewReader("raw"))
-	resp, err := hc.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = resp.Body.Close()
-	if method != http.MethodPost || body != "raw" {
-		t.Errorf("method=%s body=%q", method, body)
-	}
-
-	req, _ = http.NewRequest(http.MethodPatch, srv.URL, nil)
-	resp, err = hc.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_ = resp.Body.Close()
-	if method != http.MethodPatch || body != "" {
-		t.Errorf("nil-body PATCH: method=%s body=%q", method, body)
-	}
-}
-
-type errReader struct{}
-
-func (errReader) Read([]byte) (int, error) { return 0, errors.New("read fail") }
-
-func TestSparsePatch_BodyErrors(t *testing.T) {
-	s := sparsePatch{attrs: map[string]any{}}
-
-	req, _ := http.NewRequest(http.MethodPatch, "http://127.0.0.1:1", errReader{})
-	_, err := s.RoundTrip(req)
-	wantErr(t, err, "read fail")
-
-	req, _ = http.NewRequest(http.MethodPatch, "http://127.0.0.1:1", strings.NewReader("{not json"))
-	_, err = s.RoundTrip(req)
-	if err == nil || !strings.HasPrefix(err.Error(), "rewriting update body: ") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -489,10 +415,101 @@ func TestGetCmd_RendersResultAndRenderError(t *testing.T) {
 	wantErr(t, err, `unsupported output format: "bogus"`)
 }
 
-func TestSparsePatch_UnmarshalableAttrs(t *testing.T) {
-	s := sparsePatch{attrs: map[string]any{"bad": make(chan int)}}
-	req, _ := http.NewRequest(http.MethodPatch, "http://127.0.0.1:1", strings.NewReader(`{"data":{"type":"w","id":"1"}}`))
-	if _, err := s.RoundTrip(req); err == nil || !strings.Contains(err.Error(), "unsupported type") {
-		t.Fatalf("unexpected error: %v", err)
+func TestUpdateCmd_NoFieldFlagsIsAnError(t *testing.T) {
+	cfg := richConfig()
+	cfg.NewClient = func() (*terrakube.Client, error) { return realClient(t), nil }
+	cfg.Update = func(context.Context, *terrakube.Client, []string, string, terrakube.Patch) (*richResource, error) {
+		t.Error("Update must not be called without a field flag")
+		return nil, nil
+	}
+	_, err := runCmd(t, cfg, "update", "--organization", testOrgID, "--id", "x")
+	wantErr(t, err, "nothing to update: set at least one field flag, see --help")
+}
+
+type linkTarget struct {
+	ID string `jsonapi:"primary,target"`
+}
+
+type linkedResource struct {
+	ID     string      `jsonapi:"primary,linked"`
+	Name   string      `jsonapi:"attr,name"`
+	Target *linkTarget `jsonapi:"relation,target,omitempty"`
+}
+
+func linkedConfig(resolver func(context.Context, *terrakube.Client, []string, string) (string, error)) Config[linkedResource] {
+	return Config[linkedResource]{
+		Runtime: testRuntime(),
+		Name:    "linked",
+		Parents: []ParentScope{{Name: "organization", Flag: "organization", IDFlag: "organization-id"}},
+		Fields: []FieldDef{
+			{StructField: "Name", Flag: "name", Type: String},
+			{StructField: "Target", Flag: "target", Type: Relationship, RelType: "target", Resolver: resolver},
+		},
+	}
+}
+
+func TestRelationship_NameWithoutResolverIsAnError(t *testing.T) {
+	cfg := linkedConfig(nil)
+	cfg.Create = func(context.Context, *terrakube.Client, []string, terrakube.Patch) (*linkedResource, error) {
+		t.Error("Create must not be called")
+		return nil, nil
+	}
+	_, err := runCmd(t, cfg, "create", "--organization", testOrgID, "--target", "prod")
+	wantErr(t, err, `--target: "prod" is not a UUID`)
+}
+
+func TestRelationship_NameGoesThroughResolver(t *testing.T) {
+	const resolved = "11111111-2222-4333-8444-555555555555"
+	var gotParents []string
+	cfg := linkedConfig(func(_ context.Context, _ *terrakube.Client, parents []string, name string) (string, error) {
+		gotParents = parents
+		if name != "prod" {
+			t.Errorf("resolver got %q", name)
+		}
+		return resolved, nil
+	})
+	var got terrakube.Patch
+	cfg.Create = func(_ context.Context, _ *terrakube.Client, _ []string, p terrakube.Patch) (*linkedResource, error) {
+		got = p
+		return &linkedResource{ID: "l1"}, nil
+	}
+	if _, err := runCmd(t, cfg, "create", "--organization", testOrgID, "--target", "prod"); err != nil {
+		t.Fatal(err)
+	}
+	rel := got.Relationships["target"]
+	if rel.Type != "target" || rel.ID == nil || *rel.ID != resolved {
+		t.Errorf("relationship: %+v", rel)
+	}
+	if len(gotParents) != 1 || gotParents[0] != testOrgID {
+		t.Errorf("resolver parents: %v", gotParents)
+	}
+}
+
+func TestRelationship_ResolverErrorStopsTheWrite(t *testing.T) {
+	cfg := linkedConfig(func(context.Context, *terrakube.Client, []string, string) (string, error) {
+		return "", errors.New(`target "prod" not found`)
+	})
+	cfg.NewClient = func() (*terrakube.Client, error) { return realClient(t), nil }
+	cfg.Update = func(context.Context, *terrakube.Client, []string, string, terrakube.Patch) (*linkedResource, error) {
+		t.Error("Update must not be called")
+		return nil, nil
+	}
+	_, err := runCmd(t, cfg, "update", "--organization", testOrgID, "--id", "x", "--target", "prod")
+	wantErr(t, err, `target "prod" not found`)
+}
+
+func TestCheckFields_RelationshipNeedsRelationFieldAndType(t *testing.T) {
+	for name, f := range map[string]FieldDef{
+		"attr field":  {StructField: "Name", Flag: "name", Type: Relationship, RelType: "x"},
+		"no rel type": {StructField: "Target", Flag: "target", Type: Relationship},
+	} {
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Error("expected checkFields to panic")
+				}
+			}()
+			checkFields[linkedResource]([]FieldDef{f})
+		})
 	}
 }

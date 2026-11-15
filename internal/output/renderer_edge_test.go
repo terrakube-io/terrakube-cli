@@ -171,7 +171,7 @@ func TestRenderTSV_FieldFormatting(t *testing.T) {
 	if err := Render(&buf, d, "tsv"); err != nil {
 		t.Fatal(err)
 	}
-	want := "f1\t2026-01-02T15:04:05Z\t7\ttrue\tlbl\t-9\t3\tt\n"
+	want := "f1\t2026-01-02T15:04:05Z\t7\ttrue\tlbl\t-9\t3\tt\tr\n"
 	if buf.String() != want {
 		t.Errorf("got %q want %q", buf.String(), want)
 	}
@@ -180,7 +180,7 @@ func TestRenderTSV_FieldFormatting(t *testing.T) {
 	if err := Render(&buf, &formatted{ID: "f2"}, "tsv"); err != nil {
 		t.Fatal(err)
 	}
-	if want := "f2\t\t\t\t\t0\t0\t\n"; buf.String() != want {
+	if want := "f2\t\t\t\t\t0\t0\t\t\n"; buf.String() != want {
 		t.Errorf("nil pointers: got %q want %q", buf.String(), want)
 	}
 }

@@ -45,11 +45,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.VCS, error) {
 			return c.VCS.Get(ctx, pIDs[0], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, v *terrakube.VCS) (*terrakube.VCS, error) {
-			return c.VCS.Create(ctx, pIDs[0], v)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.VCS, error) {
+			return c.VCS.CreateFields(ctx, pIDs[0], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, v *terrakube.VCS) (*terrakube.VCS, error) {
-			return c.VCS.Update(ctx, pIDs[0], v)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.VCS, error) {
+			return c.VCS.UpdateFields(ctx, pIDs[0], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.VCS.Delete(ctx, pIDs[0], id)

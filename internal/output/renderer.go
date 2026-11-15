@@ -188,7 +188,9 @@ func renderTSV(w io.Writer, data any) error {
 }
 
 // extractRows converts a struct or slice of structs into string rows and headers.
-// ID is always the first column. Fields tagged with jsonapi "relation,..." are skipped.
+// ID is always the first column. A to-one relation (other than organization, the
+// scope the user passed) becomes a column with the related ID; to-many relations
+// are skipped.
 func extractRows(data any) ([][]string, []string) {
 	v := reflect.ValueOf(data)
 	headers := []string{"ID"}
@@ -219,6 +221,15 @@ func appendFields(d reflect.Value, row []string, headers []string, buildHeaders 
 		}
 		tag := field.Tag.Get("jsonapi")
 		if strings.HasPrefix(tag, "relation,") {
+			// Columns stay aligned across rows: the related ID, or "" when unset.
+			name := strings.Split(tag, ",")[1]
+			if field.Type.Kind() != reflect.Pointer || name == "organization" {
+				continue
+			}
+			if buildHeaders {
+				headers = append(headers, field.Name)
+			}
+			row = append(row, relatedID(d.Field(j)))
 			continue
 		}
 		if buildHeaders {
@@ -227,6 +238,18 @@ func appendFields(d reflect.Value, row []string, headers []string, buildHeaders 
 		row = append(row, formatFieldValue(d.Field(j)))
 	}
 	return row, headers
+}
+
+// relatedID returns the ID of a to-one relation, or "" when it is unset.
+func relatedID(v reflect.Value) string {
+	if v.IsNil() {
+		return ""
+	}
+	id := v.Elem().FieldByName("ID")
+	if !id.IsValid() || id.Kind() != reflect.String {
+		return ""
+	}
+	return id.String()
 }
 
 func formatFieldValue(v reflect.Value) string {

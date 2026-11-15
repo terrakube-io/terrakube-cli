@@ -285,7 +285,7 @@ func TestCmdJobCreateMissingOrgId(t *testing.T) {
 	ts := setupTestServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
 	defer ts.Close()
 
-	_, err := executeCommand("job", "create", "--template-reference", "tpl-plan", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
+	_, err := executeCommand("job", "create", "--template-reference", "c3d4e5f6-a7b8-4901-9cde-f12345678901", "--workspace-id", "38b6635a-d38e-46f2-a95e-d00a416de4fd")
 	if err == nil {
 		t.Fatal("expected error for job create without --organization, got nil")
 	}

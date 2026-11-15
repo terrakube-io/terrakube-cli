@@ -48,14 +48,16 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.History, error) {
 			return c.History.Get(ctx, pIDs[0], pIDs[1], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, h *terrakube.History) (*terrakube.History, error) {
-			return c.History.Create(ctx, pIDs[0], pIDs[1], h)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.History, error) {
+			return c.History.CreateFields(ctx, pIDs[0], pIDs[1], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, h *terrakube.History) (*terrakube.History, error) {
-			return c.History.Update(ctx, pIDs[0], pIDs[1], h)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.History, error) {
+			return c.History.UpdateFields(ctx, pIDs[0], pIDs[1], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.History.Delete(ctx, pIDs[0], pIDs[1], id)
 		},
+		// Only executor or super-service tokens may call these; the server answers 403 otherwise.
+		HiddenVerbs: []string{"create", "update", "delete"},
 	})
 }

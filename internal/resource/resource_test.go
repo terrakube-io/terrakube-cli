@@ -45,10 +45,10 @@ func testConfig() Config[testResource] {
 		Get: func(_ context.Context, _ *terrakube.Client, _ []string, _ string) (*testResource, error) {
 			return nil, nil
 		},
-		Create: func(_ context.Context, _ *terrakube.Client, _ []string, _ *testResource) (*testResource, error) {
+		Create: func(_ context.Context, _ *terrakube.Client, _ []string, _ terrakube.Patch) (*testResource, error) {
 			return nil, nil
 		},
-		Update: func(_ context.Context, _ *terrakube.Client, _ []string, _ *testResource) (*testResource, error) {
+		Update: func(_ context.Context, _ *terrakube.Client, _ []string, _ string, _ terrakube.Patch) (*testResource, error) {
 			return nil, nil
 		},
 		Delete: func(_ context.Context, _ *terrakube.Client, _ []string, _ string) error { return nil },
@@ -237,7 +237,7 @@ func TestPopulateFields(t *testing.T) {
 	}
 
 	r := &testResource{}
-	if err := populateFields(cmd, fields, r); err != nil {
+	if err := populateChangedFields(cmd, fields, r); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -262,8 +262,9 @@ func TestPopulateFields_EmptyStringLeavesPointerNil(t *testing.T) {
 		{StructField: "Desc", Flag: "description", Type: String},
 	}
 
+	_ = cmd.Flags().Set("description", "")
 	r := &testResource{}
-	if err := populateFields(cmd, fields, r); err != nil {
+	if err := populateChangedFields(cmd, fields, r); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 

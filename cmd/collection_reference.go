@@ -50,12 +50,12 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, _ []string, id string) (*terrakube.CollectionReference, error) {
 			return c.CollectionReferences.Get(ctx, id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, ref *terrakube.CollectionReference) (*terrakube.CollectionReference, error) {
-			ref.Workspace = &terrakube.Workspace{ID: pIDs[2]}
-			return c.CollectionReferences.Create(ctx, pIDs[0], pIDs[1], ref)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.CollectionReference, error) {
+			p.Relationships = map[string]terrakube.Relationship{"workspace": {Type: "workspace", ID: &pIDs[2]}}
+			return c.CollectionReferences.CreateFields(ctx, pIDs[0], pIDs[1], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, _ []string, ref *terrakube.CollectionReference) (*terrakube.CollectionReference, error) {
-			return c.CollectionReferences.Update(ctx, ref)
+		Update: func(ctx context.Context, c *terrakube.Client, _ []string, id string, p terrakube.Patch) (*terrakube.CollectionReference, error) {
+			return c.CollectionReferences.UpdateFields(ctx, id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, _ []string, id string) error {
 			return c.CollectionReferences.Delete(ctx, id)

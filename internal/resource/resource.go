@@ -1,17 +1,18 @@
 package resource
 
 import (
-	"bytes"
+	"bufio"
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	terrakube "github.com/terrakube-io/terrakube-go"
@@ -27,6 +28,8 @@ const (
 	Bool
 	Int
 	StringSlice
+	// Relationship is a to-one JSON:API relationship set by ID or name; "" clears it.
+	Relationship
 )
 
 // ParentScope defines a parent resource for name-to-ID resolution.
@@ -49,6 +52,14 @@ type FieldDef struct {
 	Type        FieldType
 	Required    bool
 	Description string
+	Hidden      bool // left out of --help: only executor or super-service tokens may set it
+
+	// For Relationship fields: StructField names the relation field (its jsonapi
+	// tag gives the relationship name), RelType is the JSON:API type of the target,
+	// and Resolver turns a name into an ID (nil accepts UUIDs only). A String field
+	// with a Resolver holds an ID in an attribute; a name given to it is resolved.
+	RelType  string
+	Resolver func(ctx context.Context, c *terrakube.Client, parentIDs []string, name string) (string, error)
 }
 
 // EnvAnnotation is the flag annotation listing the flag names whose
@@ -70,12 +81,37 @@ type Config[T any] struct {
 	Parents []ParentScope
 	Fields  []FieldDef
 
-	List   func(ctx context.Context, c *terrakube.Client, parentIDs []string, opts *terrakube.ListOptions) ([]*T, error)
-	Get    func(ctx context.Context, c *terrakube.Client, parentIDs []string, id string) (*T, error)
-	Create func(ctx context.Context, c *terrakube.Client, parentIDs []string, resource *T) (*T, error)
-	Update func(ctx context.Context, c *terrakube.Client, parentIDs []string, resource *T) (*T, error)
+	List func(ctx context.Context, c *terrakube.Client, parentIDs []string, opts *terrakube.ListOptions) ([]*T, error)
+	Get  func(ctx context.Context, c *terrakube.Client, parentIDs []string, id string) (*T, error)
+	// Create and Update receive only the attributes (and relationships) the user set,
+	// so server defaults apply to the rest and explicit false/0/"" values are kept.
+	Create func(ctx context.Context, c *terrakube.Client, parentIDs []string, p terrakube.Patch) (*T, error)
+	Update func(ctx context.Context, c *terrakube.Client, parentIDs []string, id string, p terrakube.Patch) (*T, error)
 	Delete func(ctx context.Context, c *terrakube.Client, parentIDs []string, id string) error
+
+	// SoftDelete, when set, makes delete set an attribute through Update instead of
+	// sending DELETE (the server's hooks only clean up on the attribute).
+	SoftDelete *SoftDelete
+
+	// HiddenVerbs lists subcommands (e.g. "delete") left out of --help because the
+	// server allows them only to executor or super-service tokens. They still run.
+	HiddenVerbs []string
 }
+
+// SoftDelete configures a delete that sets Attribute to true.
+type SoftDelete struct {
+	Attribute string // e.g. "deleted" or "disabled"
+	Done      string // printed after the name, e.g. "marked as deleted"
+	Hard      bool   // add --hard, which sends DELETE through Config.Delete
+	Confirm   bool   // ask for the resource name on a TTY, or require --yes
+}
+
+// IsTerminal reports whether stdin is a terminal; Stdin is where the delete
+// confirmation is read. Both are variables so tests can replace them.
+var (
+	IsTerminal           = func() bool { return isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd()) }
+	Stdin      io.Reader = os.Stdin
+)
 
 // Register creates Cobra commands for the resource and adds them to root.
 func Register[T any](root *cobra.Command, cfg Config[T]) *cobra.Command {
@@ -99,8 +135,13 @@ func Register[T any](root *cobra.Command, cfg Config[T]) *cobra.Command {
 	if cfg.Update != nil {
 		parentCmd.AddCommand(newUpdateCmd(cfg))
 	}
-	if cfg.Delete != nil {
+	if cfg.Delete != nil || cfg.SoftDelete != nil {
 		parentCmd.AddCommand(newDeleteCmd(cfg))
+	}
+	for _, sub := range parentCmd.Commands() {
+		if slices.Contains(cfg.HiddenVerbs, sub.Name()) {
+			sub.Hidden = true
+		}
 	}
 	return parentCmd
 }
@@ -193,11 +234,15 @@ func newCreateCmd[T any](cfg Config[T]) *cobra.Command {
 			}
 
 			resource := new(T)
-			if err := populateFields(cmd, cfg.Fields, resource); err != nil {
+			if err := populateChangedFields(cmd, cfg.Fields, resource); err != nil {
 				return err
 			}
 
-			result, err := cfg.Create(ctx, client, parentIDs, resource)
+			patch := changedPatch(cmd, cfg.Fields, resource)
+			if err := addRelationships[T](ctx, client, cmd, cfg.Fields, parentIDs, &patch); err != nil {
+				return err
+			}
+			result, err := cfg.Create(ctx, client, parentIDs, patch)
 			if err != nil {
 				return err
 			}
@@ -235,26 +280,14 @@ func newUpdateCmd[T any](cfg Config[T]) *cobra.Command {
 				return err
 			}
 
-			// terrakube-go marshals every attribute (no omitempty), which would
-			// wipe unset fields and write-only secrets. Send only changed attributes.
-			attrs := map[string]any{}
-			rv := reflect.ValueOf(resource).Elem()
-			for _, f := range cfg.Fields {
-				flag := cmd.Flags().Lookup(f.Flag)
-				sf, ok := rv.Type().FieldByName(f.StructField)
-				if flag == nil || !flag.Changed || !ok {
-					continue
-				}
-				if tag := strings.Split(sf.Tag.Get("jsonapi"), ","); len(tag) > 1 && tag[0] == "attr" {
-					attrs[tag[1]] = rv.FieldByIndex(sf.Index).Interface()
-				}
+			patch := changedPatch(cmd, cfg.Fields, resource)
+			if err := addRelationships[T](ctx, client, cmd, cfg.Fields, parentIDs, &patch); err != nil {
+				return err
 			}
-			// ponytail: terrakube-go exposes no sparse update or raw request API, so
-			// the PATCH body is rewritten in the transport. This replaces the client's
-			// HTTP client; carry over any custom TLS/transport here if newClient adds one.
-			_ = terrakube.WithHTTPClient(&http.Client{Transport: sparsePatch{attrs: attrs}})(client)
-
-			result, err := cfg.Update(ctx, client, parentIDs, resource)
+			if len(patch.Attributes) == 0 && len(patch.Relationships) == 0 {
+				return errors.New("nothing to update: set at least one field flag, see --help")
+			}
+			result, err := cfg.Update(ctx, client, parentIDs, id, patch)
 			if err != nil {
 				return err
 			}
@@ -281,11 +314,21 @@ func newUpdateCmd[T any](cfg Config[T]) *cobra.Command {
 }
 
 func newDeleteCmd[T any](cfg Config[T]) *cobra.Command {
+	soft := cfg.SoftDelete
 	cmd := &cobra.Command{
 		Use:          "delete",
 		Short:        fmt.Sprintf("delete a %s resource", cfg.Name),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			confirm := false
+			if soft != nil && soft.Confirm {
+				yes, _ := cmd.Flags().GetBool("yes")
+				if !yes && !IsTerminal() {
+					return fmt.Errorf("%s delete needs confirmation: run it in a terminal or pass --yes", cfg.Name)
+				}
+				confirm = !yes
+			}
+
 			client, err := cfg.NewClient()
 			if err != nil {
 				return err
@@ -298,11 +341,26 @@ func newDeleteCmd[T any](cfg Config[T]) *cobra.Command {
 			}
 
 			id, _ := cmd.Flags().GetString("id")
-			if err := cfg.Delete(ctx, client, parentIDs, id); err != nil {
+			if confirm {
+				if err := confirmByName(ctx, cmd, cfg, client, parentIDs, id); err != nil {
+					return err
+				}
+			}
+
+			hard, _ := cmd.Flags().GetBool("hard")
+			if soft == nil || hard {
+				if err := cfg.Delete(ctx, client, parentIDs, id); err != nil {
+					return err
+				}
+				_, err = fmt.Fprintf(os.Stdout, "%s deleted\n", cfg.Name)
 				return err
 			}
 
-			_, err = fmt.Fprintf(os.Stdout, "%s deleted\n", cfg.Name)
+			p := terrakube.Patch{Attributes: map[string]any{soft.Attribute: true}}
+			if _, err := cfg.Update(ctx, client, parentIDs, id, p); err != nil {
+				return err
+			}
+			_, err = fmt.Fprintf(os.Stdout, "%s %s\n", cfg.Name, soft.Done)
 			return err
 		},
 	}
@@ -310,7 +368,29 @@ func newDeleteCmd[T any](cfg Config[T]) *cobra.Command {
 	addParentFlags(cmd, cfg.Parents)
 	cmd.Flags().String("id", "", fmt.Sprintf("%s ID", cfg.Name))
 	_ = cmd.MarkFlagRequired("id")
+	if soft != nil && soft.Hard {
+		cmd.Flags().Bool("hard", false, fmt.Sprintf("send DELETE instead of setting %s=true", soft.Attribute))
+	}
+	if soft != nil && soft.Confirm {
+		cmd.Flags().Bool("yes", false, "skip the confirmation prompt")
+	}
 	return cmd
+}
+
+// confirmByName reads the resource's name from the terminal and fails unless it
+// matches the stored name.
+func confirmByName[T any](ctx context.Context, cmd *cobra.Command, cfg Config[T], client *terrakube.Client, parentIDs []string, id string) error {
+	current, err := cfg.Get(ctx, client, parentIDs, id)
+	if err != nil {
+		return err
+	}
+	name := reflect.ValueOf(current).Elem().FieldByName("Name").String()
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Type the %s name (%s) to confirm: ", cfg.Name, name)
+	typed, _ := bufio.NewReader(Stdin).ReadString('\n')
+	if strings.TrimSpace(typed) != name {
+		return fmt.Errorf("confirmation did not match %q: nothing changed", name)
+	}
+	return nil
 }
 
 var timeType = reflect.TypeFor[time.Time]()
@@ -338,6 +418,9 @@ func checkFields[T any](fields []FieldDef) {
 			fits = ft.Kind() >= reflect.Int && ft.Kind() <= reflect.Int64
 		case StringSlice:
 			fits = ft == reflect.TypeFor[[]string]()
+		case Relationship:
+			tag := strings.Split(sf.Tag.Get("jsonapi"), ",")
+			fits = ft.Kind() == reflect.Struct && len(tag) > 1 && tag[0] == "relation" && f.RelType != ""
 		}
 		if !fits {
 			panic(fmt.Sprintf("%s.%s is %s, cannot hold flag --%s", t.Name(), f.StructField, sf.Type, f.Flag))
@@ -382,7 +465,7 @@ func addFieldFlags(cmd *cobra.Command, fields []FieldDef, forCreate bool) {
 		}
 
 		switch f.Type {
-		case String:
+		case String, Relationship:
 			cmd.Flags().StringP(f.Flag, f.Short, "", desc)
 		case Bool:
 			cmd.Flags().BoolP(f.Flag, f.Short, false, desc)
@@ -395,16 +478,10 @@ func addFieldFlags(cmd *cobra.Command, fields []FieldDef, forCreate bool) {
 		if forCreate && f.Required {
 			_ = cmd.MarkFlagRequired(f.Flag)
 		}
-	}
-}
-
-func populateFields(cmd *cobra.Command, fields []FieldDef, obj any) error {
-	for _, f := range fields {
-		if err := setFieldFromFlag(cmd, f, obj); err != nil {
-			return err
+		if f.Hidden {
+			_ = cmd.Flags().MarkHidden(f.Flag)
 		}
 	}
-	return nil
 }
 
 func populateChangedFields(cmd *cobra.Command, fields []FieldDef, obj any) error {
@@ -428,6 +505,8 @@ func setFieldFromFlag(cmd *cobra.Command, f FieldDef, obj any) error {
 	}
 
 	switch f.Type {
+	case Relationship:
+		// Sent as a relationship by addRelationships, not stored in the struct.
 	case String:
 		val, _ := cmd.Flags().GetString(f.Flag)
 		if err := setStringField(field, val); err != nil {
@@ -509,38 +588,64 @@ func setStructField(obj any, name string, val string) {
 	}
 }
 
-// sparsePatch rewrites JSON:API PATCH bodies to {data:{type,id,attributes}}
-// with attributes replaced by attrs (built from changed flags, so omitempty
-// tags can't drop explicit false/""); relationships and included are dropped.
-type sparsePatch struct{ attrs map[string]any }
+// changedPatch returns the JSON:API attributes of the flags set on cmd, with
+// the typed values already parsed into obj by populateChangedFields.
+func changedPatch(cmd *cobra.Command, fields []FieldDef, obj any) terrakube.Patch {
+	p := terrakube.Patch{Attributes: map[string]any{}}
+	rv := reflect.ValueOf(obj).Elem()
+	for _, f := range fields {
+		flag := cmd.Flags().Lookup(f.Flag)
+		sf, ok := rv.Type().FieldByName(f.StructField)
+		if flag == nil || !flag.Changed || !ok {
+			continue
+		}
+		if tag := strings.Split(sf.Tag.Get("jsonapi"), ","); len(tag) > 1 && tag[0] == "attr" {
+			p.Attributes[tag[1]] = rv.FieldByIndex(sf.Index).Interface()
+		}
+	}
+	return p
+}
 
-func (s sparsePatch) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.Method != http.MethodPatch || req.Body == nil {
-		return http.DefaultTransport.RoundTrip(req)
+// addRelationships adds the Relationship flags set on cmd to p: an ID as is, a
+// name through the field's Resolver, and "" as a cleared link. It also resolves
+// names given to String fields that have a Resolver (attributes holding an ID).
+func addRelationships[T any](ctx context.Context, client *terrakube.Client, cmd *cobra.Command, fields []FieldDef, parentIDs []string, p *terrakube.Patch) error {
+	for _, f := range fields {
+		flag := cmd.Flags().Lookup(f.Flag)
+		if flag == nil || !flag.Changed || f.Resolver == nil && f.Type != Relationship {
+			continue
+		}
+		sf, _ := reflect.TypeFor[T]().FieldByName(f.StructField) // checked by checkFields
+		name := strings.Split(sf.Tag.Get("jsonapi"), ",")[1]
+		if f.Type == String {
+			// An attribute holding an ID (e.g. defaultTemplate): resolve a name to it.
+			if val := flag.Value.String(); val != "" && !IsUUID(val) {
+				id, err := f.Resolver(ctx, client, parentIDs, val)
+				if err != nil {
+					return err
+				}
+				p.Attributes[name] = id
+			}
+			continue
+		}
+		if p.Relationships == nil {
+			p.Relationships = map[string]terrakube.Relationship{}
+		}
+		val := flag.Value.String()
+		switch {
+		case val == "":
+			p.Relationships[name] = terrakube.Relationship{}
+		case IsUUID(val):
+			p.Relationships[name] = terrakube.Relationship{Type: f.RelType, ID: &val}
+		case f.Resolver == nil:
+			return fmt.Errorf("--%s: %q is not a UUID", f.Flag, val)
+		default:
+			id, err := f.Resolver(ctx, client, parentIDs, val)
+			if err != nil {
+				return err
+			}
+			p.Relationships[name] = terrakube.Relationship{Type: f.RelType, ID: &id}
+		}
 	}
-	raw, err := io.ReadAll(req.Body)
-	_ = req.Body.Close()
-	if err != nil {
-		return nil, err
-	}
-	var doc struct {
-		Data struct {
-			Type       string         `json:"type"`
-			ID         string         `json:"id"`
-			Attributes map[string]any `json:"attributes,omitempty"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return nil, fmt.Errorf("rewriting update body: %w", err)
-	}
-	doc.Data.Attributes = s.attrs
-	body, err := json.Marshal(doc)
-	if err != nil {
-		return nil, err
-	}
-	req = req.Clone(req.Context())
-	req.Body = io.NopCloser(bytes.NewReader(body))
-	req.ContentLength = int64(len(body))
-	req.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(body)), nil }
-	return http.DefaultTransport.RoundTrip(req)
+	return nil
 }

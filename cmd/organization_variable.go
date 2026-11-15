@@ -39,11 +39,11 @@ func init() {
 		Get: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) (*terrakube.OrganizationVariable, error) {
 			return c.OrganizationVariables.Get(ctx, pIDs[0], id)
 		},
-		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, v *terrakube.OrganizationVariable) (*terrakube.OrganizationVariable, error) {
-			return c.OrganizationVariables.Create(ctx, pIDs[0], v)
+		Create: func(ctx context.Context, c *terrakube.Client, pIDs []string, p terrakube.Patch) (*terrakube.OrganizationVariable, error) {
+			return c.OrganizationVariables.CreateFields(ctx, pIDs[0], p)
 		},
-		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, v *terrakube.OrganizationVariable) (*terrakube.OrganizationVariable, error) {
-			return c.OrganizationVariables.Update(ctx, pIDs[0], v)
+		Update: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string, p terrakube.Patch) (*terrakube.OrganizationVariable, error) {
+			return c.OrganizationVariables.UpdateFields(ctx, pIDs[0], id, p)
 		},
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.OrganizationVariables.Delete(ctx, pIDs[0], id)

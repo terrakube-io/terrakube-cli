@@ -33,8 +33,12 @@ type routeCase struct {
 	base     string
 	itemBase string
 	create   []string // required create flags
-	verbs    []string
-	extra    []string // extra args for every verb (e.g. an optional parent)
+	update   []string // a field flag for update when create has none
+	del      []string // extra delete flags (workspace --hard sends DELETE)
+	// softDelete: delete sends PATCH to the item instead of DELETE.
+	softDelete bool
+	verbs      []string
+	extra      []string // extra args for every verb (e.g. an optional parent)
 }
 
 var routeAllVerbs = []string{"list", "get", "create", "update", "delete"}
@@ -52,17 +56,17 @@ var routeCases = []routeCase{
 	{cmd: "collection-item", typ: "item", parents: []string{"organization", "collection"}, base: routeOrg + "collection/{2}/item", create: []string{"--key", "k", "--value", "v"}},
 	{
 		cmd: "collection-reference", typ: "reference", parents: []string{"organization", "collection", "workspace"},
-		base: routeOrg + "collection/{2}/reference", itemBase: "reference",
+		base: routeOrg + "collection/{2}/reference", itemBase: "reference", update: []string{"--description", "d"},
 	},
 	{cmd: "federated", typ: "federated", base: "federated", create: []string{"--audience", "a", "--issuer-url", "http://i", "--name", "n"}},
 	{cmd: "federated-claim", typ: "federated_claim", parents: []string{"federated"}, base: "federated/{1}/claims", create: []string{"--claim-key", "k", "--claim-value", "v"}},
 	{cmd: "github-app-token", typ: "github_app_token", base: "github_app_token", create: []string{"--app-id", "1", "--installation-id", "2", "--owner", "o"}},
-	{cmd: "history", typ: "history", parents: []string{"organization", "workspace"}, base: routeOrgWs + "history"},
+	{cmd: "history", typ: "history", parents: []string{"organization", "workspace"}, base: routeOrgWs + "history", update: []string{"--job-reference", "r"}},
 	{
 		cmd: "implementation", typ: "implementation", parents: []string{"organization", "provider", "provider-version"},
 		base: routeOrg + "provider/{2}/version/{3}/implementation", create: []string{"--arch", "a", "--filename", "f", "--os", "o"},
 	},
-	{cmd: "job", typ: "job", parents: []string{"organization", "workspace"}, base: routeOrg + "job", create: []string{"--template-reference", "t"}},
+	{cmd: "job", typ: "job", parents: []string{"organization", "workspace"}, base: routeOrg + "job", create: []string{"--template-reference", "77777777-7777-4777-8777-777777777777"}},
 	{cmd: "module", typ: "module", parents: []string{"organization"}, base: routeOrg + "module", create: []string{"--name", "n"}},
 	{cmd: "module-version", typ: "module_version", parents: []string{"organization", "module"}, base: routeOrg + "module/{2}/version", create: []string{"--version", "1.0.0"}},
 	{
@@ -79,7 +83,8 @@ var routeCases = []routeCase{
 		cmd: "notification-trigger", typ: "notification_trigger", parents: []string{"organization", "notification-configuration"},
 		base: routeOrg + "notificationConfiguration/{2}/triggers", create: []string{"--job-status", "COMPLETED"},
 	},
-	{cmd: "organization", typ: "organization", base: "organization", create: []string{"--name", "n"}},
+	// organization delete is a soft delete: PATCH disabled=true instead of DELETE.
+	{cmd: "organization", typ: "organization", base: "organization", create: []string{"--name", "n"}, del: []string{"--yes"}, softDelete: true},
 	{
 		cmd: "organization-variable", typ: "globalvar", parents: []string{"organization"}, base: routeOrg + "globalvar",
 		create: []string{"--category", "TERRAFORM", "--key", "k", "--value", "v"},
@@ -101,16 +106,16 @@ var routeCases = []routeCase{
 			"--client-id", "i", "--client-secret", "s", "--endpoint", "http://e", "--vcs-api-url", "http://a",
 		},
 	},
-	{cmd: "webhook", typ: "webhook", parents: []string{"organization", "workspace"}, base: routeOrgWs + "webhook"},
-	{cmd: "webhook-event", typ: "webhook_event", parents: []string{"organization", "workspace", "webhook"}, base: routeOrgWs + "webhook/{3}/events"},
-	{cmd: "workspace", typ: "workspace", parents: []string{"organization"}, base: routeOrg + "workspace", create: []string{"--name", "n"}},
+	{cmd: "webhook", typ: "webhook", parents: []string{"organization", "workspace"}, base: routeOrgWs + "webhook", update: []string{"--remote-hook-id", "r"}},
+	{cmd: "webhook-event", typ: "webhook_event", parents: []string{"organization", "workspace", "webhook"}, base: routeOrgWs + "webhook/{3}/events", update: []string{"--branch", "main"}},
+	{cmd: "workspace", typ: "workspace", parents: []string{"organization"}, base: routeOrg + "workspace", create: []string{"--name", "n"}, del: []string{"--hard"}},
 	{cmd: "workspace-access", typ: "access", parents: []string{"organization", "workspace"}, base: routeOrgWs + "access", create: []string{"--name", "n"}},
 	// The schedule API is keyed by workspace alone; the org flag is not part of the path.
 	{
 		cmd: "workspace-schedule", typ: "schedule", parents: []string{"organization", "workspace"}, base: "workspace/{2}/schedule",
-		create: []string{"--schedule", "0 0 * * *", "--template-id", "t"},
+		create: []string{"--schedule", "0 0 * * *", "--template-id", "77777777-7777-4777-8777-777777777777"},
 	},
-	{cmd: "workspace-tag", typ: "workspacetag", parents: []string{"organization", "workspace"}, base: routeOrgWs + "workspaceTag", create: []string{"--tag-id", "t"}},
+	{cmd: "workspace-tag", typ: "workspacetag", parents: []string{"organization", "workspace"}, base: routeOrgWs + "workspaceTag", create: []string{"--tag-id", "77777777-7777-4777-8777-777777777777"}},
 }
 
 // routeNotChecked lists resource-shaped commands this table deliberately skips.
@@ -182,9 +187,17 @@ func TestResourceRoutes(t *testing.T) {
 			case "create":
 				verbArgs, want = c.create, "POST "+base
 			case "update":
-				verbArgs, want = []string{"--id", routeID}, "PATCH "+item
+				// An update needs at least one field flag; the create flags are valid on update too.
+				upd := c.update
+				if upd == nil {
+					upd = c.create
+				}
+				verbArgs, want = append([]string{"--id", routeID}, upd...), "PATCH "+item
 			case "delete":
-				verbArgs, want = []string{"--id", routeID}, "DELETE "+item
+				verbArgs, want = append([]string{"--id", routeID}, c.del...), "DELETE "+item
+				if c.softDelete {
+					want = "PATCH " + item
+				}
 			}
 			name := c.name
 			if name == "" {
