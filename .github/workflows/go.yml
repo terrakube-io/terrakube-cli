@@ -52,6 +52,9 @@ jobs:
         continue-on-error: true
         with:
           coverage-file-name: coverage.out
+          # The module path is "terrakube", not github.com/<repo> (the action's default),
+          # so without this no package in the profile matches and every delta reads 0.00%.
+          root-package: terrakube
 
   lint:
     runs-on: ubuntu-latest

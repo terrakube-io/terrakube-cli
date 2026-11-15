@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -193,5 +194,48 @@ func TestRenderJSON_MarshalError(t *testing.T) {
 	}
 	if buf.Len() != 0 {
 		t.Errorf("expected no output, got %q", buf.String())
+	}
+}
+
+type withCollections struct {
+	ID    string
+	Addrs []string
+	Empty []string
+	Vars  map[string]any
+	Nums  []int
+	Ptr   *[]string
+}
+
+// Slices and maps print their values, not reflection placeholders.
+func TestRenderTSV_SlicesAndMaps(t *testing.T) {
+	d := &withCollections{
+		ID:    "c1",
+		Addrs: []string{"module.a", "aws_s3_bucket.b"},
+		Vars:  map[string]any{"region": "eu-west-1", "count": 2},
+		Nums:  []int{1, 2},
+		Ptr:   &[]string{"x"},
+	}
+	var buf bytes.Buffer
+	if err := Render(&buf, d, "tsv"); err != nil {
+		t.Fatal(err)
+	}
+	want := "c1\tmodule.a,aws_s3_bucket.b\t\tcount=2,region=eu-west-1\t1,2\tx\n"
+	if buf.String() != want {
+		t.Errorf("got %q\nwant %q", buf.String(), want)
+	}
+}
+
+func TestFormatFieldValue_OtherKinds(t *testing.T) {
+	for _, tt := range []struct {
+		in   any
+		want string
+	}{
+		{map[string]any{"a": nil, "b": 1.5}, "a=,b=1.5"},
+		{[2]uint{3, 4}, "3,4"},
+		{float32(2.25), "2.25"},
+	} {
+		if got := formatFieldValue(reflect.ValueOf(tt.in)); got != tt.want {
+			t.Errorf("%#v: got %q, want %q", tt.in, got, tt.want)
+		}
 	}
 }

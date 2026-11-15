@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -292,11 +293,34 @@ func formatFieldValue(v reflect.Value) string {
 		case reflect.Bool:
 			return fmt.Sprintf("%t", elem.Bool())
 		default:
-			return fmt.Sprintf("%v", elem.Interface())
+			return formatFieldValue(elem)
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return fmt.Sprintf("%d", v.Int())
+	case reflect.Slice, reflect.Array:
+		// A list joins its items with commas; an empty one is an empty cell.
+		items := make([]string, v.Len())
+		for i := range items {
+			items[i] = formatFieldValue(v.Index(i))
+		}
+		return strings.Join(items, ",")
+	case reflect.Map:
+		// key=value pairs sorted by key, so the output is stable.
+		pairs := make([]string, 0, v.Len())
+		for _, k := range v.MapKeys() {
+			pairs = append(pairs, fmt.Sprintf("%v=%s", k.Interface(), formatFieldValue(v.MapIndex(k))))
+		}
+		sort.Strings(pairs)
+		return strings.Join(pairs, ",")
+	case reflect.Interface:
+		if v.IsNil() {
+			return ""
+		}
+		return formatFieldValue(v.Elem())
 	default:
-		return v.String()
+		if v.Kind() == reflect.String {
+			return v.String()
+		}
+		return fmt.Sprintf("%v", v.Interface())
 	}
 }
