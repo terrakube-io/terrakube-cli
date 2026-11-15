@@ -89,6 +89,15 @@ var routeCases = []routeCase{
 		cmd: "organization-variable", typ: "globalvar", parents: []string{"organization"}, base: routeOrg + "globalvar",
 		create: []string{"--category", "TERRAFORM", "--key", "k", "--value", "v"},
 	},
+	{cmd: "policy-set", typ: "policy_set", parents: []string{"organization"}, base: routeOrg + "policySet", create: []string{"--name", "n"}},
+	{
+		cmd: "policy-set-parameter", typ: "policy_set_parameter", parents: []string{"organization", "policy-set"},
+		base: routeOrg + "policySet/{2}/parameters", create: []string{"--key", "k", "--value", "v"},
+	},
+	{
+		cmd: "policy-attachment", typ: "policy_attachment", parents: []string{"organization", "policy-set"},
+		base: routeOrg + "policySet/{2}/attachments", create: []string{"--tag", "77777777-7777-4777-8777-777777777777"},
+	},
 	{cmd: "project", typ: "project", parents: []string{"organization"}, base: routeOrg + "project", create: []string{"--name", "n"}},
 	{cmd: "project-access", typ: "project_access", parents: []string{"organization", "project"}, base: routeOrg + "project/{2}/projectAccess", create: []string{"--name", "n"}},
 	{cmd: "provider", typ: "provider", parents: []string{"organization"}, base: routeOrg + "provider", create: []string{"--name", "n"}},

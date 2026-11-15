@@ -27,6 +27,7 @@ For full CLI reference documentation, visit our official guide at [https://docs.
   - [5. Add Workspace Environment Variables & Tags](#5-add-workspace-environment-variables--tags)
   - [6. Configure Notifications (Slack / Teams / Webhook)](#6-configure-notifications-slack--teams--webhook)
   - [7. Run a Plan or Apply and Wait for It](#7-run-a-plan-or-apply-and-wait-for-it)
+  - [8. Enforce Policies](#8-enforce-policies)
 - [Breaking Changes](#breaking-changes)
 - [Contributing](#contributing)
 - [Security](#security)
@@ -386,6 +387,16 @@ echo $?   # 0 completed or no changes, 1 error, 2 failed, rejected or cancelled,
 `job create --wait` and `job wait <job-id>` wait the same way, so a CI step can branch on the exit code. `job logs <job-id>` prints every step's log in order (`--step 200` for one step); `--follow` streams the running step until the job ends and exits with the same codes.
 
 A job waiting for approval is listed with `job list -o my-org -w prod --status waitingApproval` and handled with `job approve <job-id>`, `job reject <job-id>` or `job cancel <job-id>`. Each checks the job's current status first and changes nothing if it does not allow the action. `workspace lock prod -o my-org --reason "release freeze"` stops new runs on a workspace until `workspace unlock prod -o my-org`.
+
+### 8. Enforce Policies
+
+A policy set points at a repository of OPA policies. Attach it to exactly one workspace, project or tag per attachment (names or IDs); a `policy-attachment` with no target or more than one fails before any request.
+
+```bash
+terrakube policy-set create -o my-org --name baseline --repository https://github.com/acme/policies --enforcement-level SOFT_MANDATORY
+terrakube policy-set-parameter create -o my-org --policy-set baseline --key max_instances --value 3
+terrakube policy-attachment create -o my-org --policy-set baseline --workspace prod
+```
 
 ## Breaking Changes
 
