@@ -27,6 +27,9 @@ For full CLI reference documentation, visit our official guide at [https://docs.
   - [5. Add Workspace Environment Variables & Tags](#5-add-workspace-environment-variables--tags)
   - [6. Configure Notifications (Slack / Teams / Webhook)](#6-configure-notifications-slack--teams--webhook)
   - [7. Run a Plan or Apply and Wait for It](#7-run-a-plan-or-apply-and-wait-for-it)
+  - [8. Enforce Policies](#8-enforce-policies)
+  - [9. Other Resource Fields](#9-other-resource-fields)
+  - [10. Work with State](#10-work-with-state)
 - [Breaking Changes](#breaking-changes)
 - [Contributing](#contributing)
 - [Security](#security)
@@ -272,6 +275,8 @@ terrakube organization create \
   --output json
 ```
 
+The settings from the workspace's Settings page are flags of `workspace create|update`: `--template` (default template), `--require-approve-to-apply`, `--restrict-apply-to-configured-branch`, `--allow-remote-apply`, `--global-remote-state`, `--shared-ids` (comma-separated workspace IDs that may read the state) and `--module-ssh-key` (name or ID; `""` clears it).
+
 *Save the returned organization ID (e.g., `09e86337-b6bb-49e0-82aa-c114ad0f41ab`) for subsequent operations.*
 
 ### 3. Create an Admin Team & Assign Permissions
@@ -293,8 +298,12 @@ terrakube team create \
   --manage-job \
   --plan-job \
   --approve-job \
+  --destroy-job \
+  --manage-policies \
   --output table
 ```
+
+`workspace-access` grants a team rights on one workspace (`--plan-job`, `--approve-job`, `--destroy-job`, `--role`, and the `--manage-*` flags); `project-access` does the same for a project.
 
 ### 4. Create a Workspace (OpenTofu & Docker Compose)
 
@@ -363,6 +372,8 @@ terrakube variable create \
      --output json
    ```
 
+   `--templates Plan,Apply` limits a configuration to jobs of those templates (names or IDs; the list replaces the current set, `--templates ""` empties it).
+
 2. Add a trigger on job completion or failure:
    ```bash
    terrakube notification-trigger create \
@@ -386,6 +397,70 @@ echo $?   # 0 completed or no changes, 1 error, 2 failed, rejected or cancelled,
 `job create --wait` and `job wait <job-id>` wait the same way, so a CI step can branch on the exit code. `job logs <job-id>` prints every step's log in order (`--step 200` for one step); `--follow` streams the running step until the job ends and exits with the same codes.
 
 A job waiting for approval is listed with `job list -o my-org -w prod --status waitingApproval` and handled with `job approve <job-id>`, `job reject <job-id>` or `job cancel <job-id>`. Each checks the job's current status first and changes nothing if it does not allow the action. `workspace lock prod -o my-org --reason "release freeze"` stops new runs on a workspace until `workspace unlock prod -o my-org`.
+
+A run trigger starts a run in one workspace after an apply in another. `-w` is the workspace that gets the run, `--source` the one whose apply fires it; without `--template` the run uses the destination's default template:
+
+```bash
+terrakube run-trigger create -o my-org -w app --source network --template Apply
+terrakube run-trigger update -o my-org -w app --id <TRIGGER_ID> --enabled=false
+```
+
+### 8. Enforce Policies
+
+A policy set points at a repository of OPA policies. Attach it to exactly one workspace, project or tag per attachment (names or IDs); a `policy-attachment` with no target or more than one fails before any request.
+
+```bash
+terrakube policy-set create -o my-org --name baseline --repository https://github.com/acme/policies --enforcement-level SOFT_MANDATORY
+terrakube policy-set-parameter create -o my-org --policy-set baseline --key max_instances --value 3
+terrakube policy-attachment create -o my-org --policy-set baseline --workspace prod
+```
+
+An exemption skips one rule of a policy set until it expires, for one workspace (`--workspace`), one project (`--project`) or, with neither, the whole organization. When a job stops on a soft-mandatory failure, read its evaluations and override one with a justification, then approve the job:
+
+```bash
+terrakube policy-exemption create -o my-org --policy-set baseline --rule deny_public_s3 \
+  --justification "legacy bucket, migration in SEC-12" --ticket SEC-12 --expires-at 2027-01-31T00:00:00Z --workspace prod
+terrakube policy-evaluation list -o my-org --job 42
+terrakube policy-override create -o my-org --job 42 --policy-evaluation <EVALUATION_ID> --justification "accepted risk"
+terrakube job approve 42 -o my-org
+```
+
+`policy-override create` records the user named in your token (email, else user name) as the one who overrode.
+
+### 9. Other Resource Fields
+
+- Templates: `template create --name Plan --content-file plan.yaml` reads the flow from a file instead of `--content`.
+- Registry: `module-version` and `provider-version` take `--status DEPRECATED --deprecation-message "..."`; `provider` takes `--registry-namespace` (needed with `--imported`); `module` takes `--vcs` and `--ssh` (names or IDs) for private repositories.
+- Jobs: `job create --variables region=eu-west-1 --variables size=3` passes run variables to that job only.
+- `workspace-schedule` takes `--enabled` and `--description`, `workspace-tag` takes `--value`, and `variable` takes `--incomplete`.
+
+### 10. Work with State
+
+`state` reads a workspace's Terraform state through the API with your token, so no `curl` is needed. Workspaces are given by name or ID.
+
+```bash
+terrakube state pull prod -o my-org > prod.tfstate             # current state, byte for byte
+terrakube state pull prod -o my-org --version <HISTORY_ID> -f old.tfstate
+```
+
+`--version` takes an ID from `history list` and writes that version's raw state (the same format as without it). The CLI only sends the token to the configured API: if a history entry points at another host, `state pull` fails with exit code 1 and sends nothing there.
+
+`state rollback prod <HISTORY_ID> -o my-org` makes that version the current state, as the UI's rollback does. It asks you to type the workspace name; in scripts pass `--yes`. Without a terminal and without `--yes` it fails before any request.
+
+`state diff prod <HISTORY_ID_A> <HISTORY_ID_B> -o my-org` lists what changed from version A to version B: resource instances by address and outputs by name, never their values.
+
+```text
+Resources: 1 added, 1 removed, 1 changed
+  + aws_s3_bucket.logs[0]
+  - aws_instance.old
+  ~ module.net.aws_subnet.private["b"]
+Outputs: 0 added, 0 removed, 1 changed
+  ~ vpc_id
+```
+
+With an explicit `--output json` (or `yaml`) it prints `{"resources": {"added": [...], "removed": [...], "changed": [...]}, "outputs": {...}}`; `tsv` prints one `change kind address` line per difference.
+
+`state outputs prod -o my-org` prints the outputs of the newest state. With `--output json` (the default) it prints the same map as `terraform output -json`, so CI can read it with `jq -r .vpc_id.value`; `table` and `tsv` print one line per output. Sensitive values print as `(sensitive)` unless `--show-sensitive` is set.
 
 ## Breaking Changes
 

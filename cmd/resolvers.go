@@ -105,3 +105,13 @@ func tagResolver(ctx context.Context, c *terrakube.Client, pIDs []string, name s
 	items, err := c.Tags.List(ctx, pIDs[0], nameFilter(name))
 	return resolveByName(items, err, "tag", name, pIDs[0], func(x *terrakube.Tag) (string, string) { return x.ID, x.Name })
 }
+
+func policySetResolver(ctx context.Context, c *terrakube.Client, pIDs []string, name string) (string, error) {
+	items, err := c.PolicySets.List(ctx, pIDs[0], nameFilter(name))
+	return resolveByName(items, err, "policy-set", name, pIDs[0], func(x *terrakube.PolicySet) (string, string) {
+		if x.Name == nil {
+			return x.ID, ""
+		}
+		return x.ID, *x.Name
+	})
+}

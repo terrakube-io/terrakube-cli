@@ -40,6 +40,8 @@ func init() {
 			{StructField: "PlanJob", Flag: "plan-job", Type: resource.Bool, Description: "Plan Job permissions"},
 			{StructField: "ApproveJob", Flag: "approve-job", Type: resource.Bool, Description: "Approve Job permissions"},
 			{StructField: "Role", Flag: "role", Type: resource.String, Description: "Team role"},
+			{StructField: "DestroyJob", Flag: "destroy-job", Type: resource.Bool, Description: "Destroy Job permissions"},
+			{StructField: "ManagePolicies", Flag: "manage-policies", Type: resource.Bool, Description: "Manage policy sets, exemptions and overrides"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Team, error) {
 			return c.Teams.List(ctx, pIDs[0], opts)

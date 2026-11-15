@@ -44,6 +44,7 @@ func init() {
 			{StructField: "SigningSecret", Flag: "signing-secret", Type: resource.String, Description: "Signing secret for payload verification"},
 			{StructField: "Active", Flag: "active", Type: resource.Bool, Description: "Whether notification configuration is active"},
 			{StructField: "MessageStyle", Flag: "message-style", Type: resource.String, Description: "Message style (DETAILED, SIMPLE)"},
+			{StructField: "Templates", Flag: "templates", Type: resource.RelationshipMany, RelType: "template", Resolver: templateResolver, Description: "Notify only for jobs of these templates, by name or ID; replaces the set (\"\" empties it)"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.NotificationConfiguration, error) {
 			if len(pIDs) > 1 && pIDs[1] != "" {

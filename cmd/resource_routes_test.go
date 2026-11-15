@@ -89,10 +89,32 @@ var routeCases = []routeCase{
 		cmd: "organization-variable", typ: "globalvar", parents: []string{"organization"}, base: routeOrg + "globalvar",
 		create: []string{"--category", "TERRAFORM", "--key", "k", "--value", "v"},
 	},
+	{cmd: "policy-set", typ: "policy_set", parents: []string{"organization"}, base: routeOrg + "policySet", create: []string{"--name", "n"}},
+	{
+		cmd: "policy-set-parameter", typ: "policy_set_parameter", parents: []string{"organization", "policy-set"},
+		base: routeOrg + "policySet/{2}/parameters", create: []string{"--key", "k", "--value", "v"},
+	},
+	{
+		cmd: "policy-attachment", typ: "policy_attachment", parents: []string{"organization", "policy-set"},
+		base: routeOrg + "policySet/{2}/attachments", create: []string{"--tag", "77777777-7777-4777-8777-777777777777"},
+	},
+	{
+		cmd: "policy-exemption", typ: "policy_exemption", parents: []string{"organization"}, base: routeOrg + "policyExemption",
+		create: []string{"--policy-set", "77777777-7777-4777-8777-777777777777", "--rule", "r", "--justification", "j", "--expires-at", "2027-01-02T15:04:05Z", "--ticket", "OPS-1"},
+	},
+	{cmd: "policy-evaluation", typ: "policy_evaluation", parents: []string{"organization", "job"}, base: routeOrg + "job/{2}/policyEvaluation", verbs: []string{"list", "get"}},
+	{
+		cmd: "policy-override", typ: "policy_override", parents: []string{"organization", "job", "policy-evaluation"},
+		base: routeOrg + "job/{2}/policyEvaluation/{3}/override", create: []string{"--justification", "j"}, verbs: []string{"get", "create"},
+	},
 	{cmd: "project", typ: "project", parents: []string{"organization"}, base: routeOrg + "project", create: []string{"--name", "n"}},
 	{cmd: "project-access", typ: "project_access", parents: []string{"organization", "project"}, base: routeOrg + "project/{2}/projectAccess", create: []string{"--name", "n"}},
 	{cmd: "provider", typ: "provider", parents: []string{"organization"}, base: routeOrg + "provider", create: []string{"--name", "n"}},
 	{cmd: "provider-version", typ: "version", parents: []string{"organization", "provider"}, base: routeOrg + "provider/{2}/version", create: []string{"--version-number", "1.0.0"}},
+	{
+		cmd: "run-trigger", typ: "runTrigger", parents: []string{"organization", "workspace"}, base: routeOrgWs + "runTriggers",
+		create: []string{"--source", "77777777-7777-4777-8777-777777777777"}, update: []string{"--enabled"},
+	},
 	{cmd: "ssh", typ: "ssh", parents: []string{"organization"}, base: routeOrg + "ssh", create: []string{"--name", "n", "--private-key", "k", "--ssh-type", "rsa"}},
 	{cmd: "step", typ: "step", parents: []string{"organization", "job"}, base: routeOrg + "job/{2}/step", create: []string{"--name", "n"}},
 	{cmd: "tag", typ: "tag", parents: []string{"organization"}, base: routeOrg + "tag", create: []string{"--name", "n"}},

@@ -50,6 +50,7 @@ func init() {
 			{StructField: "RefreshOnly", Flag: "refresh-only", Type: resource.Bool, Description: "Refresh state only"},
 			{StructField: "TargetAddrs", Flag: "target-addrs", Type: resource.StringSlice, Description: "Target resource addresses"},
 			{StructField: "ReplaceAddrs", Flag: "replace-addrs", Type: resource.StringSlice, Description: "Replace resource addresses"},
+			{StructField: "Variables", Flag: "variables", Type: resource.StringMap, Description: "Run variable for this job only"},
 		},
 		List: func(ctx context.Context, c *terrakube.Client, pIDs []string, opts *terrakube.ListOptions) ([]*terrakube.Job, error) {
 			return c.Jobs.List(ctx, pIDs[0], opts)

@@ -151,14 +151,7 @@ func newClient() (*terrakube.Client, error) {
 		return nil, configErr
 	}
 	endpoint := viper.GetString("api_url")
-	// Env beats the config file: TERRAKUBE_TOKEN, then TERRAKUBE_PAT, then config.
-	token := os.Getenv("TERRAKUBE_TOKEN")
-	if token == "" {
-		token = os.Getenv("TERRAKUBE_PAT")
-	}
-	if token == "" {
-		token = viper.GetString("token")
-	}
+	token := currentToken()
 	if endpoint == "" || token == "" {
 		return nil, errors.New(`not logged in: run "terrakube login" or set TERRAKUBE_API_URL and TERRAKUBE_TOKEN (or TERRAKUBE_PAT)`)
 	}
@@ -166,6 +159,18 @@ func newClient() (*terrakube.Client, error) {
 		terrakube.WithEndpoint(endpoint),
 		terrakube.WithToken(token),
 	)
+}
+
+// currentToken returns the API token. Env beats the config file:
+// TERRAKUBE_TOKEN, then TERRAKUBE_PAT, then the config's token.
+func currentToken() string {
+	if token := os.Getenv("TERRAKUBE_TOKEN"); token != "" {
+		return token
+	}
+	if token := os.Getenv("TERRAKUBE_PAT"); token != "" {
+		return token
+	}
+	return viper.GetString("token")
 }
 
 func getContext() context.Context {
