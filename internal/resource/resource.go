@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -51,6 +52,7 @@ type FieldDef struct {
 	Type        FieldType
 	Required    bool
 	Description string
+	Hidden      bool // left out of --help: only executor or super-service tokens may set it
 
 	// For Relationship fields: StructField names the relation field (its jsonapi
 	// tag gives the relationship name), RelType is the JSON:API type of the target,
@@ -90,6 +92,10 @@ type Config[T any] struct {
 	// SoftDelete, when set, makes delete set an attribute through Update instead of
 	// sending DELETE (the server's hooks only clean up on the attribute).
 	SoftDelete *SoftDelete
+
+	// HiddenVerbs lists subcommands (e.g. "delete") left out of --help because the
+	// server allows them only to executor or super-service tokens. They still run.
+	HiddenVerbs []string
 }
 
 // SoftDelete configures a delete that sets Attribute to true.
@@ -131,6 +137,11 @@ func Register[T any](root *cobra.Command, cfg Config[T]) *cobra.Command {
 	}
 	if cfg.Delete != nil || cfg.SoftDelete != nil {
 		parentCmd.AddCommand(newDeleteCmd(cfg))
+	}
+	for _, sub := range parentCmd.Commands() {
+		if slices.Contains(cfg.HiddenVerbs, sub.Name()) {
+			sub.Hidden = true
+		}
 	}
 	return parentCmd
 }
@@ -466,6 +477,9 @@ func addFieldFlags(cmd *cobra.Command, fields []FieldDef, forCreate bool) {
 
 		if forCreate && f.Required {
 			_ = cmd.MarkFlagRequired(f.Flag)
+		}
+		if f.Hidden {
+			_ = cmd.Flags().MarkHidden(f.Flag)
 		}
 	}
 }

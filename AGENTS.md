@@ -42,6 +42,7 @@ Every resource is registered through `resource.Register[T](rootCmd, resource.Con
 - List adds `--filter` (RSQL). Get, update, and delete take `--id`.
 - `SoftDelete` turns delete into an update of one attribute (`workspace`: `deleted`, with `--hard` for `DELETE`; `organization`: `disabled`, confirmed by typing the name or `--yes`). `resource.IsTerminal` and `resource.Stdin` are variables so tests can fake the prompt.
 - Field flags must not be named `output` (it is the global format flag); the job log field is `--job-output`.
+- Executor-only parts are hidden from `--help` but still work: `FieldDef.Hidden` for flags, `Config.HiddenVerbs` for subcommands (job/step/history/github-app-token writes the server allows only to executor or super-service tokens).
 
 Hand-written commands (`login`, `logout`, `team-token`, `operations`) call `newClient()` themselves.
 

@@ -37,11 +37,11 @@ func init() {
 		},
 		Fields: []resource.FieldDef{
 			{StructField: "TemplateReference", Flag: "template-reference", Short: "t", Type: resource.String, Required: true, Resolver: templateResolver, Description: "Template to run, by name or ID"},
-			{StructField: "Output", Flag: "job-output", Type: resource.String, Description: "Job output log"},
+			{StructField: "Output", Flag: "job-output", Type: resource.String, Hidden: true, Description: "Job output log (executor only)"},
 			{StructField: "Status", Flag: "status", Type: resource.String, Description: "Job status"},
 			{StructField: "CommitID", Flag: "commit-id", Type: resource.String, Description: "VCS commit ID"},
 			{StructField: "OverrideBranch", Flag: "override-branch", Type: resource.String, Description: "Override branch"},
-			{StructField: "OverrideSource", Flag: "override-source", Type: resource.String, Description: "Override source repository"},
+			{StructField: "OverrideSource", Flag: "override-source", Type: resource.String, Hidden: true, Description: "Override source repository (executor only)"},
 			{StructField: "PlanChanges", Flag: "plan-changes", Type: resource.Bool, Description: "Whether plan contains changes"},
 			{StructField: "Refresh", Flag: "refresh", Type: resource.Bool, Description: "Whether to refresh state"},
 			{StructField: "RefreshOnly", Flag: "refresh-only", Type: resource.Bool, Description: "Refresh state only"},
@@ -66,5 +66,7 @@ func init() {
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.Jobs.Delete(ctx, pIDs[0], id)
 		},
+		// Only executor or super-service tokens may call these; the server answers 403 otherwise.
+		HiddenVerbs: []string{"delete"},
 	})
 }

@@ -57,5 +57,7 @@ func init() {
 		Delete: func(ctx context.Context, c *terrakube.Client, pIDs []string, id string) error {
 			return c.History.Delete(ctx, pIDs[0], pIDs[1], id)
 		},
+		// Only executor or super-service tokens may call these; the server answers 403 otherwise.
+		HiddenVerbs: []string{"create", "update", "delete"},
 	})
 }
