@@ -67,7 +67,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Pushes Formula/terrakube.rb to terrakube-io/homebrew-cli.
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TOKEN }}
-          CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
           GORELEASER_SNAP_CHANNEL: ${{ steps.channel.outputs.channel }}
 
@@ -83,6 +82,34 @@ jobs:
             echo "No snap package found in dist/"
             exit 1
           fi
+
+      # Kept out of GoReleaser so that push.chocolatey.org being slow or down
+      # (it answered 504 for v1.0.0-rc.1) does not fail the release and skip
+      # packslip. The step still shows as failed in the run.
+      - name: Push the Chocolatey package
+        continue-on-error: true
+        env:
+          CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+        run: |
+          set -u
+          pkg=$(find dist -maxdepth 1 -name '*.nupkg' | head -n 1)
+          if [ -z "$pkg" ]; then echo "::error::no .nupkg in dist/"; exit 1; fi
+          for attempt in 1 2 3; do
+            if out=$(choco push "$pkg" --source https://push.chocolatey.org/ --api-key "$CHOCOLATEY_API_KEY" 2>&1); then
+              echo "$out"
+              exit 0
+            fi
+            echo "$out"
+            # A retry after a timeout can find the package already uploaded.
+            if echo "$out" | grep -q '409'; then
+              echo "The package is already on Chocolatey."
+              exit 0
+            fi
+            echo "Attempt $attempt failed."
+            [ "$attempt" -lt 3 ] && sleep 60
+          done
+          echo "::error::Pushing $pkg to Chocolatey failed; push it manually with choco push."
+          exit 1
 
   packslip:
     name: packslip

@@ -112,7 +112,7 @@ brews:
 # ---------------------------------------------------------------------------
 # Chocolatey — `choco install terrakube`. The package downloads the release's
 # Windows zips. The release workflow puts a Docker-based `choco` on PATH
-# (.github/scripts/choco).
+# (.github/scripts/choco) and pushes the package after GoReleaser.
 # ---------------------------------------------------------------------------
 chocolateys:
   - name: terrakube
@@ -133,8 +133,9 @@ chocolateys:
       organizations, workspaces, variables, modules, runs and jobs, policies,
       state and tokens. Log in with `terrakube login`.
     release_notes: "https://github.com/terrakube-io/terrakube-cli/releases/tag/{{ .Tag }}"
-    api_key: "{{ .Env.CHOCOLATEY_API_KEY }}"
-    source_repo: https://push.chocolatey.org/
+    # The release workflow pushes the package itself, with retries, so a
+    # Chocolatey outage does not fail the rest of the release.
+    skip_publish: true
 
 # ---------------------------------------------------------------------------
 # GitHub Release — upload artifacts to the already-created release

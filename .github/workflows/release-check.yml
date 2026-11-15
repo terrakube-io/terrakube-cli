@@ -39,7 +39,6 @@ jobs:
           args: release --snapshot --clean --skip=docker,snapcraft
         env:
           HOMEBREW_TAP_GITHUB_TOKEN: unused
-          CHOCOLATEY_API_KEY: unused
           GORELEASER_SNAP_CHANNEL: latest/edge
 
       - name: Show the Homebrew formula and Chocolatey package
