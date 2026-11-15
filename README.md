@@ -256,12 +256,39 @@ export TERRAKUBE_PAT="XXXXXXXXXXXXX"
 terrakube login
 ```
 
+To log in through the browser instead of with a PAT, use `--web`:
+
+```bash
+terrakube login --web --api-url "https://terrakube-api.platform.local"
+```
+
+`login --web` reads `login.v1` from the server's `/.well-known/terraform.json`, prints the login URL and opens it in the browser (`open` on macOS, `xdg-open` on Linux, `rundll32` on Windows; on a headless machine, copy the URL instead). It runs the OAuth authorization code flow with PKCE (S256) and waits up to `--timeout` (default `5m`) for the redirect to `http://localhost:<port>/login`, on the first free port in the range the server advertises. `--api-url` falls back to `TERRAKUBE_API_URL`, then to `api_url` in the config. If no advertised port is free, the callback's `state` does not match, the login is denied or the timeout passes, it exits with code 1 and saves nothing.
+
+What it saves depends on the server:
+
+- with the Terrakube login broker (`/oauth/authorize`), a Terrakube token; you choose its lifetime on the consent page, and it is used like a PAT;
+- with Dex (`/auth`), the Dex access token, plus the `refresh_token`, the token's expiry and the token endpoint and client ID needed to renew it.
+
+The Dex access token is short-lived. Before a command uses a saved Dex token that has expired or expires within a minute, the CLI exchanges the refresh token for a new one and saves it (mode `0600`). If that fails, the command exits with code 1 and `session expired, run terrakube login --web`. A token from `TERRAKUBE_TOKEN` or `TERRAKUBE_PAT`, and a PAT saved by `terrakube login`, are never refreshed. `terrakube login` with a PAT and `terrakube logout` remove the saved refresh data.
+
 To run commands without a config file (for example in CI), set `TERRAKUBE_API_URL` and a token. The token is taken from the first of these that is set: `TERRAKUBE_TOKEN`, `TERRAKUBE_PAT`, the `token` saved in the config file. `terrakube logout` removes the stored token (a token in the environment still applies).
 
 Parent-scope flags can also come from the environment when not passed on the command line, for example `TERRAKUBE_ORGANIZATION` (or `TERRAKUBE_ORGANIZATION_ID`) for `-o` and `TERRAKUBE_WORKSPACE` (or `TERRAKUBE_WORKSPACE_ID`) for `-w`, as do `TERRAKUBE_OUTPUT` and `TERRAKUBE_HIDE_NULLS`. Other flags such as `--name` or `--id` must be passed explicitly.
 
 > [!NOTE]
 > An exported `TERRAKUBE_WORKSPACE` / `TERRAKUBE_WORKSPACE_ID` also applies where the workspace is optional. For example, `notification-configuration list` and `create` then work on that workspace instead of the organization. Unset it to work at organization level.
+
+Manage your personal access tokens and check who you are logged in as:
+
+```bash
+terrakube pat create --days 30 --description "ci pipeline"   # prints the token once, with its id
+terrakube pat list
+terrakube pat delete --id <PAT_ID>
+terrakube whoami                                  # your teams (identity provider groups)
+terrakube whoami --org my-org --workspace prod    # plus your effective permissions there
+```
+
+`--days 0` asks for a token that does not expire; the server refuses it when it caps token lifetimes. The server lets only a user logged in through the browser (`terrakube login --web`) create tokens; with a PAT login `pat create` gets 403.
 
 ### 2. Create an Organization
 
