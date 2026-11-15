@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 	terrakube "github.com/terrakube-io/terrakube-go"
@@ -14,7 +15,13 @@ import (
 )
 
 const loginLong = `
-Authenticate to a remote Terrakube server using a Personal Access Token (PAT).
+Authenticate to a remote Terrakube server using a Personal Access Token (PAT),
+or with --web through the browser.
+
+--web reads login.v1 from the server's /.well-known/terraform.json, opens the
+browser (the URL is also printed) and waits for the login on a local port from
+the advertised range. It saves the token it gets: a Terrakube token from
+the Terrakube login broker, or a Dex token.
 
 The API URL should be provided in the following format:
   http://your-server:port
@@ -30,6 +37,9 @@ Login to a local Terrakube server using PAT
 Login to a remote Terrakube server
   %[1]v login --api-url https://terrakube.example.com --pat your-pat-token
 
+Login through the browser (--api-url can be omitted when the config has api_url)
+  %[1]v login --web --api-url https://terrakube.example.com
+
 Login using environment variables
   TERRAKUBE_API_URL=https://terrakube.example.com TERRAKUBE_PAT=your-pat-token %[1]v login
 `
@@ -40,6 +50,10 @@ var loginCmd = &cobra.Command{
 	Long:         loginLong,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, _ []string) error {
+		if web, _ := cmd.Flags().GetBool("web"); web {
+			timeout, _ := cmd.Flags().GetDuration("timeout")
+			return loginWeb(cmd.ErrOrStderr(), timeout)
+		}
 		return login()
 	},
 	Example: fmt.Sprintf(loginExamples, rootCmd.Use),
@@ -54,6 +68,9 @@ func init() {
 	rootCmd.AddCommand(loginCmd)
 	loginCmd.Flags().StringVarP(&apiURL, "api-url", "a", "", "API URL (or TERRAKUBE_API_URL)")
 	loginCmd.Flags().StringVarP(&patToken, "pat", "t", "", "Personal Access Token (or TERRAKUBE_PAT)")
+	loginCmd.Flags().Bool("web", false, "Log in through the browser instead of with a PAT")
+	loginCmd.Flags().Duration("timeout", 5*time.Minute, "With --web: how long to wait for the browser login")
+	loginCmd.MarkFlagsMutuallyExclusive("web", "pat")
 }
 
 func login() error {
@@ -72,8 +89,7 @@ func login() error {
 		return errors.New("--pat or TERRAKUBE_PAT is required")
 	}
 
-	// Strip /api/v1 (with or without trailing slash) from the URL if present
-	url = strings.TrimRight(strings.TrimSuffix(strings.TrimRight(url, "/"), "/api/v1"), "/")
+	url = trimAPIURL(url)
 
 	client, err := terrakube.NewClient(
 		terrakube.WithEndpoint(url),
@@ -98,6 +114,11 @@ func login() error {
 
 	fmt.Println("Successfully logged in to Terrakube server")
 	return nil
+}
+
+// trimAPIURL strips a trailing /api/v1 (with or without a trailing slash).
+func trimAPIURL(url string) string {
+	return strings.TrimRight(strings.TrimSuffix(strings.TrimRight(url, "/"), "/api/v1"), "/")
 }
 
 // updateConfig applies fn to the config file's settings and atomically

@@ -9,7 +9,7 @@ Terrakube CLI (`terrakube`) is a command-line tool for managing Terrakube Server
 - **CLI framework**: [cobra](https://github.com/spf13/cobra) + [viper](https://github.com/spf13/viper)
 - **API client**: [github.com/terrakube-io/terrakube-go](https://github.com/terrakube-io/terrakube-go) (JSON:API via [google/jsonapi](https://github.com/google/jsonapi))
 - **Config**: `~/.terrakube-cli.yaml` or `--config` flag
-- **Auth**: `terrakube login` stores `api_url` and `token`; commands read them from the config or `TERRAKUBE_API_URL` / `TERRAKUBE_TOKEN`
+- **Auth**: `terrakube login` (PAT) or `terrakube login --web` (browser, OAuth with PKCE) stores `api_url` and `token`; commands read them from the config or `TERRAKUBE_API_URL` / `TERRAKUBE_TOKEN`
 - **Output formats**: json (default), yaml, table, tsv, none
 
 ## Architecture
@@ -19,6 +19,7 @@ main.go              # Entry point, calls cmd.Execute()
 cmd/
   root.go            # Root command, config init, env handling, --output validation, newClient()
   login.go logout.go # Write/remove credentials in the config file
+  login_web.go       # login --web: login.v1 discovery, PKCE, loopback callback, token request
   resolvers.go       # Name-to-ID resolvers for parent flags (resolveByName + quoted RSQL nameFilter)
   <resource>.go      # One file per resource, each calls resource.Register
   team_token.go      # Hand-written commands (no generic CRUD shape)
@@ -53,6 +54,7 @@ Hand-written commands (`login`, `logout`, `team-token`, `operations`, `job wait|
 
 - Config file: `~/.terrakube-cli.yaml` or `--config`. `login` writes only `api_url` and `token` (mode 0600, other keys kept); `logout` removes `token`.
 - `login` takes `--api-url`/`-a` and `--pat`/`-t`, falling back to `TERRAKUBE_API_URL` / `TERRAKUBE_PAT`.
+- `login --web` (excludes `--pat`) reads `login.v1` from `<api_url>/.well-known/terraform.json` and runs the authorization code flow with PKCE (S256) and a `state` check. The callback is `http://localhost:<port>/login` on the first free port of the advertised `ports` range (bound on 127.0.0.1); `--timeout` (default 5m) bounds the wait. The URL is always printed; `openBrowser` (a variable, `open`/`xdg-open`/`rundll32`) is replaced in tests, which fake the server with httptest. `--api-url` falls back to `TERRAKUBE_API_URL`, then the config's `api_url`. Busy ports, a wrong `state`, `error=` in the callback, a failed token request or the timeout end with exit 1 and nothing saved. login.v1 comes in two variants: the Terrakube broker (`<api>/oauth/authorize`, client `terraform-cli`, ports 10000-10010) returns a Terrakube token that lives as long as the user chose on the consent page (no refresh token); Dex (`<dex>/auth?scope=...offline_access...`, ports 10000-10001) returns a short-lived access token.
 - Other commands read `api_url` from `TERRAKUBE_API_URL` or the config. The token comes from `TERRAKUBE_TOKEN`, then `TERRAKUBE_PAT`, then the config `token`. If either value is missing the command fails with "not logged in".
 - `applyEnv` (`cmd/root.go`) fills a flag from `TERRAKUBE_<FLAG>` (uppercase, `-` to `_`) only when the flag was not set explicitly, and only for:
   - parent-scope flags, via `resource.EnvAnnotation` (e.g. `TERRAKUBE_ORGANIZATION` or `TERRAKUBE_ORGANIZATION_ID`, `TERRAKUBE_WORKSPACE` or `TERRAKUBE_WORKSPACE_ID`). This includes `Optional` parents: an exported `TERRAKUBE_WORKSPACE` scopes `notification-configuration` to that workspace;
