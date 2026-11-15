@@ -10,13 +10,14 @@ For full CLI reference documentation, visit our official guide at [https://docs.
   - [Homebrew (macOS / Linux)](#homebrew-macos--linux)
   - [Chocolatey (Windows)](#chocolatey-windows)
   - [packslip (verified install)](#packslip-verified-install)
+  - [mise](#mise)
   - [Snap Package (Ubuntu / Linux)](#snap-package-ubuntu--linux)
-  - [Linux & macOS](#linux--macos)
-  - [Windows](#windows)
+  - [Linux & macOS](#linux--macos-bash--zsh)
+  - [Windows](#windows-powershell)
   - [Docker](#docker)
 - [Adding Terrakube CLI to PATH](#adding-terrakube-cli-to-path)
-  - [Linux & macOS](#linux--macos-1)
-  - [Windows](#windows-1)
+  - [Linux & macOS](#linux--macos)
+  - [Windows](#windows)
 - [Building & Testing from Source](#building--testing-from-source)
   - [Compiling the Binary](#compiling-the-binary)
   - [Building Snap Package Locally](#building-snap-package-locally)
@@ -41,7 +42,20 @@ For full CLI reference documentation, visit our official guide at [https://docs.
 
 ## Download & Installation
 
-Pre-compiled archives are published on [GitHub Releases](https://github.com/terrakube-io/terrakube-cli/releases/latest) for Linux and macOS (amd64, arm64) and Windows (amd64, 386). The CLI is also available from Homebrew, Chocolatey, the Snap Store, through packslip and as a Docker image.
+Pre-compiled archives are published on [GitHub Releases](https://github.com/terrakube-io/terrakube-cli/releases/latest) for Linux and macOS (amd64, arm64) and Windows (amd64, 386). The CLI is also available from Homebrew, Chocolatey, the Snap Store, packslip, mise and as a Docker image.
+
+| Method | Platforms | Command |
+|---|---|---|
+| [Homebrew](#homebrew-macos--linux) | macOS, Linux | `brew install terrakube-io/cli/terrakube` |
+| [Chocolatey](#chocolatey-windows) | Windows | `choco install terrakube` |
+| [packslip](#packslip-verified-install) | macOS, Linux | `packslip install github.com/terrakube-io/terrakube-cli` |
+| [mise](#mise) | macOS, Linux, Windows | `mise use -g github:terrakube-io/terrakube-cli` |
+| [Snap Store](#snap-package-ubuntu--linux) | Linux | `sudo snap install terrakube-cli` |
+| [Release archive](#linux--macos-bash--zsh) | macOS, Linux, Windows | download from [GitHub Releases](https://github.com/terrakube-io/terrakube-cli/releases/latest) |
+| [Docker](#docker) | any Docker host | `docker run --rm azbuilder/terrakube-cli --help` |
+| [From source](#compiling-the-binary) | any Go platform | `go build -o terrakube main.go` |
+
+Each method installs the `terrakube` command (the snap installs `terrakube-cli`, see below). Check it with `terrakube --version`.
 
 ### Homebrew (macOS / Linux)
 
@@ -49,6 +63,8 @@ Pre-compiled archives are published on [GitHub Releases](https://github.com/terr
 brew install terrakube-io/cli/terrakube
 terrakube --version
 ```
+
+This one command adds the `terrakube-io/cli` tap and installs the formula; `brew upgrade terrakube` updates it.
 
 ### Chocolatey (Windows)
 
@@ -66,6 +82,20 @@ Every release carries a signed [packslip](https://packslip.dev) bundle (`packsli
 ```bash
 packslip install github.com/terrakube-io/terrakube-cli
 ```
+
+Get packslip itself with `mise use -g packslip` or `curl -fsSL https://packslip.sh | sh`. On Windows, use WSL.
+
+### mise
+
+[mise](https://mise.jdx.dev) installs the CLI straight from the GitHub release archives:
+
+```bash
+mise use -g github:terrakube-io/terrakube-cli         # latest release
+mise use -g github:terrakube-io/terrakube-cli@x.y.z   # a specific version
+terrakube --version
+```
+
+In a project, `mise use github:terrakube-io/terrakube-cli@x.y.z` pins the version in `mise.toml`, which also suits CI.
 
 ### Snap Package (Ubuntu / Linux)
 
