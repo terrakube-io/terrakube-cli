@@ -271,6 +271,30 @@ What it saves depends on the server:
 
 The Dex access token is short-lived. Before a command uses a saved Dex token that has expired or expires within a minute, the CLI exchanges the refresh token for a new one and saves it (mode `0600`). If that fails, the command exits with code 1 and `session expired, run terrakube login --web`. A token from `TERRAKUBE_TOKEN` or `TERRAKUBE_PAT`, and a PAT saved by `terrakube login`, are never refreshed. `terrakube login` with a PAT and `terrakube logout` remove the saved refresh data.
 
+#### Workload identity in CI/CD
+
+Inside GitHub Actions, GitLab CI, Bitbucket Pipelines or Azure Pipelines, `login --oidc` detects the platform, obtains its OIDC token and logs in with it. Terrakube accepts the token when a `federated` credential matches its issuer, audience and claims. `--terraform-credentials` also writes the token to `~/.terraform.d/credentials.tfrc.json` (`%APPDATA%\terraform.d` on Windows) for `terraform init` / `tofu init`; `--terraform-host` picks other hosts than the API URL's.
+
+```yaml
+# GitHub Actions
+permissions:
+  id-token: write
+steps:
+  - run: terrakube login -a https://terrakube-api.example.com --oidc --oidc-audience terrakube --terraform-credentials
+
+# GitLab CI
+plan:
+  id_tokens:
+    TERRAKUBE_OIDC_TOKEN:
+      aud: terrakube
+  script:
+    - terrakube login -a https://terrakube-api.example.com --oidc --terraform-credentials
+```
+
+Bitbucket needs `oidc: true` on the step. Azure Pipelines needs a workload identity service connection, with `SYSTEM_ACCESSTOKEN: $(System.AccessToken)` and `AZURESUBSCRIPTION_SERVICE_CONNECTION_ID` mapped into the step `env`. Elsewhere, pass `--oidc-token-file` or set `TERRAKUBE_OIDC_TOKEN`. OIDC tokens are short-lived and never refreshed, so log in right before use.
+
+`--oidc` requires an https API URL, and GitHub Actions requires `--oidc-audience` because the default audience is trusted by other services too. Azure Pipelines tokens always carry the Azure AD audience, so give the service connection no Azure role assignments. The token is stored in HOME, so clean it up on persistent self-hosted runners.
+
 To run commands without a config file (for example in CI), set `TERRAKUBE_API_URL` and a token. The token is taken from the first of these that is set: `TERRAKUBE_TOKEN`, `TERRAKUBE_PAT`, the `token` saved in the config file. `terrakube logout` removes the stored token (a token in the environment still applies).
 
 Parent-scope flags can also come from the environment when not passed on the command line, for example `TERRAKUBE_ORGANIZATION` (or `TERRAKUBE_ORGANIZATION_ID`) for `-o` and `TERRAKUBE_WORKSPACE` (or `TERRAKUBE_WORKSPACE_ID`) for `-w`, as do `TERRAKUBE_OUTPUT` and `TERRAKUBE_HIDE_NULLS`. Other flags such as `--name` or `--id` must be passed explicitly.

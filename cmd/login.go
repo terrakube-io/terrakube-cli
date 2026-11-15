@@ -3,7 +3,10 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
+	"net"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,7 +19,8 @@ import (
 
 const loginLong = `
 Authenticate to a remote Terrakube server using a Personal Access Token (PAT),
-or with --web through the browser.
+with --web through the browser, or with --oidc inside CI/CD using the
+platform's workload identity (OIDC) token.
 
 --web reads login.v1 from the server's /.well-known/terraform.json, opens the
 browser (the URL is also printed) and waits for the login on a local port from
@@ -29,6 +33,28 @@ The API URL should be provided in the following format:
   https://your-server:port
 
 Note: Do not include /api/v1 in the URL as it will be added automatically.
+
+--oidc sends the CI platform's OIDC token to Terrakube as-is. The server accepts
+it when a federated credential matches its issuer, audience and claims (see
+"terrakube federated" and "terrakube federated-claim"). The token is taken from
+the first available source:
+  1. --oidc-token-file (e.g. a Kubernetes projected service account token)
+  2. TERRAKUBE_OIDC_TOKEN environment variable
+  3. The CI platform the CLI detects it is running on:
+     GitHub Actions       requires "permissions: id-token: write" and --oidc-audience
+     GitLab CI            id_tokens: { TERRAKUBE_OIDC_TOKEN: { aud: <audience> } }
+     Bitbucket Pipelines  "oidc: true" on the step (BITBUCKET_STEP_OIDC_TOKEN)
+     Azure Pipelines      workload identity service connection; map SYSTEM_ACCESSTOKEN
+                          and AZURESUBSCRIPTION_SERVICE_CONNECTION_ID into the step env
+
+OIDC tokens are short-lived: run login right before the commands that need it.
+--oidc requires an https API URL. The token is stored on disk, so clean up HOME
+on persistent self-hosted runners. On Azure Pipelines the token's audience is
+fixed to Azure AD: use a service connection with no Azure role assignments.
+
+--terraform-credentials also stores the token in the Terraform/OpenTofu CLI
+credentials file (credentials.tfrc.json), so "terraform init" can use Terrakube
+as a remote backend or private registry without extra setup.
 `
 
 var loginExamples = `
@@ -43,6 +69,16 @@ Login through the browser (--api-url can be omitted when the config has api_url)
 
 Login using environment variables
   TERRAKUBE_API_URL=https://terrakube.example.com TERRAKUBE_PAT=your-pat-token %[1]v login
+
+Login from GitHub Actions and write Terraform credentials
+  %[1]v login -a https://terrakube.example.com --oidc --oidc-audience terrakube --terraform-credentials
+
+Login from GitLab CI, Bitbucket Pipelines or Azure Pipelines (the token source is detected)
+  %[1]v login -a https://terrakube.example.com --oidc --terraform-credentials
+
+Also write Terraform credentials for a separate registry host
+  %[1]v login -a https://terrakube-api.example.com --oidc --terraform-credentials \
+    --terraform-host terrakube-api.example.com --terraform-host terrakube-reg.example.com
 `
 
 var loginCmd = &cobra.Command{
@@ -55,14 +91,22 @@ var loginCmd = &cobra.Command{
 			timeout, _ := cmd.Flags().GetDuration("timeout")
 			return loginWeb(cmd.ErrOrStderr(), timeout)
 		}
-		return login()
+		if oidcLogin {
+			return loginOIDC(cmd.OutOrStdout())
+		}
+		return login(cmd.OutOrStdout())
 	},
 	Example: fmt.Sprintf(loginExamples, rootCmd.Use),
 }
 
 var (
-	apiURL   string
-	patToken string
+	apiURL               string
+	patToken             string
+	oidcLogin            bool
+	oidcAudience         string
+	oidcTokenFile        string
+	terraformCredentials bool
+	terraformHosts       []string
 )
 
 func init() {
@@ -71,14 +115,18 @@ func init() {
 	loginCmd.Flags().StringVarP(&patToken, "pat", "t", "", "Personal Access Token (or TERRAKUBE_PAT)")
 	loginCmd.Flags().Bool("web", false, "Log in through the browser instead of with a PAT")
 	loginCmd.Flags().Duration("timeout", 5*time.Minute, "With --web: how long to wait for the browser login")
-	loginCmd.MarkFlagsMutuallyExclusive("web", "pat")
+	loginCmd.Flags().BoolVar(&oidcLogin, "oidc", false, "Log in with the CI/CD workload identity (OIDC) token instead of a PAT")
+	loginCmd.Flags().StringVar(&oidcAudience, "oidc-audience", "", "With --oidc: audience to request, required on GitHub Actions (other platforms set it in the pipeline)")
+	loginCmd.Flags().StringVar(&oidcTokenFile, "oidc-token-file", "", "With --oidc: file containing the OIDC token")
+	loginCmd.Flags().BoolVar(&terraformCredentials, "terraform-credentials", false, "Also write the token to the Terraform CLI credentials file")
+	loginCmd.Flags().StringSliceVar(&terraformHosts, "terraform-host", nil, "With --terraform-credentials: host(s) to write credentials for (default: the API URL host)")
+	loginCmd.MarkFlagsMutuallyExclusive("web", "pat", "oidc")
+	// A --web token may be renewed later; the copy in credentials.tfrc.json would not be.
+	loginCmd.MarkFlagsMutuallyExclusive("web", "terraform-credentials")
 }
 
-func login() error {
-	url := apiURL
-	if url == "" {
-		url = os.Getenv("TERRAKUBE_API_URL")
-	}
+func login(out io.Writer) error {
+	url := loginAPIURL()
 	pat := patToken
 	if pat == "" {
 		pat = os.Getenv("TERRAKUBE_PAT")
@@ -89,12 +137,60 @@ func login() error {
 	if pat == "" {
 		return errors.New("--pat or TERRAKUBE_PAT is required")
 	}
+	return saveLogin(out, url, pat)
+}
 
-	url = trimAPIURL(url)
+// loginOIDC logs in with the CI/CD workload identity token.
+func loginOIDC(out io.Writer) error {
+	url := loginAPIURL()
+	if url == "" {
+		return errors.New("--api-url or TERRAKUBE_API_URL is required")
+	}
+	// CI tokens may also be accepted by other relying parties (e.g. Azure AD), so never send them in clear text.
+	if u, err := neturl.Parse(url); err != nil || (u.Scheme != "https" && !isLoopback(u.Hostname())) {
+		return fmt.Errorf("--oidc requires an https API URL, got %q", url)
+	}
+	token, err := resolveOIDCToken(oidcTokenFile, oidcAudience)
+	if err != nil {
+		return err
+	}
+	return saveLogin(out, url, token)
+}
+
+func loginAPIURL() string {
+	if apiURL != "" {
+		return trimAPIURL(apiURL)
+	}
+	return trimAPIURL(os.Getenv("TERRAKUBE_API_URL"))
+}
+
+func isLoopback(host string) bool {
+	ip := net.ParseIP(host)
+	return host == "localhost" || (ip != nil && ip.IsLoopback())
+}
+
+// saveLogin checks token against the server and saves it, and with
+// --terraform-credentials also writes it to credentials.tfrc.json.
+func saveLogin(out io.Writer, url, token string) error {
+	// Check the hosts first, so a typo fails before anything is saved.
+	var tfHosts []string
+	if terraformCredentials {
+		hosts := terraformHosts
+		if len(hosts) == 0 {
+			hosts = []string{url}
+		}
+		for _, h := range hosts {
+			key, err := terraformHost(h)
+			if err != nil {
+				return err
+			}
+			tfHosts = append(tfHosts, key)
+		}
+	}
 
 	client, err := terrakube.NewClient(
 		terrakube.WithEndpoint(url),
-		terrakube.WithToken(pat),
+		terrakube.WithToken(token),
 	)
 	if err != nil {
 		return fmt.Errorf("creating client: %w", err)
@@ -107,16 +203,24 @@ func login() error {
 
 	if err := updateConfig(func(settings map[string]any) {
 		settings["api_url"] = url
-		settings["token"] = pat
+		settings["token"] = token
 		delete(settings, "pat") // written by older versions of login
 		for _, k := range refreshKeys {
-			delete(settings, k) // a PAT is never refreshed
+			delete(settings, k) // a PAT or CI token is never refreshed
 		}
 	}); err != nil {
 		return fmt.Errorf("saving configuration: %w", err)
 	}
 
-	fmt.Println("Successfully logged in to Terrakube server")
+	if terraformCredentials {
+		path, err := writeTerraformCredentials(tfHosts, token)
+		if err != nil {
+			return err
+		}
+		_, _ = fmt.Fprintf(out, "Terraform credentials for %s written to %s\n", strings.Join(tfHosts, ", "), path)
+	}
+
+	_, _ = fmt.Fprintln(out, "Successfully logged in to Terrakube server")
 	return nil
 }
 
