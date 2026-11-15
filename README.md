@@ -278,6 +278,18 @@ Parent-scope flags can also come from the environment when not passed on the com
 > [!NOTE]
 > An exported `TERRAKUBE_WORKSPACE` / `TERRAKUBE_WORKSPACE_ID` also applies where the workspace is optional. For example, `notification-configuration list` and `create` then work on that workspace instead of the organization. Unset it to work at organization level.
 
+Manage your personal access tokens and check who you are logged in as:
+
+```bash
+terrakube pat create --days 30 --description "ci pipeline"   # prints the token once, with its id
+terrakube pat list
+terrakube pat delete --id <PAT_ID>
+terrakube whoami                                  # your teams (identity provider groups)
+terrakube whoami --org my-org --workspace prod    # plus your effective permissions there
+```
+
+`--days 0` asks for a token that does not expire; the server refuses it when it caps token lifetimes. The server lets only a user logged in through the browser (`terrakube login --web`) create tokens; with a PAT login `pat create` gets 403.
+
 ### 2. Create an Organization
 
 Create a new organization configured for remote execution:
